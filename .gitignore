@@ -1,0 +1,10 @@
+build
+compile_commands.json
+.vscode
+.DS_STORE
+*.dSYM
+*.swp
+*.tmp
+*.csv
+.clinerules
+cline_tasks

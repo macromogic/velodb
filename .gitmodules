@@ -1,0 +1,6 @@
+[submodule "thirdparty/sql-parser"]
+	path = thirdparty/sql-parser
+	url = https://github.com/hyrise/sql-parser.git
+[submodule "thirdparty/argparse"]
+	path = thirdparty/argparse
+	url = https://github.com/p-ranav/argparse.git
