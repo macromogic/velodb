@@ -1,6 +1,7 @@
 #include "velodb.hpp"
 #include "planner/plan_visualizer.hpp"
 #include "catalog/mock_catalog_builder.hpp"
+#include "common/traced_exception.hpp"
 #include <argparse/argparse.hpp>
 #include <iostream>
 #include <memory>
@@ -92,6 +93,13 @@ int main(int argc, char* argv[])
                     std::cout << PlanVisualizer::visualizeDetailed(plan) << std::endl;
                 }
                     
+            } catch (const TracedException& e) {
+                std::cerr << "VeloDB Error: " << e.message() << std::endl;
+                if (program["--verbose"] == true) {
+                    std::cerr << "\nFull error with stack trace:" << std::endl;
+                    std::cerr << e.what() << std::endl;
+                }
+                return -1;
             } catch (const std::exception& e) {
                 std::cerr << "Error planning query: " << e.what() << std::endl;
                 return -1;

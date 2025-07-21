@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/traced_exception.hpp"
 #include <memory>
 #include <optional>
 #include <string>
@@ -42,35 +43,35 @@ public:
     // Access methods
     [[nodiscard]] T& value() & {
         if (!has_value()) {
-            throw std::runtime_error("Attempted to access value of Result containing error");
+            VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::get<T>(value_);
     }
     
     [[nodiscard]] const T& value() const& {
         if (!has_value()) {
-            throw std::runtime_error("Attempted to access value of Result containing error");
+            VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::get<T>(value_);
     }
     
     [[nodiscard]] T&& value() && {
         if (!has_value()) {
-            throw std::runtime_error("Attempted to access value of Result containing error");
+            VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::move(std::get<T>(value_));
     }
     
     [[nodiscard]] const E& error() const& {
         if (!has_error()) {
-            throw std::runtime_error("Attempted to access error of Result containing value");
+            VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
         return std::get<E>(value_);
     }
     
     [[nodiscard]] E&& error() && {
         if (!has_error()) {
-            throw std::runtime_error("Attempted to access error of Result containing value");
+            VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
         return std::move(std::get<E>(value_));
     }

@@ -1,4 +1,5 @@
 #include "catalog/table.hpp"
+#include "common/traced_exception.hpp"
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -20,14 +21,14 @@ Tuple::Tuple(const Schema& schema, std::vector<Value> values)
     , values_(std::move(values))
 {
     if (values_.size() != schema.getColumnCount()) {
-        throw std::invalid_argument("Value count mismatch with schema");
+        VELODB_THROW(CatalogError, "Value count mismatch with schema");
     }
 }
 
 const Value& Tuple::getValue(size_t column_index) const
 {
     if (column_index >= values_.size()) {
-        throw std::out_of_range("Column index out of range");
+        VELODB_THROW(CatalogError, "Column index out of range");
     }
     return values_[column_index];
 }
@@ -41,7 +42,7 @@ const Value& Tuple::getValue(const std::string& column_name) const
 void Tuple::setValue(size_t column_index, const Value& value)
 {
     if (column_index >= values_.size()) {
-        throw std::out_of_range("Column index out of range");
+        VELODB_THROW(CatalogError, "Column index out of range");
     }
     values_[column_index] = value;
 }
@@ -49,7 +50,7 @@ void Tuple::setValue(size_t column_index, const Value& value)
 void Tuple::setValue(size_t column_index, Value&& value)
 {
     if (column_index >= values_.size()) {
-        throw std::out_of_range("Column index out of range");
+        VELODB_THROW(CatalogError, "Column index out of range");
     }
     values_[column_index] = std::move(value);
 }
@@ -141,7 +142,7 @@ void Table::insertRow(const std::vector<Value>& values)
 void Table::insertRow(std::vector<Value>&& values)
 {
     if (values.size() != table_info_->getColumnCount()) {
-        throw std::invalid_argument("Value count mismatch with schema");
+        VELODB_THROW(CatalogError, "Value count mismatch with schema");
     }
     
     const RowId new_row_id = row_count_;
@@ -169,7 +170,7 @@ void Table::insertBatchRows(const std::vector<std::vector<Value>>& rows)
     for (size_t row_idx = 0; row_idx < rows.size(); ++row_idx) {
         const std::vector<Value>& values = rows[row_idx];
         if (values.size() != table_info_->getColumnCount()) {
-            throw std::invalid_argument("Value count mismatch with schema");
+            VELODB_THROW(CatalogError, "Value count mismatch with schema");
         }
         
         const RowId row_id = old_row_count + row_idx;
@@ -184,7 +185,7 @@ void Table::insertBatchRows(const std::vector<std::vector<Value>>& rows)
 void Table::insertRowInternal(const std::vector<Value>& values)
 {
     if (values.size() != table_info_->getColumnCount()) {
-        throw std::invalid_argument("Value count mismatch with schema");
+        VELODB_THROW(CatalogError, "Value count mismatch with schema");
     }
     
     const RowId new_row_id = row_count_;
@@ -202,7 +203,7 @@ void Table::insertRowInternal(const std::vector<Value>& values)
 void Table::insertTuple(const Tuple& tuple)
 {
     if (tuple.getColumnCount() != table_info_->getColumnCount()) {
-        throw std::invalid_argument("Tuple column count mismatch");
+        VELODB_THROW(CatalogError, "Tuple column count mismatch");
     }
     
     // Convert tuple to vector of values and use column-based insertion
@@ -218,7 +219,7 @@ void Table::insertTuple(const Tuple& tuple)
 void Table::insertTuple(Tuple&& tuple)
 {
     if (tuple.getColumnCount() != table_info_->getColumnCount()) {
-        throw std::invalid_argument("Tuple column count mismatch");
+        VELODB_THROW(CatalogError, "Tuple column count mismatch");
     }
     
     // Convert tuple to vector of values and use column-based insertion
@@ -234,7 +235,7 @@ void Table::insertTuple(Tuple&& tuple)
 Tuple Table::getTuple(RowId row_id) const
 {
     if (row_id >= row_count_) {
-        throw std::out_of_range("Row ID out of range");
+        VELODB_THROW(CatalogError, "Row ID out of range");
     }
     
     // Reconstruct tuple from column-based storage
@@ -251,10 +252,10 @@ Tuple Table::getTuple(RowId row_id) const
 Value Table::getValue(RowId row_id, size_t column_index) const
 {
     if (row_id >= row_count_) {
-        throw std::out_of_range("Row ID out of range");
+        VELODB_THROW(CatalogError, "Row ID out of range");
     }
     if (column_index >= columns_.size()) {
-        throw std::out_of_range("Column index out of range");
+        VELODB_THROW(CatalogError, "Column index out of range");
     }
     
     return columns_[column_index][row_id];
@@ -263,7 +264,7 @@ Value Table::getValue(RowId row_id, size_t column_index) const
 std::vector<Value> Table::getValues(RowId row_id, const std::vector<size_t>& column_indices) const
 {
     if (row_id >= row_count_) {
-        throw std::out_of_range("Row ID out of range");
+        VELODB_THROW(CatalogError, "Row ID out of range");
     }
     
     std::vector<Value> values;
@@ -271,7 +272,7 @@ std::vector<Value> Table::getValues(RowId row_id, const std::vector<size_t>& col
     
     for (size_t const col_idx : column_indices) {
         if (col_idx >= columns_.size()) {
-            throw std::out_of_range("Column index out of range");
+            VELODB_THROW(CatalogError, "Column index out of range");
         }
         values.push_back(columns_[col_idx][row_id]);
     }
@@ -281,7 +282,7 @@ std::vector<Value> Table::getValues(RowId row_id, const std::vector<size_t>& col
 const ValueVector& Table::getColumn(size_t column_index) const
 {
     if (column_index >= columns_.size()) {
-        throw std::out_of_range("Column index out of range");
+        VELODB_THROW(CatalogError, "Column index out of range");
     }
     return columns_[column_index];
 }
@@ -289,7 +290,7 @@ const ValueVector& Table::getColumn(size_t column_index) const
 ValueVector& Table::getColumn(size_t column_index)
 {
     if (column_index >= columns_.size()) {
-        throw std::out_of_range("Column index out of range");
+        VELODB_THROW(CatalogError, "Column index out of range");
     }
     return columns_[column_index];
 }
@@ -308,7 +309,7 @@ void Table::insertBatch(const std::vector<Tuple>& tuples)
     for (size_t tuple_idx = 0; tuple_idx < tuples.size(); ++tuple_idx) {
         const Tuple& tuple = tuples[tuple_idx];
         if (tuple.getColumnCount() != table_info_->getColumnCount()) {
-            throw std::invalid_argument("Tuple column count mismatch");
+            VELODB_THROW(CatalogError, "Tuple column count mismatch");
         }
         
         const RowId row_id = old_row_count + tuple_idx;
@@ -323,7 +324,7 @@ void Table::insertBatch(const std::vector<Tuple>& tuples)
 std::vector<Value> Table::getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const
 {
     if (column_index >= columns_.size()) {
-        throw std::out_of_range("Column index out of range");
+        VELODB_THROW(CatalogError, "Column index out of range");
     }
     
     std::vector<Value> values;
@@ -331,7 +332,7 @@ std::vector<Value> Table::getColumnValues(size_t column_index, const std::vector
     
     for (RowId const row_id : row_ids) {
         if (row_id >= row_count_) {
-            throw std::out_of_range("Row ID out of range");
+            VELODB_THROW(CatalogError, "Row ID out of range");
         }
         values.push_back(columns_[column_index][row_id]);
     }
@@ -346,7 +347,7 @@ std::vector<ValueVector> Table::getColumns(const std::vector<size_t>& column_ind
     
     for (size_t const col_idx : column_indices) {
         if (col_idx >= columns_.size()) {
-            throw std::out_of_range("Column index out of range");
+            VELODB_THROW(CatalogError, "Column index out of range");
         }
         result.push_back(columns_[col_idx]);
     }
@@ -393,7 +394,7 @@ std::unique_ptr<TableIterator> View::getIterator() const
 const Tuple& View::getTuple(size_t index) const
 {
     if (index >= tuples_.size()) {
-        throw std::out_of_range("Index out of range");
+        VELODB_THROW(CatalogError, "Index out of range");
     }
     return tuples_[index];
 }
@@ -430,7 +431,7 @@ bool TableIterator::hasNext() const
 const Tuple& TableIterator::next()
 {
     if (!hasNext()) {
-        throw std::runtime_error("No more tuples");
+        VELODB_THROW(CatalogError, "No more tuples");
     }
 
     if (is_view_) {

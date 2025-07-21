@@ -1,3 +1,4 @@
+#include "common/traced_exception.hpp"
 #include "planner/limit_plan_node.hpp"
 #include <stdexcept>
 #include <sstream>
@@ -15,7 +16,7 @@ LimitPlanNode::LimitPlanNode(std::unique_ptr<Schema> output_schema, size_t limit
 std::unique_ptr<AbstractOperator> LimitPlanNode::createOperator([[maybe_unused]] ExecutionContext* context) const
 {
     // TODO: Implement limit operator creation
-    throw std::runtime_error("LimitPlanNode::createOperator not implemented");
+    VELODB_THROW(ExecutionError, "LimitPlanNode::createOperator not implemented");
 }
 
 std::string LimitPlanNode::toString() const

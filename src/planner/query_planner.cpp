@@ -1,3 +1,4 @@
+#include "common/traced_exception.hpp"
 #include "planner/query_planner.hpp"
 #include "planner/scan_filter_plan_node.hpp"
 #include "planner/projection_plan_node.hpp"
@@ -24,7 +25,7 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planQuery(const hsql::SQLStateme
     case hsql::kStmtSelect:
         return planSelect(dynamic_cast<const hsql::SelectStatement*>(statement));
     default:
-        throw std::runtime_error("Statement type not supported in planner");
+        VELODB_THROW(ExecutionError, "Statement type not supported in planner");
     }
 }
 
@@ -32,7 +33,7 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
 {
     // Plan the FROM clause
     if (select_stmt->fromTable == nullptr) {
-        throw std::runtime_error("SELECT without FROM not supported");
+        VELODB_THROW(ExecutionError, "SELECT without FROM not supported");
     }
 
     // Plan WHERE clause and merge with scan
@@ -68,18 +69,18 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRe
         std::string const table_name = table_ref->name;
         TableBase* table = catalog_->getTable(table_name);
         if (table == nullptr) {
-            throw std::runtime_error("Table not found: " + table_name);
+            VELODB_THROW(CatalogError, "Table not found: " + table_name);
         }
         return std::make_unique<ScanFilterPlanNode>(*table, std::move(predicate));
     }
     case hsql::kTableSelect:
         // TODO: Handle subqueries
-        throw std::runtime_error("Subqueries not implemented");
+        VELODB_THROW(ExecutionError, "Subqueries not implemented");
     case hsql::kTableJoin:
         // TODO: Handle joins
-        throw std::runtime_error("Joins not implemented");
+        VELODB_THROW(ExecutionError, "Joins not implemented");
     default:
-        throw std::runtime_error("Unsupported table reference type");
+        VELODB_THROW(ExecutionError, "Unsupported table reference type");
     }
 }
 
@@ -98,9 +99,9 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::Exp
     case hsql::kExprOperator:
         return planOperator(expr);
     case hsql::kExprStar:
-        throw std::runtime_error("* expression should be handled in planSelectList, not planExpression");
+        VELODB_THROW(ExecutionError, "* expression should be handled in planSelectList, not planExpression");
     default:
-        throw std::runtime_error("Expression type not implemented");
+        VELODB_THROW(ExecutionError, "Expression type not implemented");
     }
 }
 
@@ -131,7 +132,7 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planLiteral(const hsql::Expr* 
     case hsql::kExprLiteralString:
         return std::make_unique<ConstantExpression>(Value::createString(expr->name));
     default:
-        throw std::runtime_error("Unsupported literal type");
+        VELODB_THROW(ExecutionError, "Unsupported literal type");
     }
 }
 
@@ -209,7 +210,7 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Expr*
         // BETWEEN is: expr BETWEEN low AND high
         // Transform to: (expr >= low) AND (expr <= high)
         if (expr->exprList == nullptr || expr->exprList->size() != 2) {
-            throw std::runtime_error("BETWEEN requires exactly 2 operands");
+            VELODB_THROW(ExecutionError, "BETWEEN requires exactly 2 operands");
         }
         
         auto low_expr = planExpression((*expr->exprList)[0]);
@@ -236,11 +237,11 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Expr*
     }
     case hsql::kOpIn: {
         // TODO: Implement IN operator
-        throw std::runtime_error("IN operator not yet implemented");
+        VELODB_THROW(ExecutionError, "IN operator not yet implemented");
     }
     // TODO: Implement other complex operators
     default:
-        throw std::runtime_error("Operator not implemented: " + std::to_string(static_cast<int>(expr->opType)));
+        VELODB_THROW(ExecutionError, "Operator not implemented: " + std::to_string(static_cast<int>(expr->opType)));
     }
 }
 
@@ -261,7 +262,7 @@ std::vector<std::unique_ptr<AbstractExpression>> QueryPlanner::planSelectList(co
     
     for (const auto* expr : *select_list) {
         if (expr->type == hsql::kExprStar) {
-            throw std::runtime_error("* cannot be mixed with other expressions in SELECT list");
+            VELODB_THROW(ExecutionError, "* cannot be mixed with other expressions in SELECT list");
         }
         expressions.push_back(planExpression(expr));
     }

@@ -4,3 +4,6 @@
 [submodule "thirdparty/argparse"]
 	path = thirdparty/argparse
 	url = https://github.com/p-ranav/argparse.git
+[submodule "backward-cpp"]
+	path = backward-cpp
+	url = https://github.com/bombela/backward-cpp.git

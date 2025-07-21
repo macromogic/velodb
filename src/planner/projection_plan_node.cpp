@@ -1,3 +1,4 @@
+#include "common/traced_exception.hpp"
 #include "planner/projection_plan_node.hpp"
 #include "execution/operator/projection_operator.hpp"
 #include <stdexcept>
@@ -16,7 +17,7 @@ std::unique_ptr<AbstractOperator> ProjectionPlanNode::createOperator([[maybe_unu
 {
     // Create child operator
     if (children_.size() != 1) {
-        throw std::runtime_error("ProjectionPlanNode must have exactly one child");
+        VELODB_THROW(ExecutionError, "ProjectionPlanNode must have exactly one child");
     }
 
     auto child_operator = children_[0]->createOperator(context);

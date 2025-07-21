@@ -1,4 +1,5 @@
 #include "types/data_type.hpp"
+#include "common/traced_exception.hpp"
 #include <stdexcept>
 
 namespace velodb {
@@ -23,7 +24,7 @@ std::unique_ptr<DataType> DataType::createType(DataTypeId type_id, size_t size)
     case DataTypeId::VARCHAR:
         return std::make_unique<VarcharType>(size);
     default:
-        throw std::invalid_argument("Unsupported data type");
+        VELODB_THROW(TypeError, "Unsupported data type");
     }
 }
 

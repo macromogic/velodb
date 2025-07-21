@@ -1,4 +1,5 @@
 #include "catalog/schema.hpp"
+#include "common/traced_exception.hpp"
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -61,7 +62,7 @@ void Schema::addColumn(Column column)
 const Column& Schema::getColumn(size_t index) const
 {
     if (index >= columns_.size()) {
-        throw std::out_of_range("Column index out of range");
+        VELODB_THROW(SchemaError, "Column index out of range");
     }
     return columns_[index];
 }
@@ -70,7 +71,7 @@ const Column& Schema::getColumn(const std::string& name) const
 {
     auto it = column_name_to_index_.find(name);
     if (it == column_name_to_index_.end()) {
-        throw std::invalid_argument("Column not found: " + name);
+        VELODB_THROW(SchemaError, "Column not found: " + name);
     }
     return columns_[it->second];
 }
@@ -79,7 +80,7 @@ size_t Schema::getColumnIndex(const std::string& name) const
 {
     auto it = column_name_to_index_.find(name);
     if (it == column_name_to_index_.end()) {
-        throw std::invalid_argument("Column not found: " + name);
+        VELODB_THROW(SchemaError, "Column not found: " + name);
     }
     return it->second;
 }

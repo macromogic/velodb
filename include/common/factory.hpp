@@ -1,6 +1,7 @@
 #pragma once
 
 #include "result.hpp"
+#include "traced_exception.hpp"
 #include <memory>
 #include <optional>
 #include <functional>
@@ -67,7 +68,7 @@ template<typename T, typename... Args>
 UniqueResult<T> make_unique_result(Args&&... args) noexcept {
     try {
         return UniqueResult<T>::success(std::make_unique<T>(std::forward<Args>(args)...));
-    } catch (const std::exception& e) {
+    } catch (const TracedException& e) {
         return UniqueResult<T>::failure(e.what());
     } catch (...) {
         return UniqueResult<T>::failure("Unknown error during object construction");
@@ -86,7 +87,7 @@ template<typename T, typename... Args>
 SharedResult<T> make_shared_result(Args&&... args) noexcept {
     try {
         return SharedResult<T>::success(std::make_shared<T>(std::forward<Args>(args)...));
-    } catch (const std::exception& e) {
+    } catch (const TracedException& e) {
         return SharedResult<T>::failure(e.what());
     } catch (...) {
         return SharedResult<T>::failure("Unknown error during object construction");

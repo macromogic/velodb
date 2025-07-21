@@ -4,6 +4,7 @@
 #include "catalog/table.hpp"
 #include "catalog/schema.hpp"
 #include "types/data_type.hpp"
+#include "common/traced_exception.hpp"
 #include "SQLParser.h"
 
 using namespace velodb;
@@ -113,7 +114,7 @@ TEST_F(PlannerTest, PlanInvalidTable) {
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
     
     // Should throw an exception for non-existent table
-    EXPECT_THROW(planner_->planSelect(select_stmt), std::runtime_error);
+    EXPECT_THROW(planner_->planSelect(select_stmt), CatalogError);
 }
 
 TEST_F(PlannerTest, PlanComplexWhere) {

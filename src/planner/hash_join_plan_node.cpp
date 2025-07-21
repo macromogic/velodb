@@ -1,3 +1,4 @@
+#include "common/traced_exception.hpp"
 #include "planner/hash_join_plan_node.hpp"
 #include <stdexcept>
 
@@ -18,7 +19,7 @@ HashJoinPlanNode::HashJoinPlanNode(std::unique_ptr<Schema> output_schema,
 std::unique_ptr<AbstractOperator> HashJoinPlanNode::createOperator([[maybe_unused]] ExecutionContext* context) const
 {
     // TODO: Implement hash join operator creation
-    throw std::runtime_error("HashJoinPlanNode::createOperator not implemented");
+    VELODB_THROW(ExecutionError, "HashJoinPlanNode::createOperator not implemented");
 }
 
 std::string HashJoinPlanNode::toString() const

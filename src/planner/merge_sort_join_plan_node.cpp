@@ -1,3 +1,4 @@
+#include "common/traced_exception.hpp"
 #include "planner/merge_sort_join_plan_node.hpp"
 #include <stdexcept>
 
@@ -18,7 +19,7 @@ MergeSortJoinPlanNode::MergeSortJoinPlanNode(std::unique_ptr<Schema> output_sche
 std::unique_ptr<AbstractOperator> MergeSortJoinPlanNode::createOperator([[maybe_unused]] ExecutionContext* context) const
 {
     // TODO: Implement merge sort join operator creation
-    throw std::runtime_error("MergeSortJoinPlanNode::createOperator not implemented");
+    VELODB_THROW(ExecutionError, "MergeSortJoinPlanNode::createOperator not implemented");
 }
 
 std::string MergeSortJoinPlanNode::toString() const

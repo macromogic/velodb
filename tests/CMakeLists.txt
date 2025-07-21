@@ -7,6 +7,7 @@ find_package(GTest REQUIRED)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/src)
+include_directories(${CMAKE_SOURCE_DIR}/backward-cpp)
 
 # Test executable
 add_executable(velodb_tests
@@ -30,7 +31,9 @@ add_executable(velodb_tests
 # Link libraries
 target_link_libraries(velodb_tests
     ${ALL_OBJS}
+    common
     sqlparser
+    backward
     GTest::GTest
     GTest::Main
     pthread

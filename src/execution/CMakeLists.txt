@@ -17,7 +17,8 @@ add_library(velodb_execution OBJECT
     execution_engine.cpp)
 
 target_include_directories(velodb_execution PRIVATE
-    ${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/src)
+    ${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/src
+    ${CMAKE_SOURCE_DIR}/backward-cpp)
 
 set(ALL_OBJS
     ${ALL_OBJS} $<TARGET_OBJECTS:velodb_execution>

@@ -1,4 +1,5 @@
 #include "types/value.hpp"
+#include "common/traced_exception.hpp"
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -21,45 +22,45 @@ Value::Value(DataTypeId type_id)
 bool Value::getBoolean() const
 {
     if (is_null_)
-        throw std::runtime_error("Cannot get value from NULL");
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
     if (type_id_ != DataTypeId::BOOLEAN)
-        throw std::runtime_error("Type mismatch");
+        VELODB_THROW(TypeError, "Type mismatch");
     return std::get<bool>(data_);
 }
 
 int32_t Value::getInteger() const
 {
     if (is_null_)
-        throw std::runtime_error("Cannot get value from NULL");
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
     if (type_id_ != DataTypeId::INTEGER)
-        throw std::runtime_error("Type mismatch");
+        VELODB_THROW(TypeError, "Type mismatch");
     return std::get<int32_t>(data_);
 }
 
 int64_t Value::getBigInt() const
 {
     if (is_null_)
-        throw std::runtime_error("Cannot get value from NULL");
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
     if (type_id_ != DataTypeId::BIGINT)
-        throw std::runtime_error("Type mismatch");
+        VELODB_THROW(TypeError, "Type mismatch");
     return std::get<int64_t>(data_);
 }
 
 double Value::getDouble() const
 {
     if (is_null_)
-        throw std::runtime_error("Cannot get value from NULL");
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
     if (type_id_ != DataTypeId::DOUBLE)
-        throw std::runtime_error("Type mismatch");
+        VELODB_THROW(TypeError, "Type mismatch");
     return std::get<double>(data_);
 }
 
 std::string Value::getString() const
 {
     if (is_null_)
-        throw std::runtime_error("Cannot get value from NULL");
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
     if (type_id_ != DataTypeId::VARCHAR)
-        throw std::runtime_error("Type mismatch");
+        VELODB_THROW(TypeError, "Type mismatch");
     return std::get<std::string>(data_);
 }
 

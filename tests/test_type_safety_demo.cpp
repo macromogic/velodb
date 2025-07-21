@@ -4,6 +4,7 @@
 #include "types/data_type.hpp"
 #include "types/value.hpp"
 #include "catalog/schema.hpp"
+#include "common/traced_exception.hpp"
 
 using namespace velodb;
 
@@ -73,7 +74,7 @@ TEST_F(TypeSafetyDemoTest, InvalidArithmeticExpressions) {
             std::move(int_const), 
             std::move(string_const)
         );
-    }, std::runtime_error);
+    }, TypeError);
 
     // Test invalid modulo: DOUBLE % INTEGER (should throw at construction)
     auto double_const = std::make_unique<ConstantExpression>(Value::createDouble(10.5));
@@ -85,7 +86,7 @@ TEST_F(TypeSafetyDemoTest, InvalidArithmeticExpressions) {
             std::move(double_const), 
             std::move(int_const2)
         );
-    }, std::runtime_error);
+    }, TypeError);
 }
 
 TEST_F(TypeSafetyDemoTest, ValidCastExpressions) {

@@ -1,4 +1,5 @@
 #include "execution/expression.hpp"
+#include "common/traced_exception.hpp"
 #include <stdexcept>
 
 namespace velodb {
@@ -83,7 +84,7 @@ Value ComparisonExpression::compareValues(const Value& left_val, const Value& ri
         break;
     // TODO: Implement other comparison operators
     default:
-        throw std::runtime_error("Comparison operator not implemented");
+        VELODB_THROW(ExecutionError, "Comparison operator not implemented");
     }
 
     return Value::createBoolean(result);

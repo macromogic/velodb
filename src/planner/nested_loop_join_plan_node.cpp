@@ -1,3 +1,4 @@
+#include "common/traced_exception.hpp"
 #include "planner/nested_loop_join_plan_node.hpp"
 #include <stdexcept>
 
@@ -16,7 +17,7 @@ NestedLoopJoinPlanNode::NestedLoopJoinPlanNode(std::unique_ptr<Schema> output_sc
 std::unique_ptr<AbstractOperator> NestedLoopJoinPlanNode::createOperator([[maybe_unused]] ExecutionContext* context) const
 {
     // TODO: Implement join operator creation
-    throw std::runtime_error("NestedLoopJoinPlanNode::createOperator not implemented");
+    VELODB_THROW(ExecutionError, "NestedLoopJoinPlanNode::createOperator not implemented");
 }
 
 std::string NestedLoopJoinPlanNode::toString() const

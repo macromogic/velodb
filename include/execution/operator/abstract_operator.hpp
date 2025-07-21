@@ -3,6 +3,7 @@
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "common/non_copyable.hpp"
+#include "common/traced_exception.hpp"
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -34,9 +35,9 @@ public:
     [[nodiscard]] const std::vector<std::unique_ptr<AbstractOperator>>& getChildren() const { return children_; }
 
     // Legacy interface - deprecated, throws error
-    virtual bool next([[maybe_unused]] Tuple* tuple, [[maybe_unused]] RowId* row_id)
-    {
-        throw std::runtime_error("Legacy Next() interface not supported - use late materialization only");
+    virtual std::vector<Tuple> next() {
+        // Legacy interface not supported in late materialization design
+        VELODB_THROW(ExecutionError, "Legacy Next() interface not supported - use late materialization only");
     }
 
 protected:

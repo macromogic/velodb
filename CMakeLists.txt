@@ -59,7 +59,11 @@ add_dependencies(sqlparser sql-parser)
 # Add argparse as subdirectory (header-only library)
 add_subdirectory(thirdparty/argparse)
 
+# Add backward-cpp
+add_subdirectory(backward-cpp)
+
 # Project source files
+add_subdirectory(src/common)
 add_subdirectory(src/types)
 add_subdirectory(src/catalog)
 add_subdirectory(src/execution)
@@ -91,6 +95,8 @@ target_include_directories(velodb PRIVATE
 target_link_libraries(velodb 
     sqlparser
     argparse::argparse
+    backward
+    common
 )
 
 # Set executable properties
