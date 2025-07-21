@@ -34,14 +34,6 @@ bool NestedLoopJoinOperator::nextRowId(RowId* /*row_id*/)
     throw std::runtime_error("NestedLoopJoinOperator::nextRowId not implemented");
 }
 
-void NestedLoopJoinOperator::materializeRowIds(const std::vector<RowId>& /*row_ids*/,
-    const std::vector<size_t>& /*column_indices*/,
-    std::vector<Tuple>* /*tuples*/)
-{
-    // TODO: Implement nested loop join materialization
-    throw std::runtime_error("NestedLoopJoinOperator::materializeRowIds not implemented");
-}
-
 void NestedLoopJoinOperator::reset()
 {
     left_child_->reset();

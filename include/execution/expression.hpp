@@ -5,6 +5,7 @@
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "types/value.hpp"
+#include "common/non_copyable.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -60,14 +61,10 @@ enum class ArithmeticType {
 };
 
 // Abstract base class for all expressions
-class AbstractExpression {
+class AbstractExpression : private NonCopyable {
 public:
     AbstractExpression(ExpressionType type, std::unique_ptr<DataType> return_type);
     virtual ~AbstractExpression() = default;
-
-    // Delete copy constructor and assignment
-    AbstractExpression(const AbstractExpression&) = delete;
-    AbstractExpression& operator=(const AbstractExpression&) = delete;
 
     [[nodiscard]] ExpressionType getExpressionType() const { return type_; }
     [[nodiscard]] const DataType& getReturnType() const { return *return_type_; }
@@ -94,12 +91,14 @@ class ColumnRefExpression;
 class ComparisonExpression;
 class ConjunctionExpression;
 class ArithmeticExpression;
+class CastExpression;
 class FunctionCallExpression;
 
 } // namespace velodb
 
 // Include concrete expression implementations
 #include "arithmetic_expression.hpp"
+#include "cast_expression.hpp"
 #include "column_ref_expression.hpp"
 #include "comparison_expression.hpp"
 #include "conjunction_expression.hpp"

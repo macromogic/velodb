@@ -16,9 +16,6 @@ public:
 
     // Late materialization interface
     bool nextRowId(RowId* row_id) override;
-    void materializeRowIds(const std::vector<RowId>& row_ids,
-        const std::vector<size_t>& column_indices,
-        std::vector<Tuple>* tuples) override;
 
 private:
     std::unique_ptr<AbstractOperator> child_;

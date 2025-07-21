@@ -11,23 +11,25 @@ include_directories(${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/src)
 # Test executable
 add_executable(velodb_tests
     test_main.cpp
-    test_data_types.cpp
-    test_value.cpp
-    test_schema.cpp
-    test_table.cpp
     test_catalog.cpp
+    test_data_types.cpp
+    test_execution_engine.cpp
     test_expression.cpp
     test_operator.cpp
     test_planner.cpp
-    test_execution_engine.cpp
+    test_schema.cpp
+    test_table.cpp
+    test_type_checker.cpp
+    test_type_safety_demo.cpp
+    test_value.cpp
+    test_where_clause.cpp
+    test_plan_visualization.cpp
+    test_adaptive_catalog.cpp
 )
 
 # Link libraries
 target_link_libraries(velodb_tests
-    velodb_types
-    velodb_catalog
-    velodb_execution
-    velodb_planner
+    ${ALL_OBJS}
     sqlparser
     GTest::GTest
     GTest::Main

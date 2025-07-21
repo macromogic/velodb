@@ -38,12 +38,4 @@ bool SortOperator::nextRowId(RowId* /*row_id*/)
     throw std::runtime_error("SortOperator::nextRowId not implemented");
 }
 
-void SortOperator::materializeRowIds(const std::vector<RowId>& /*row_ids*/,
-    const std::vector<size_t>& /*column_indices*/,
-    std::vector<Tuple>* /*tuples*/)
-{
-    // TODO: Implement sort materialization
-    throw std::runtime_error("SortOperator::materializeRowIds not implemented");
-}
-
 } // namespace velodb

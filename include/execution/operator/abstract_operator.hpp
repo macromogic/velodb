@@ -2,6 +2,7 @@
 
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
+#include "common/non_copyable.hpp"
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -10,29 +11,27 @@ namespace velodb {
 
 // Forward declarations
 class ExecutionContext;
+class QueryResult;
 
 // Abstract base class for all operators
-class AbstractOperator {
+class AbstractOperator : private NonCopyable {
 public:
     explicit AbstractOperator(std::unique_ptr<Schema> output_schema);
     virtual ~AbstractOperator() = default;
 
-    // Delete copy constructor and assignment
-    AbstractOperator(const AbstractOperator&) = delete;
-    AbstractOperator& operator=(const AbstractOperator&) = delete;
-
     [[nodiscard]] const Schema& getOutputSchema() const { return *output_schema_; }
+
+    // Main execution interface - executes the entire operator tree
+    virtual std::unique_ptr<QueryResult> execute() = 0;
 
     // Core operator interface - Late materialization only
     virtual void init() = 0;
     virtual bool nextRowId(RowId* row_id) = 0;
     virtual void reset() = 0;
 
-    // Materialization interface
-    virtual void materializeRowIds(const std::vector<RowId>& row_ids,
-        const std::vector<size_t>& column_indices,
-        std::vector<Tuple>* tuples)
-        = 0;
+    // Child operator management
+    virtual void addChild(std::unique_ptr<AbstractOperator> child);
+    [[nodiscard]] const std::vector<std::unique_ptr<AbstractOperator>>& getChildren() const { return children_; }
 
     // Legacy interface - deprecated, throws error
     virtual bool next([[maybe_unused]] Tuple* tuple, [[maybe_unused]] RowId* row_id)
@@ -42,6 +41,7 @@ public:
 
 protected:
     std::unique_ptr<Schema> output_schema_;
+    std::vector<std::unique_ptr<AbstractOperator>> children_;
 };
 
 } // namespace velodb

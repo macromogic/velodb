@@ -95,6 +95,12 @@ public:
 private:
     // Helper methods
     std::unique_ptr<AbstractOperator> createOperatorTree(const AbstractPlanNode& plan_node);
+    
+    // New execution methods for row ID pipeline
+    std::unique_ptr<QueryResult> executeOperatorTree(std::unique_ptr<AbstractOperator> root_op);
+    std::unique_ptr<QueryResult> executeWithRowIdCollection(std::unique_ptr<AbstractOperator> op);
+    
+    // Legacy methods
     void collectResults(AbstractOperator* op, QueryResult* result);
     void collectResultsWithLateMaterialization(
         AbstractOperator* op,

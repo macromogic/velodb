@@ -8,26 +8,31 @@ namespace velodb {
 
 // Forward declarations
 class AbstractExpression;
+class QueryResult;
+class TableBase;
 
-// Projection operator
+// Projection operator - handles final materialization and projection
 class ProjectionOperator : public AbstractOperator {
 public:
-    ProjectionOperator(std::unique_ptr<AbstractOperator> child,
+    ProjectionOperator(std::unique_ptr<Schema> output_schema,
+        std::unique_ptr<AbstractOperator> child,
         std::vector<std::unique_ptr<AbstractExpression>> expressions);
     ~ProjectionOperator() override = default;
+
+    // Main execution interface - implements tree traversal
+    std::unique_ptr<QueryResult> execute() override;
 
     void init() override;
     void reset() override;
 
     // Late materialization interface
     bool nextRowId(RowId* row_id) override;
-    void materializeRowIds(const std::vector<RowId>& row_ids,
-        const std::vector<size_t>& column_indices,
-        std::vector<Tuple>* tuples) override;
 
 private:
-    std::unique_ptr<AbstractOperator> child_;
     std::vector<std::unique_ptr<AbstractExpression>> expressions_;
+    
+    // Helper method to find the base table for materialization
+    const TableBase* findSourceTable() const;
 };
 
 } // namespace velodb

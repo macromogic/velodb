@@ -4,6 +4,8 @@
 #include "types/value.hpp"
 #include <memory>
 #include <vector>
+#include <optional>
+#include <functional>
 
 namespace velodb {
 
@@ -36,7 +38,7 @@ public:
     void insert(const std::vector<Value>& key_values, Tuple&& tuple);
 
     // Lookup tuples by key values
-    [[nodiscard]] const std::vector<Tuple>* lookup(const std::vector<Value>& key_values) const;
+    [[nodiscard]] std::optional<std::reference_wrapper<const std::vector<Tuple>>> lookup(const std::vector<Value>& key_values) const;
 
     // Get all entries (for iteration)
     [[nodiscard]] const std::vector<std::unique_ptr<HashTableEntry>>& getEntries() const { return entries_; }

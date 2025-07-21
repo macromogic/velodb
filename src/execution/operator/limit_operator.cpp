@@ -42,12 +42,4 @@ bool LimitOperator::nextRowId(RowId* row_id)
     return false;
 }
 
-void LimitOperator::materializeRowIds(const std::vector<RowId>& row_ids,
-    const std::vector<size_t>& column_indices,
-    std::vector<Tuple>* tuples)
-{
-    // TODO: Implement limit materialization
-    child_->materializeRowIds(row_ids, column_indices, tuples);
-}
-
 } // namespace velodb

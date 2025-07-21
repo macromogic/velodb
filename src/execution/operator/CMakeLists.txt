@@ -2,9 +2,8 @@
 set(OPERATOR_SOURCES
     abstract_operator.cpp
     result_set.cpp
-    seq_scan_operator.cpp
+    scan_filter_operator.cpp
     projection_operator.cpp
-    filter_operator.cpp
     nested_loop_join_operator.cpp
     hash_join_operator.cpp
     merge_sort_join_operator.cpp

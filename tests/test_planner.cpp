@@ -57,8 +57,8 @@ TEST_F(PlannerTest, PlanSimpleSelect) {
     auto plan = planner_->planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
     
-    // Should create a SeqScan plan node
-    EXPECT_EQ(plan->getPlanType(), PlanType::SEQ_SCAN);
+    // Should create a ScanFilter plan node
+    EXPECT_EQ(plan->getPlanType(), PlanType::SCAN_FILTER);
     EXPECT_EQ(plan->getOutputSchema().getColumnCount(), 2);
 }
 
@@ -77,8 +77,8 @@ TEST_F(PlannerTest, PlanSelectWithWhere) {
     auto plan = planner_->planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
     
-    // Should still be a SeqScan (predicate pushed down)
-    EXPECT_EQ(plan->getPlanType(), PlanType::SEQ_SCAN);
+    // Should still be a ScanFilter (predicate pushed down)
+    EXPECT_EQ(plan->getPlanType(), PlanType::SCAN_FILTER);
 }
 
 TEST_F(PlannerTest, PlanSelectWithProjection) {

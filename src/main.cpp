@@ -1,164 +1,109 @@
 #include "velodb.hpp"
+#include "planner/plan_visualizer.hpp"
+#include "catalog/mock_catalog_builder.hpp"
 #include <argparse/argparse.hpp>
 #include <iostream>
 #include <memory>
-#include <string>
 
 using namespace velodb;
 
-// TODO: Implement comprehensive main function with database operations
 int main(int argc, char* argv[])
 {
-    // Create argument parser
+    // Simple test version with mock catalog support
     argparse::ArgumentParser program("velodb", VERSION_STRING);
     
-    program.add_description("GPU-accelerated Object Database with Late Materialization");
-    
-    // Add command-line arguments
     program.add_argument("query")
-        .help("SQL query to execute")
-        .nargs(argparse::nargs_pattern::optional);
+        .help("SQL query to execute");
     
-    program.add_argument("-f", "--file")
-        .help("Execute SQL queries from file")
-        .metavar("FILE");
-    
-    program.add_argument("-o", "--output")
-        .help("Output file for query results")
-        .metavar("FILE");
-    
-    program.add_argument("--no-sample-data")
-        .help("Skip loading sample data")
+    program.add_argument("--mock-catalog")
+        .help("Use mock catalog with adaptive table creation")
         .flag();
     
-    program.add_argument("--list-tables")
-        .help("List all available tables and exit")
-        .flag();
+    program.add_argument("--plan-format")
+        .help("Format for query plan visualization {text,graphviz,detailed}")
+        .default_value("text")
+        .nargs(1)
+        .choices("text", "graphviz", "detailed");
     
-    program.add_argument("--db-info")
-        .help("Show database information and exit")
-        .flag();
-    
-    program.add_argument("-V", "--verbose")
+    program.add_argument("--verbose")
         .help("Enable verbose output")
         .flag();
 
     try {
         program.parse_args(argc, argv);
     } catch (const std::exception& err) {
-        std::cerr << "Error parsing arguments: " << err.what() << std::endl;
+        std::cerr << "Error: " << err.what() << std::endl;
         std::cerr << program;
         return -1;
     }
-
-    // Print header if verbose or no specific flags
-    bool verbose = program.get<bool>("--verbose");
-    bool list_tables = program.get<bool>("--list-tables");
-    bool db_info = program.get<bool>("--db-info");
     
-    if (verbose || (!list_tables && !db_info)) {
+    bool verbose = program.get<bool>("--verbose");
+    bool use_mock_catalog = program.get<bool>("--mock-catalog");
+    
+    // Debug: Print what argparse actually parsed
+    if (verbose) {
         std::cout << "VeloDB v" << VERSION_STRING << std::endl;
-        std::cout << "GPU-accelerated Object Database with Late Materialization" << std::endl;
-        std::cout << "=========================================================" << std::endl;
+        std::cout << "Query Plan Visualization Tool" << std::endl;
+        std::cout << "=============================" << std::endl;
     }
-
-    try {
-        // Create a sample database
-        auto db = util::createSampleDatabase();
-
-        if (!db->initialize()) {
-            std::cerr << "Failed to initialize database" << std::endl;
-            return -1;
-        }
-
-        // Populate with sample data unless disabled
-        if (!program.get<bool>("--no-sample-data")) {
-            if (verbose) {
-                std::cout << "Loading sample data..." << std::endl;
-            }
-            util::populateSampleData(db.get());
-        }
-
-        // Handle --list-tables flag
-        if (list_tables) {
-            std::cout << "Available tables:" << std::endl;
-            auto table_names = db->getTableNames();
-            for (const auto& name : table_names) {
-                std::cout << "  - " << name << std::endl;
-            }
-            db->shutdown();
-            return 0;
-        }
-
-        // Handle --db-info flag
-        if (db_info) {
-            std::cout << "Database Info:" << std::endl;
-            std::cout << db->getDatabaseInfo() << std::endl;
-            db->shutdown();
-            return 0;
-        }
-
-        // Handle file input
-        if (program.is_used("--file")) {
-            std::string filename = program.get<std::string>("--file");
-            if (verbose) {
-                std::cout << "Reading queries from file: " << filename << std::endl;
-            }
-            // TODO: Implement file reading and query execution
-            std::cerr << "File input not yet implemented" << std::endl;
-            db->shutdown();
-            return -1;
-        }
-
-        // Handle direct query
-        if (program.is_used("query")) {
-            std::string query = program.get<std::string>("query");
+    
+    std::string query = program.get<std::string>("query");
+    
+    if (use_mock_catalog) {
+        // Create adaptive catalog and plan query
+        auto catalog = MockCatalogBuilder::createAdaptiveCatalog();
             
-            if (verbose) {
-                std::cout << "\nExecuting query: " << query << std::endl;
-            }
-
-            try {
-                auto result = db->executeQuery(query);
+        // Ensure tables exist for this query
+        bool success = MockCatalogBuilder::ensureTablesForQuery(*catalog, query);
+        if (!success) {
+            std::cerr << "Failed to create mock tables for query: " << query << std::endl;
+            return -1;
+        }
+            
+        if (verbose) {
+            std::cout << "Created " << catalog->getTableCount() << " mock tables for query" << std::endl;
+        }
+            
+        // Plan and visualize
+        hsql::SQLParserResult result;
+        hsql::SQLParser::parse(query, &result);
+            
+        if (!result.isValid()) {
+            std::cerr << "Invalid SQL query: " << result.errorMsg() << std::endl;
+            return -1;
+        }
+            
+        if (result.getStatement(0)->type() == hsql::kStmtSelect) {
+            QueryPlanner planner(catalog.get());
+            const auto* select_stmt = static_cast<const hsql::SelectStatement*>(result.getStatement(0));
                 
-                // Handle output redirection
-                if (program.is_used("--output")) {
-                    std::string output_file = program.get<std::string>("--output");
-                    if (verbose) {
-                        std::cout << "Writing results to: " << output_file << std::endl;
-                    }
-                    // TODO: Implement file output
-                    std::cerr << "File output not yet implemented" << std::endl;
-                } else {
-                    std::cout << "\nQuery Result:" << std::endl;
-                    std::cout << result->toString() << std::endl;
+            try {
+                auto plan = planner.planSelect(select_stmt);
+                    
+                std::cout << "Query plan for: " << query << std::endl;
+                std::cout << std::endl;
+                    
+                auto format = program.get<std::string>("--plan-format");
+                if (format == "text") {
+                    std::cout << PlanVisualizer::visualizeAsText(plan) << std::endl;
+                } else if (format == "graphviz") {
+                    std::cout << PlanVisualizer::visualizeAsGraphviz(plan) << std::endl;
+                } else if (format == "detailed") {
+                    std::cout << PlanVisualizer::visualizeDetailed(plan) << std::endl;
                 }
+                    
             } catch (const std::exception& e) {
-                std::cerr << "Query execution failed: " << e.what() << std::endl;
-                db->shutdown();
+                std::cerr << "Error planning query: " << e.what() << std::endl;
                 return -1;
             }
         } else {
-            // No query provided, show usage and available tables
-            std::cout << "\nNo query provided. Use --help for usage information." << std::endl;
-            std::cout << "\nAvailable tables:" << std::endl;
-            auto table_names = db->getTableNames();
-            for (const auto& name : table_names) {
-                std::cout << "  - " << name << std::endl;
-            }
-            std::cout << "\nExample usage:" << std::endl;
-            std::cout << "  " << argv[0] << " \"SELECT * FROM test_table;\"" << std::endl;
+            std::cerr << "Only SELECT queries are supported" << std::endl;
+            return -1;
         }
-
-        db->shutdown();
-        if (verbose) {
-            std::cout << "\nDatabase shutdown complete." << std::endl;
-        }
-
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+    } else {
+        std::cerr << "Please use --mock-catalog flag for query planning" << std::endl;
         return -1;
     }
-
+    
     return 0;
 }

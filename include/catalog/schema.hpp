@@ -1,6 +1,7 @@
 #pragma once
 
 #include "types/data_type.hpp"
+#include "common/non_copyable.hpp"
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -8,7 +9,7 @@
 
 namespace velodb {
 
-class Column {
+class Column : private NonCopyable {
 public:
     Column(std::string name, std::unique_ptr<DataType> type, bool nullable = true);
     ~Column() = default;
@@ -16,10 +17,6 @@ public:
     // Move constructor and assignment
     Column(Column&& other) noexcept;
     Column& operator=(Column&& other) noexcept;
-
-    // Delete copy constructor and assignment
-    Column(const Column&) = delete;
-    Column& operator=(const Column&) = delete;
 
     [[nodiscard]] const std::string& getName() const { return name_; }
     [[nodiscard]] const DataType& getType() const { return *type_; }
@@ -39,7 +36,7 @@ private:
     size_t offset_ { 0 }; // Offset in tuple for fixed-size columns
 };
 
-class Schema {
+class Schema : private NonCopyable {
 public:
     Schema() = default;
     explicit Schema(std::vector<Column> columns);
@@ -48,10 +45,6 @@ public:
     // Move constructor and assignment
     Schema(Schema&& other) noexcept = default;
     Schema& operator=(Schema&& other) noexcept = default;
-
-    // Delete copy constructor and assignment
-    Schema(const Schema&) = delete;
-    Schema& operator=(const Schema&) = delete;
 
     void addColumn(Column column);
     const Column& getColumn(size_t index) const;
@@ -70,6 +63,8 @@ public:
     // Iterator support
     auto begin() const { return columns_.begin(); }
     auto end() const { return columns_.end(); }
+
+    static std::unique_ptr<Schema> scanFilterSchema();
 
 private:
     void computeOffsets();

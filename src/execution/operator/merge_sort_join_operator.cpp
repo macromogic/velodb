@@ -46,12 +46,4 @@ bool MergeSortJoinOperator::nextRowId(RowId* /*row_id*/)
     throw std::runtime_error("MergeSortJoinOperator::nextRowId not implemented");
 }
 
-void MergeSortJoinOperator::materializeRowIds(const std::vector<RowId>& /*row_ids*/,
-    const std::vector<size_t>& /*column_indices*/,
-    std::vector<Tuple>* /*tuples*/)
-{
-    // TODO: Implement merge sort join materialization
-    throw std::runtime_error("MergeSortJoinOperator::materializeRowIds not implemented");
-}
-
 } // namespace velodb

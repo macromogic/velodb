@@ -39,7 +39,7 @@ TEST_F(ValueTest, CreateStringValue) {
     EXPECT_EQ(string_val.getTypeId(), DataTypeId::VARCHAR);
     EXPECT_FALSE(string_val.isNull());
     EXPECT_EQ(string_val.getString(), "hello");
-    EXPECT_EQ(string_val.toString(), "hello");
+    EXPECT_EQ(string_val.toString(), "'hello'");
 }
 
 TEST_F(ValueTest, CreateBooleanValue) {

@@ -46,12 +46,4 @@ bool HashJoinOperator::nextRowId(RowId* /*row_id*/)
     throw std::runtime_error("HashJoinOperator::nextRowId not implemented");
 }
 
-void HashJoinOperator::materializeRowIds(const std::vector<RowId>& /*row_ids*/,
-    const std::vector<size_t>& /*column_indices*/,
-    std::vector<Tuple>* /*tuples*/)
-{
-    // TODO: Implement hash join materialization
-    throw std::runtime_error("HashJoinOperator::materializeRowIds not implemented");
-}
-
 } // namespace velodb

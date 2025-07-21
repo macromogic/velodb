@@ -8,11 +8,11 @@
 
 namespace velodb {
 
-// Sequential scan plan node
-class SeqScanPlanNode : public AbstractPlanNode {
+// Scan with filter plan node
+class ScanFilterPlanNode : public AbstractPlanNode {
 public:
-    explicit SeqScanPlanNode(const TableBase& table, std::unique_ptr<AbstractExpression> predicate = nullptr);
-    ~SeqScanPlanNode() override = default;
+    explicit ScanFilterPlanNode(const TableBase& table, std::unique_ptr<AbstractExpression> predicate = nullptr);
+    ~ScanFilterPlanNode() override = default;
 
     std::unique_ptr<AbstractOperator> createOperator(ExecutionContext* context) const override;
     [[nodiscard]] std::string toString() const override;

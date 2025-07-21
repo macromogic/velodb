@@ -9,6 +9,8 @@ add_library(velodb_execution OBJECT
     comparison_expression.cpp
     conjunction_expression.cpp
     arithmetic_expression.cpp
+    cast_expression.cpp
+    type_checker.cpp
     function_call_expression.cpp
     hash_table.cpp
     sorter.cpp

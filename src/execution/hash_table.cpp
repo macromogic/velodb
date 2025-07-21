@@ -50,18 +50,18 @@ void HashTable::insert(const std::vector<Value>& key_values, Tuple&& tuple)
     entries_.push_back(std::move(entry));
 }
 
-const std::vector<Tuple>* HashTable::lookup(const std::vector<Value>& key_values) const
+std::optional<std::reference_wrapper<const std::vector<Tuple>>> HashTable::lookup(const std::vector<Value>& key_values) const
 {
     // TODO: Implement efficient hash table lookup
     // For now, use simple linear search
 
     for (const auto& entry : entries_) {
         if (keysEqual(entry->key_values_, key_values)) {
-            return &entry->tuples_;
+            return std::cref(entry->tuples_);
         }
     }
 
-    return nullptr;
+    return std::nullopt;
 }
 
 void HashTable::clear()

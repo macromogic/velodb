@@ -8,3 +8,6 @@ compile_commands.json
 *.csv
 .clinerules
 cline_tasks
+.github
+copilot_tasks
+*.bak

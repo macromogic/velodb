@@ -21,7 +21,7 @@ public:
     [[nodiscard]] const std::vector<std::unique_ptr<AbstractExpression>>& getExpressions() const { return expressions_; }
 
 private:
-    std::vector<std::unique_ptr<AbstractExpression>> expressions_;
+    mutable std::vector<std::unique_ptr<AbstractExpression>> expressions_;
 };
 
 } // namespace velodb

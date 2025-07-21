@@ -2,6 +2,7 @@
 
 #include "catalog/schema.hpp"
 #include "execution/operator.hpp"
+#include "common/non_copyable.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -14,9 +15,8 @@ class ExecutionContext;
 // Plan node types
 enum class PlanType {
     INVALID = 0,
-    SEQ_SCAN,
+    SCAN_FILTER,
     PROJECTION,
-    FILTER,
     NESTED_LOOP_JOIN,
     HASH_JOIN,
     MERGE_SORT_JOIN,
@@ -26,14 +26,10 @@ enum class PlanType {
 };
 
 // Abstract base class for plan nodes
-class AbstractPlanNode {
+class AbstractPlanNode : private NonCopyable {
 public:
     AbstractPlanNode(PlanType type, std::unique_ptr<Schema> output_schema);
     virtual ~AbstractPlanNode() = default;
-
-    // Delete copy constructor and assignment
-    AbstractPlanNode(const AbstractPlanNode&) = delete;
-    AbstractPlanNode& operator=(const AbstractPlanNode&) = delete;
 
     [[nodiscard]] PlanType getPlanType() const { return type_; }
     [[nodiscard]] const Schema& getOutputSchema() const { return *output_schema_; }
