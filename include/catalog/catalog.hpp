@@ -27,10 +27,11 @@ public:
     TableBase* getTable(const std::string& table_name) const;
     Table* getMutableTable(const std::string& table_name) const;
 
-    // View management
+    // View management - Column-based
     bool createView(const std::string& view_name,
         std::unique_ptr<Schema> schema,
-        std::vector<Tuple> materialized_tuples);
+        std::vector<ValueVector> columns);
+    
     bool dropView(const std::string& view_name);
     bool hasView(const std::string& view_name) const;
 

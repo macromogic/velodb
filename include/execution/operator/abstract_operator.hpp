@@ -34,12 +34,6 @@ public:
     virtual void addChild(std::unique_ptr<AbstractOperator> child);
     [[nodiscard]] const std::vector<std::unique_ptr<AbstractOperator>>& getChildren() const { return children_; }
 
-    // Legacy interface - deprecated, throws error
-    virtual std::vector<Tuple> next() {
-        // Legacy interface not supported in late materialization design
-        VELODB_THROW(ExecutionError, "Legacy Next() interface not supported - use late materialization only");
-    }
-
 protected:
     std::unique_ptr<Schema> output_schema_;
     std::vector<std::unique_ptr<AbstractOperator>> children_;

@@ -26,11 +26,15 @@ std::unique_ptr<QueryResult> ScanFilterOperator::execute()
     while (nextRowId(&row_id)) {
         // For late materialization, ScanFilter only collects row IDs
         // Actual materialization happens at the ProjectionOperator
-        // So we create an empty tuple with just the row ID for now
-        Tuple tuple(*output_schema_);
+        // So we create an empty row with default values for now
+        std::vector<Value> empty_values;
+        empty_values.reserve(output_schema_->getColumnCount());
+        for (size_t i = 0; i < output_schema_->getColumnCount(); ++i) {
+            empty_values.emplace_back(); // Default Value constructor
+        }
         // TODO: In late materialization, we shouldn't materialize here
         // This is just for compatibility with current QueryResult
-        result->addTuple(std::move(tuple));
+        result->addRow(std::move(empty_values));
     }
     
     return result;

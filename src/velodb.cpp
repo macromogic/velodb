@@ -61,7 +61,14 @@ bool Database::insertTuple(const std::string& table_name, const Tuple& tuple)
     Table* table = catalog_->getMutableTable(table_name);
     if (table == nullptr)
         return false;
-    table->insertTuple(tuple);
+    
+    // Convert tuple to values vector
+    std::vector<Value> values;
+    values.reserve(tuple.getColumnCount());
+    for (size_t i = 0; i < tuple.getColumnCount(); ++i) {
+        values.push_back(tuple.getValue(i));
+    }
+    table->insertRow(values);
     return true;
 }
 
@@ -72,7 +79,14 @@ bool Database::insertTuple(const std::string& table_name, Tuple&& tuple)
     Table* table = catalog_->getMutableTable(table_name);
     if (table == nullptr)
         return false;
-    table->insertTuple(std::move(tuple));
+    
+    // Convert tuple to values vector
+    std::vector<Value> values;
+    values.reserve(tuple.getColumnCount());
+    for (size_t i = 0; i < tuple.getColumnCount(); ++i) {
+        values.push_back(std::move(const_cast<Tuple&>(tuple).getValue(i)));
+    }
+    table->insertRow(std::move(values));
     return true;
 }
 

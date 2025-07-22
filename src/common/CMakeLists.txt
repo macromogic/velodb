@@ -4,7 +4,7 @@ add_library(common
 
 target_include_directories(common PUBLIC
     ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/backward-cpp
+    ${CMAKE_SOURCE_DIR}/thirdparty/backward-cpp
 )
 
 target_link_libraries(common

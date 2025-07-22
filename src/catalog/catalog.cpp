@@ -50,17 +50,17 @@ Table* Catalog::getMutableTable(const std::string& table_name) const
     return it->second.get();
 }
 
-// TODO: Implement view management
+// View management - Column-based
 bool Catalog::createView(const std::string& view_name,
     std::unique_ptr<Schema> schema,
-    std::vector<Tuple> materialized_tuples)
+    std::vector<ValueVector> columns)
 {
     if (hasView(view_name)) {
         return false;
     }
 
     auto table_info = std::make_unique<TableInfo>(view_name, std::move(schema));
-    auto view = std::make_unique<View>(std::move(table_info), std::move(materialized_tuples));
+    auto view = std::make_unique<View>(std::move(table_info), std::move(columns));
     views_[view_name] = std::move(view);
     return true;
 }

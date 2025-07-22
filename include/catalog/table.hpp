@@ -100,12 +100,6 @@ public:
     void insertRow(std::vector<Value>&& values);
     void insertBatchRows(const std::vector<std::vector<Value>>& rows);
     
-    // Legacy Tuple-based methods for backward compatibility
-    void insertTuple(const Tuple& tuple);
-    void insertTuple(Tuple&& tuple);
-    [[nodiscard]] Tuple getTuple(RowId row_id) const; // Reconstructs tuple from columns
-    void insertBatch(const std::vector<Tuple>& tuples);
-
     // Efficient column-based access for late materialization
     [[nodiscard]] Value getValue(RowId row_id, size_t column_index) const;
     [[nodiscard]] std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
@@ -133,21 +127,38 @@ private:
     friend class TableIterator; // Allow iterator access to private members
 };
 
-// View implementation (for derived tables from queries)
+// View implementation (for derived tables from queries) - Column-based storage
 class View : public TableBase {
 public:
-    View(std::unique_ptr<TableInfo> table_info, std::vector<Tuple> materialized_tuples);
+    // Column-based constructor
+    View(std::unique_ptr<TableInfo> table_info, std::vector<ValueVector> columns);
+    
     ~View() override = default;
 
     // TableBase interface
     std::unique_ptr<TableIterator> getIterator() const override;
-    [[nodiscard]] size_t getRowCount() const override { return tuples_.size(); }
+    [[nodiscard]] size_t getRowCount() const override { return row_count_; }
     [[nodiscard]] bool isView() const override { return true; }
 
-    [[nodiscard]] const Tuple& getTuple(size_t index) const;
+    // Column-based access methods (similar to Table)
+    [[nodiscard]] Value getValue(RowId row_id, size_t column_index) const;
+    [[nodiscard]] std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
+    [[nodiscard]] const ValueVector& getColumn(size_t column_index) const;
+    [[nodiscard]] std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
+    [[nodiscard]] std::vector<ValueVector> getColumns(const std::vector<size_t>& column_indices) const;
+    
+    // Row ID management
+    [[nodiscard]] std::vector<RowId> getAllRowIds() const;
+    [[nodiscard]] std::vector<RowId> getValidRowIds() const;
 
 private:
-    std::vector<Tuple> tuples_;
+    // Column-based storage: each column is stored as a separate vector
+    std::vector<ValueVector> columns_;
+    size_t row_count_; // Current number of rows
+    
+    // Helper methods
+    void initializeFromTuples(const std::vector<Tuple>& tuples);
+    void initializeColumns();
 };
 
 // Iterator for table scanning

@@ -15,7 +15,7 @@ struct SelectStatement;
 
 namespace velodb {
 
-// Query execution result
+// Query execution result - Column-based storage
 class QueryResult {
 public:
     explicit QueryResult(std::unique_ptr<Schema> schema);
@@ -29,19 +29,42 @@ public:
     QueryResult(const QueryResult&) = delete;
     QueryResult& operator=(const QueryResult&) = delete;
 
-    void addTuple(const Tuple& tuple);
-    void addTuple(Tuple&& tuple);
-
+    // Column-based insertion methods
+    void addRow(const std::vector<Value>& values);
+    void addRow(std::vector<Value>&& values);
+    void addBatchRows(const std::vector<std::vector<Value>>& rows);
+    
+    // Schema and basic info
     [[nodiscard]] const Schema& getSchema() const { return *schema_; }
-    [[nodiscard]] const std::vector<Tuple>& getTuples() const { return tuples_; }
-    [[nodiscard]] size_t getRowCount() const { return tuples_.size(); }
-    [[nodiscard]] bool isEmpty() const { return tuples_.empty(); }
+    [[nodiscard]] size_t getRowCount() const { return row_count_; }
+    [[nodiscard]] bool isEmpty() const { return row_count_ == 0; }
+
+    // Column-based access methods
+    [[nodiscard]] Value getValue(RowId row_id, size_t column_index) const;
+    [[nodiscard]] std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
+    [[nodiscard]] const ValueVector& getColumn(size_t column_index) const;
+    [[nodiscard]] std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
+    [[nodiscard]] std::vector<ValueVector> getColumns(const std::vector<size_t>& column_indices) const;
+    
+    // Row ID management
+    [[nodiscard]] std::vector<RowId> getAllRowIds() const;
 
     [[nodiscard]] std::string toString() const;
 
+    // Conversion to View for catalog integration
+    std::unique_ptr<View> toView(const std::string& view_name) const;
+
 private:
     std::unique_ptr<Schema> schema_;
-    std::vector<Tuple> tuples_;
+    
+    // Column-based storage: each column is stored as a separate vector
+    std::vector<ValueVector> columns_;
+    size_t row_count_; // Current number of rows
+    
+    // Helper methods
+    void initializeColumns();
+    void ensureColumnCapacity(size_t new_row_count);
+    void insertRowInternal(const std::vector<Value>& values);
 };
 
 // Late materialization optimizer
@@ -100,13 +123,6 @@ private:
     std::unique_ptr<QueryResult> executeOperatorTree(std::unique_ptr<AbstractOperator> root_op);
     std::unique_ptr<QueryResult> executeWithRowIdCollection(std::unique_ptr<AbstractOperator> op);
     
-    // Legacy methods
-    void collectResults(AbstractOperator* op, QueryResult* result);
-    void collectResultsWithLateMaterialization(
-        AbstractOperator* op,
-        QueryResult* result,
-        const LateMaterializationOptimizer::MaterializationPlan& mat_plan);
-
     Catalog* catalog_;
     std::unique_ptr<QueryPlanner> planner_;
     std::unique_ptr<ExecutionContext> context_;

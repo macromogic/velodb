@@ -10,6 +10,24 @@
 
 using namespace velodb;
 
+// Helper function to convert QueryResult to vector of tuples for testing
+static std::vector<Tuple> queryResultToTuples(const QueryResult& result) {
+    std::vector<Tuple> tuples;
+    const size_t row_count = result.getRowCount();
+    const Schema& schema = result.getSchema();
+    
+    for (size_t row_id = 0; row_id < row_count; ++row_id) {
+        std::vector<Value> values;
+        values.reserve(schema.getColumnCount());
+        for (size_t col_idx = 0; col_idx < schema.getColumnCount(); ++col_idx) {
+            values.push_back(result.getValue(row_id, col_idx));
+        }
+        tuples.emplace_back(schema, std::move(values));
+    }
+    
+    return tuples;
+}
+
 class ExecutionEngineTest : public ::testing::Test {
 protected:
     void SetUp() override {
@@ -48,8 +66,7 @@ protected:
         values1.push_back(Value::createInteger(25));
         values1.push_back(Value::createDouble(50000.0));
         values1.push_back(Value::createString("Engineering"));
-        Tuple tuple1(table->getSchema(), std::move(values1));
-        concrete_table->insertTuple(std::move(tuple1));
+        concrete_table->insertRow(values1);
         
         // Employee 2: Bob, 30, 60000.0, Sales
         std::vector<Value> values2;
@@ -58,8 +75,7 @@ protected:
         values2.push_back(Value::createInteger(30));
         values2.push_back(Value::createDouble(60000.0));
         values2.push_back(Value::createString("Sales"));
-        Tuple tuple2(table->getSchema(), std::move(values2));
-        concrete_table->insertTuple(std::move(tuple2));
+        concrete_table->insertRow(values2);
         
         // Employee 3: Charlie, 35, 75000.0, Engineering
         std::vector<Value> values3;
@@ -68,8 +84,7 @@ protected:
         values3.push_back(Value::createInteger(35));
         values3.push_back(Value::createDouble(75000.0));
         values3.push_back(Value::createString("Engineering"));
-        Tuple tuple3(table->getSchema(), std::move(values3));
-        concrete_table->insertTuple(std::move(tuple3));
+        concrete_table->insertRow(values3);
         
         // Employee 4: Diana, 28, 45000.0, HR
         std::vector<Value> values4;
@@ -78,8 +93,7 @@ protected:
         values4.push_back(Value::createInteger(28));
         values4.push_back(Value::createDouble(45000.0));
         values4.push_back(Value::createString("HR"));
-        Tuple tuple4(table->getSchema(), std::move(values4));
-        concrete_table->insertTuple(std::move(tuple4));
+        concrete_table->insertRow(values4);
         
         // Employee 5: Eve, 32, 55000.0, Sales
         std::vector<Value> values5;
@@ -88,8 +102,7 @@ protected:
         values5.push_back(Value::createInteger(32));
         values5.push_back(Value::createDouble(55000.0));
         values5.push_back(Value::createString("Sales"));
-        Tuple tuple5(table->getSchema(), std::move(values5));
-        concrete_table->insertTuple(std::move(tuple5));
+        concrete_table->insertRow(values5);
         
         // Create a legacy test table for backward compatibility
         auto legacy_int_type = std::make_unique<IntegerType>();
@@ -111,14 +124,12 @@ protected:
         std::vector<Value> legacy_values1;
         legacy_values1.push_back(Value::createInteger(1));
         legacy_values1.push_back(Value::createString("Alice"));
-        Tuple legacy_tuple1(legacy_table->getSchema(), std::move(legacy_values1));
-        legacy_concrete_table->insertTuple(std::move(legacy_tuple1));
+        legacy_concrete_table->insertRow(legacy_values1);
         
         std::vector<Value> legacy_values2;
         legacy_values2.push_back(Value::createInteger(2));
         legacy_values2.push_back(Value::createString("Bob"));
-        Tuple legacy_tuple2(legacy_table->getSchema(), std::move(legacy_values2));
-        legacy_concrete_table->insertTuple(std::move(legacy_tuple2));
+        legacy_concrete_table->insertRow(legacy_values2);
     }
 
     void TearDown() override {
@@ -175,7 +186,7 @@ TEST_F(ExecutionEngineTest, ExecuteSelectWithWhere) {
     // Should return 1 row (Alice)
     EXPECT_EQ(query_result->getRowCount(), 1);
 
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     EXPECT_EQ(tuples[0].getValue(0).getInteger(), 1);
     EXPECT_EQ(tuples[0].getValue(1).getString(), "Alice");
 }
@@ -200,7 +211,7 @@ TEST_F(ExecutionEngineTest, ExecuteSelectWithProjection) {
     EXPECT_EQ(query_result->getSchema().getColumnCount(), 1);
     
     // Check that we only get the name column
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     EXPECT_EQ(tuples[0].getColumnCount(), 1);
     EXPECT_EQ(tuples[1].getColumnCount(), 1);
 }
@@ -256,7 +267,7 @@ TEST_F(ExecutionEngineTest, WhereIntegerEquals) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 1);
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     EXPECT_EQ(tuples[0].getValue(0).getInteger(), 3);
     EXPECT_EQ(tuples[0].getValue(1).getString(), "Charlie");
 }
@@ -277,7 +288,7 @@ TEST_F(ExecutionEngineTest, WhereIntegerNotEquals) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 4);  // All except Alice
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     // Should not contain Alice (id=1)
     for (const auto& tuple : tuples) {
         EXPECT_NE(tuple.getValue(0).getInteger(), 1);
@@ -300,7 +311,7 @@ TEST_F(ExecutionEngineTest, WhereIntegerGreaterThan) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Charlie (35) and Eve (32)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_GT(tuple.getValue(2).getInteger(), 30);  // age column
     }
@@ -322,7 +333,7 @@ TEST_F(ExecutionEngineTest, WhereIntegerGreaterThanOrEqual) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Bob (30), Charlie (35), Eve (32)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_GE(tuple.getValue(2).getInteger(), 30);  // age column
     }
@@ -344,7 +355,7 @@ TEST_F(ExecutionEngineTest, WhereIntegerLessThan) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Alice (25) and Diana (28)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_LT(tuple.getValue(2).getInteger(), 30);  // age column
     }
@@ -366,7 +377,7 @@ TEST_F(ExecutionEngineTest, WhereIntegerLessThanOrEqual) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Alice (25) and Diana (28)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_LE(tuple.getValue(2).getInteger(), 28);  // age column
     }
@@ -390,7 +401,7 @@ TEST_F(ExecutionEngineTest, WhereFloatEquals) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 1);  // Bob
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     EXPECT_FLOAT_EQ(tuples[0].getValue(3).getDouble(), 60000.0f);  // salary column
     EXPECT_EQ(tuples[0].getValue(1).getString(), "Bob");
 }
@@ -411,7 +422,7 @@ TEST_F(ExecutionEngineTest, WhereFloatGreaterThan) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Bob (60000) and Charlie (75000)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_GT(tuple.getValue(3).getDouble(), 55000.0f);  // salary column
     }
@@ -433,7 +444,7 @@ TEST_F(ExecutionEngineTest, WhereFloatLessThan) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 1);  // Diana (45000)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     EXPECT_LT(tuples[0].getValue(3).getDouble(), 50000.0f);  // salary column
     EXPECT_EQ(tuples[0].getValue(1).getString(), "Diana");
 }
@@ -456,7 +467,7 @@ TEST_F(ExecutionEngineTest, WhereStringEquals) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 1);
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     EXPECT_EQ(tuples[0].getValue(1).getString(), "Alice");
     EXPECT_EQ(tuples[0].getValue(0).getInteger(), 1);
 }
@@ -477,7 +488,7 @@ TEST_F(ExecutionEngineTest, WhereStringNotEquals) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Bob (Sales), Diana (HR), Eve (Sales)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_NE(tuple.getValue(4).getString(), "Engineering");  // department column
     }
@@ -499,7 +510,7 @@ TEST_F(ExecutionEngineTest, WhereDepartmentEquals) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Bob and Eve
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getValue(4).getString(), "Sales");  // department column
     }
@@ -523,7 +534,7 @@ TEST_F(ExecutionEngineTest, WhereLogicalAnd) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 1);  // Charlie (Engineering, 35)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     EXPECT_EQ(tuples[0].getValue(4).getString(), "Engineering");  // department
     EXPECT_GT(tuples[0].getValue(2).getInteger(), 30);  // age > 30
     EXPECT_EQ(tuples[0].getValue(1).getString(), "Charlie");
@@ -545,7 +556,7 @@ TEST_F(ExecutionEngineTest, WhereLogicalOr) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Alice (25) and Charlie (75000)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         bool age_condition = tuple.getValue(2).getInteger() < 26;
         bool salary_condition = tuple.getValue(3).getDouble() > 70000.0f;
@@ -569,7 +580,7 @@ TEST_F(ExecutionEngineTest, WhereComplexLogical) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Bob (Sales, 30), Diana (HR, 28), Eve (Sales, 32)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         std::string dept = tuple.getValue(4).getString();
         int age = tuple.getValue(2).getInteger();
@@ -630,7 +641,7 @@ TEST_F(ExecutionEngineTest, WhereWithProjection) {
     EXPECT_EQ(query_result->getRowCount(), 3);  // Bob, Charlie, Eve
     EXPECT_EQ(query_result->getSchema().getColumnCount(), 2);  // name, department only
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getColumnCount(), 2);  // Only name and department
     }
@@ -654,7 +665,7 @@ TEST_F(ExecutionEngineTest, WhereMixedConditions) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Bob (id=2, salary=60000, Sales) and Charlie (id=3, salary=75000, Engineering)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_LE(tuple.getValue(0).getInteger(), 3);  // id <= 3
         EXPECT_GT(tuple.getValue(3).getDouble(), 50000.0f);  // salary > 50000

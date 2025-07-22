@@ -9,6 +9,24 @@
 
 using namespace velodb;
 
+// Helper function to convert QueryResult to vector of tuples for testing
+static std::vector<Tuple> queryResultToTuples(const QueryResult& result) {
+    std::vector<Tuple> tuples;
+    const size_t row_count = result.getRowCount();
+    const Schema& schema = result.getSchema();
+    
+    for (size_t row_id = 0; row_id < row_count; ++row_id) {
+        std::vector<Value> values;
+        values.reserve(schema.getColumnCount());
+        for (size_t col_idx = 0; col_idx < schema.getColumnCount(); ++col_idx) {
+            values.push_back(result.getValue(row_id, col_idx));
+        }
+        tuples.emplace_back(schema, std::move(values));
+    }
+    
+    return tuples;
+}
+
 class WhereClauseTest : public ::testing::Test {
 protected:
     void SetUp() override {
@@ -81,8 +99,7 @@ protected:
         values.push_back(Value::createString(category));
         values.push_back(Value::createInteger(in_stock));
         
-        Tuple tuple(table->getSchema(), std::move(values));
-        table->insertTuple(std::move(tuple));
+        table->insertRow(values);
     }
 
     std::unique_ptr<hsql::SQLParserResult> parseSQL(const std::string& sql) {
@@ -113,7 +130,7 @@ TEST_F(WhereClauseTest, PriceRangeQueries) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Laptop, Desk, Monitor
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_GT(tuple.getValue(2).getDouble(), 100.0f);  // price > 100
     }
@@ -134,7 +151,7 @@ TEST_F(WhereClauseTest, PriceBetweenRange) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Mouse, Chair, Keyboard
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         double price = tuple.getValue(2).getDouble();
         EXPECT_GE(price, 20.0f);
@@ -157,7 +174,7 @@ TEST_F(WhereClauseTest, QuantityBasedFiltering) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Laptop (10), Desk (5), Chair (0), Monitor (0)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_LE(tuple.getValue(3).getInteger(), 10);  // quantity <= 10
     }
@@ -180,7 +197,7 @@ TEST_F(WhereClauseTest, CategoryFiltering) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 4);  // Laptop, Mouse, Keyboard, Monitor
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getValue(4).getString(), "Electronics");
     }
@@ -201,7 +218,7 @@ TEST_F(WhereClauseTest, MultiCategoryFiltering) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Desk, Chair, Book
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         std::string category = tuple.getValue(4).getString();
         EXPECT_TRUE(category == "Furniture" || category == "Books");
@@ -225,7 +242,7 @@ TEST_F(WhereClauseTest, InStockFiltering) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 6);  // All except Chair and Monitor
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getValue(5).getInteger(), 1);  // in_stock = 1
     }
@@ -246,7 +263,7 @@ TEST_F(WhereClauseTest, OutOfStockFiltering) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Chair and Monitor
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getValue(5).getInteger(), 0);  // in_stock = 0
     }
@@ -269,7 +286,7 @@ TEST_F(WhereClauseTest, AvailableElectronicsQuery) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Laptop, Mouse, Keyboard
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getValue(5).getInteger(), 1);  // in_stock = 1
         EXPECT_EQ(tuple.getValue(4).getString(), "Electronics");
@@ -291,7 +308,7 @@ TEST_F(WhereClauseTest, LowStockHighValueQuery) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Laptop, Desk, Monitor
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_LE(tuple.getValue(3).getInteger(), 10);  // quantity <= 10
         EXPECT_GT(tuple.getValue(2).getDouble(), 50.0f);  // price > 50
@@ -313,7 +330,7 @@ TEST_F(WhereClauseTest, ReorderCandidatesQuery) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Desk (5), Chair (0), Monitor (0)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         bool low_quantity = tuple.getValue(3).getInteger() <= 5;
         bool out_of_stock = tuple.getValue(5).getInteger() == 0;
@@ -338,7 +355,7 @@ TEST_F(WhereClauseTest, NameStartsWith) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Laptop and Mouse
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         std::string name = tuple.getValue(1).getString();
         EXPECT_TRUE(name == "Laptop" || name == "Mouse");
@@ -362,7 +379,7 @@ TEST_F(WhereClauseTest, NotElectronicsQuery) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 4);  // Desk, Chair, Book, Pen
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_NE(tuple.getValue(4).getString(), "Electronics");
     }
@@ -383,7 +400,7 @@ TEST_F(WhereClauseTest, NotLowPriceQuery) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 6);  // All except Book and Pen
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_GT(tuple.getValue(2).getDouble(), 20.0f);
     }
@@ -407,7 +424,7 @@ TEST_F(WhereClauseTest, ProjectedExpensiveItems) {
     EXPECT_EQ(query_result->getRowCount(), 3);  // Laptop, Desk, Monitor
     EXPECT_EQ(query_result->getSchema().getColumnCount(), 3);  // name, price, category
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getColumnCount(), 3);  // Only projected columns
         // Note: In projected results, price is at index 1, not 2
@@ -431,7 +448,7 @@ TEST_F(WhereClauseTest, ProjectedStockStatus) {
     EXPECT_EQ(query_result->getRowCount(), 4);  // Laptop, Mouse, Keyboard, Monitor
     EXPECT_EQ(query_result->getSchema().getColumnCount(), 2);  // name, in_stock
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getColumnCount(), 2);  // Only projected columns
     }
@@ -454,7 +471,7 @@ TEST_F(WhereClauseTest, ExactPriceMatch) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 1);  // Mouse
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     EXPECT_FLOAT_EQ(tuples[0].getValue(2).getDouble(), 25.50f);
     EXPECT_EQ(tuples[0].getValue(1).getString(), "Mouse");
 }
@@ -474,7 +491,7 @@ TEST_F(WhereClauseTest, ZeroQuantityItems) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Chair and Monitor
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getValue(3).getInteger(), 0);  // quantity = 0
     }
@@ -513,7 +530,7 @@ TEST_F(WhereClauseTest, ComplexLogicalAndConditions) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Laptop and Keyboard
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getValue(4).getString(), "Electronics");
         EXPECT_GT(tuple.getValue(2).getDouble(), 50.0f);
@@ -536,7 +553,7 @@ TEST_F(WhereClauseTest, ComplexLogicalOrConditions) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 5);  // Book, Pen, Desk, Chair, Pen (quantity=200)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         bool condition_met = tuple.getValue(2).getDouble() < 20.0f ||
                            tuple.getValue(3).getInteger() > 100 ||
@@ -560,7 +577,7 @@ TEST_F(WhereClauseTest, MixedAndOrConditions) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Mouse, Keyboard, Book
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         std::string category = tuple.getValue(4).getString();
         EXPECT_TRUE(category == "Electronics" || category == "Books");
@@ -585,7 +602,7 @@ TEST_F(WhereClauseTest, EqualityComparisons) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 1);  // Mouse
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     EXPECT_EQ(tuples[0].getValue(1).getString(), "Mouse");
     EXPECT_EQ(tuples[0].getValue(2).getDouble(), 25.50);
 }
@@ -605,7 +622,7 @@ TEST_F(WhereClauseTest, InequalityComparisons) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 4);  // Desk, Chair, Book, Pen
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_NE(tuple.getValue(4).getString(), "Electronics");
     }
@@ -626,7 +643,7 @@ TEST_F(WhereClauseTest, BoundaryValueTests) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Chair and Monitor
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getValue(3).getInteger(), 0);
     }
@@ -650,7 +667,7 @@ TEST_F(WhereClauseTest, StringLengthBasedFiltering) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 1);  // Pen
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     EXPECT_EQ(tuples[0].getValue(1).getString(), "Pen");
 }
 
@@ -671,7 +688,7 @@ TEST_F(WhereClauseTest, MultiColumnComparisons) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Keyboard and Monitor
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_GE(tuple.getValue(0).getInteger(), 5);
         EXPECT_EQ(tuple.getValue(4).getString(), "Electronics");
@@ -731,7 +748,7 @@ TEST_F(WhereClauseTest, ComplexNestedConditions) {
     // Should not match Desk (Furniture, in_stock=1, but only qty=5)
     EXPECT_EQ(query_result->getRowCount(), 2);
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         std::string category = tuple.getValue(4).getString();
         double price = tuple.getValue(2).getDouble();
@@ -762,7 +779,7 @@ TEST_F(WhereClauseTest, ExactBoundaryValues) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 1);  // Only Laptop
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     EXPECT_EQ(tuples[0].getValue(1).getString(), "Laptop");
 }
 
@@ -781,7 +798,7 @@ TEST_F(WhereClauseTest, ZeroQuantityFilter) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Chair and Monitor
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getValue(3).getInteger(), 0);  // quantity = 0
         EXPECT_EQ(tuple.getValue(5).getInteger(), 0);  // should be out of stock
@@ -804,7 +821,7 @@ TEST_F(WhereClauseTest, StringEqualityTests) {
 
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 1);
-    EXPECT_EQ(query_result->getTuples()[0].getValue(1).getString(), "Laptop");
+    EXPECT_EQ(queryResultToTuples(*query_result)[0].getValue(1).getString(), "Laptop");
 }
 
 TEST_F(WhereClauseTest, StringInequalityTests) {
@@ -822,7 +839,7 @@ TEST_F(WhereClauseTest, StringInequalityTests) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 7);  // All except Laptop
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_NE(tuple.getValue(1).getString(), "Laptop");
     }
@@ -845,7 +862,7 @@ TEST_F(WhereClauseTest, ThreeConditionAND) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Mouse and Keyboard
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_EQ(tuple.getValue(4).getString(), "Electronics");
         EXPECT_LT(tuple.getValue(2).getDouble(), 100.0);
@@ -868,7 +885,7 @@ TEST_F(WhereClauseTest, ThreeConditionOR) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 3);  // Book, Pen, Laptop
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         std::string category = tuple.getValue(4).getString();
         double price = tuple.getValue(2).getDouble();
@@ -900,8 +917,7 @@ TEST_F(WhereClauseTest, SingleRowTable) {
     values.push_back(Value::createInteger(1));
     values.push_back(Value::createString("OnlyItem"));
     
-    Tuple tuple(concrete_table->getSchema(), std::move(values));
-    concrete_table->insertTuple(std::move(tuple));
+    concrete_table->insertRow(values);
     
     // Test matching condition
     std::string sql = "SELECT * FROM single_item WHERE id = 1";
@@ -950,7 +966,7 @@ TEST_F(WhereClauseTest, FloatingPointPrecision) {
 
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 1);  // Mouse
-    EXPECT_EQ(query_result->getTuples()[0].getValue(1).getString(), "Mouse");
+    EXPECT_EQ(queryResultToTuples(*query_result)[0].getValue(1).getString(), "Mouse");
 }
 
 TEST_F(WhereClauseTest, LargeIntegerComparison) {
@@ -968,7 +984,7 @@ TEST_F(WhereClauseTest, LargeIntegerComparison) {
     ASSERT_NE(query_result, nullptr);
     EXPECT_EQ(query_result->getRowCount(), 2);  // Book (100), Pen (200)
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         EXPECT_GE(tuple.getValue(3).getInteger(), 100);
     }
@@ -992,7 +1008,7 @@ TEST_F(WhereClauseTest, ComplexBooleanExpression) {
     // Should match: Laptop, Mouse, Keyboard, Desk
     EXPECT_EQ(query_result->getRowCount(), 4);
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         std::string category = tuple.getValue(4).getString();
         double price = tuple.getValue(2).getDouble();
@@ -1022,7 +1038,7 @@ TEST_F(WhereClauseTest, NegationWithComplexConditions) {
     // Should include: All others (7 items)
     EXPECT_EQ(query_result->getRowCount(), 7);
     
-    const auto& tuples = query_result->getTuples();
+    const auto tuples = queryResultToTuples(*query_result);
     for (const auto& tuple : tuples) {
         std::string category = tuple.getValue(4).getString();
         double price = tuple.getValue(2).getDouble();

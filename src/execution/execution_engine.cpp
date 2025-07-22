@@ -1,5 +1,6 @@
 #include "execution/execution_engine.hpp"
 #include "execution/operator/projection_operator.hpp"
+#include "common/traced_exception.hpp"
 #include "SQLParser.h"
 #include <sstream>
 #include <stdexcept>
@@ -8,31 +9,191 @@ namespace velodb {
 
 // TODO: Implement full execution engine with late materialization
 
-// QueryResult implementation
+// QueryResult implementation - Column-based storage
 QueryResult::QueryResult(std::unique_ptr<Schema> schema)
     : schema_(std::move(schema))
+    , row_count_(0)
 {
+    initializeColumns();
 }
 
-void QueryResult::addTuple(const Tuple& tuple)
+void QueryResult::initializeColumns()
 {
-    tuples_.push_back(tuple);
+    const size_t column_count = schema_->getColumnCount();
+    columns_.resize(column_count);
+    // Each column vector starts empty and will grow as rows are inserted
 }
 
-void QueryResult::addTuple(Tuple&& tuple)
+void QueryResult::ensureColumnCapacity(size_t new_row_count)
 {
-    tuples_.push_back(std::move(tuple));
+    for (auto& column : columns_) {
+        if (column.capacity() < new_row_count) {
+            column.reserve(new_row_count);
+        }
+    }
+}
+
+void QueryResult::insertRowInternal(const std::vector<Value>& values)
+{
+    if (values.size() != columns_.size()) {
+        VELODB_THROW(ExecutionError, "Row value count does not match schema column count");
+    }
+    
+    ensureColumnCapacity(row_count_ + 1);
+    
+    // Insert each value into its corresponding column
+    for (size_t col_idx = 0; col_idx < values.size(); ++col_idx) {
+        columns_[col_idx].push_back(values[col_idx]);
+    }
+    
+    ++row_count_;
+}
+
+// Column-based insertion methods
+void QueryResult::addRow(const std::vector<Value>& values)
+{
+    insertRowInternal(values);
+}
+
+void QueryResult::addRow(std::vector<Value>&& values)
+{
+    if (values.size() != columns_.size()) {
+        VELODB_THROW(ExecutionError, "Row value count does not match schema column count");
+    }
+    
+    ensureColumnCapacity(row_count_ + 1);
+    
+    // Move each value into its corresponding column
+    for (size_t col_idx = 0; col_idx < values.size(); ++col_idx) {
+        columns_[col_idx].push_back(std::move(values[col_idx]));
+    }
+    
+    ++row_count_;
+}
+
+void QueryResult::addBatchRows(const std::vector<std::vector<Value>>& rows)
+{
+    if (rows.empty()) return;
+    
+    ensureColumnCapacity(row_count_ + rows.size());
+    
+    for (const auto& row : rows) {
+        insertRowInternal(row);
+    }
+}
+
+// Column-based access methods
+Value QueryResult::getValue(RowId row_id, size_t column_index) const
+{
+    if (row_id >= row_count_) {
+        VELODB_THROW(ExecutionError, "Row ID out of range");
+    }
+    if (column_index >= columns_.size()) {
+        VELODB_THROW(ExecutionError, "Column index out of range");
+    }
+    
+    return columns_[column_index][row_id];
+}
+
+std::vector<Value> QueryResult::getValues(RowId row_id, const std::vector<size_t>& column_indices) const
+{
+    if (row_id >= row_count_) {
+        VELODB_THROW(ExecutionError, "Row ID out of range");
+    }
+    
+    std::vector<Value> values;
+    values.reserve(column_indices.size());
+    
+    for (size_t const col_idx : column_indices) {
+        if (col_idx >= columns_.size()) {
+            VELODB_THROW(ExecutionError, "Column index out of range");
+        }
+        values.push_back(columns_[col_idx][row_id]);
+    }
+    return values;
+}
+
+const ValueVector& QueryResult::getColumn(size_t column_index) const
+{
+    if (column_index >= columns_.size()) {
+        VELODB_THROW(ExecutionError, "Column index out of range");
+    }
+    return columns_[column_index];
+}
+
+std::vector<Value> QueryResult::getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const
+{
+    if (column_index >= columns_.size()) {
+        VELODB_THROW(ExecutionError, "Column index out of range");
+    }
+    
+    std::vector<Value> values;
+    values.reserve(row_ids.size());
+    
+    for (RowId const row_id : row_ids) {
+        if (row_id >= row_count_) {
+            VELODB_THROW(ExecutionError, "Row ID out of range");
+        }
+        values.push_back(columns_[column_index][row_id]);
+    }
+    
+    return values;
+}
+
+std::vector<ValueVector> QueryResult::getColumns(const std::vector<size_t>& column_indices) const
+{
+    std::vector<ValueVector> result;
+    result.reserve(column_indices.size());
+    
+    for (size_t const col_idx : column_indices) {
+        if (col_idx >= columns_.size()) {
+            VELODB_THROW(ExecutionError, "Column index out of range");
+        }
+        result.push_back(columns_[col_idx]);
+    }
+    
+    return result;
+}
+
+std::vector<RowId> QueryResult::getAllRowIds() const
+{
+    std::vector<RowId> row_ids;
+    row_ids.reserve(row_count_);
+    
+    for (RowId row_id = 0; row_id < row_count_; ++row_id) {
+        row_ids.push_back(row_id);
+    }
+    
+    return row_ids;
+}
+
+std::unique_ptr<View> QueryResult::toView(const std::string& view_name) const
+{
+    // Create a copy of the schema for the view
+    auto view_schema = schema_->clone();
+    auto table_info = std::make_unique<TableInfo>(view_name, std::move(view_schema));
+    
+    // Copy the column data
+    std::vector<ValueVector> view_columns = columns_;
+    
+    return std::make_unique<View>(std::move(table_info), std::move(view_columns));
 }
 
 std::string QueryResult::toString() const
 {
     std::stringstream ss;
-    ss << "QueryResult: " << tuples_.size() << " rows\n";
+    ss << "QueryResult: " << row_count_ << " rows\n";
     ss << "Schema: " << schema_->toString() << "\n";
 
-    for (const auto& tuple : tuples_) {
-        ss << tuple.toString() << "\n";
-    }
+    // // Show first few rows for demonstration
+    // size_t const max_rows = std::min(row_count_, static_cast<size_t>(10));
+    // for (RowId row_id = 0; row_id < max_rows; ++row_id) {
+    //     ss << getTuple(row_id).toString() << "\n";
+    // }
+    
+    // if (row_count_ > max_rows) {
+    //     ss << "... and " << (row_count_ - max_rows) << " more rows\n";
+    // }
 
     return ss.str();
 }
@@ -158,13 +319,13 @@ std::unique_ptr<QueryResult> ExecutionEngine::executeWithRowIdCollection(std::un
 
 std::unique_ptr<QueryResult> ExecutionEngine::executeWithLateMaterialization(
     std::unique_ptr<AbstractOperator> op,
-    const LateMaterializationOptimizer::MaterializationPlan& mat_plan)
+    [[maybe_unused]] const LateMaterializationOptimizer::MaterializationPlan& mat_plan)
 {
     // TODO: Implement late materialization execution
     auto result = std::make_unique<QueryResult>(
         op->getOutputSchema().clone());
 
-    collectResultsWithLateMaterialization(op.get(), result.get(), mat_plan);
+    // collectResultsWithLateMaterialization(op.get(), result.get(), mat_plan);
     return result;
 }
 
@@ -172,62 +333,6 @@ std::unique_ptr<AbstractOperator> ExecutionEngine::createOperatorTree(const Abst
 {
     // TODO: Implement plan node to operator conversion
     return plan_node.createOperator(context_.get());
-}
-
-void ExecutionEngine::collectResults(AbstractOperator* op, QueryResult* result)
-{
-    // Use late materialization interface
-    op->init();
-
-    // Collect all row IDs first
-    std::vector<RowId> row_ids;
-    RowId row_id;
-    while (op->nextRowId(&row_id)) {
-        row_ids.push_back(row_id);
-    }
-
-    // Materialize all columns for all rows
-    if (!row_ids.empty()) {
-        std::vector<size_t> all_columns;
-        for (size_t i = 0; i < op->getOutputSchema().getColumnCount(); ++i) {
-            all_columns.push_back(i);
-        }
-
-        std::vector<Tuple> tuples;
-
-        for (auto& tuple : tuples) {
-            result->addTuple(std::move(tuple));
-        }
-    }
-
-    last_execution_row_count_ = result->getRowCount();
-}
-
-void ExecutionEngine::collectResultsWithLateMaterialization(
-    AbstractOperator* op,
-    QueryResult* result,
-    [[maybe_unused]] const LateMaterializationOptimizer::MaterializationPlan& mat_plan)
-{
-    // Implement late materialization result collection
-    op->init();
-
-    // Collect all row IDs first
-    std::vector<RowId> row_ids;
-    RowId row_id;
-    while (op->nextRowId(&row_id)) {
-        row_ids.push_back(row_id);
-    }
-
-    // Materialize only the required columns
-    if (!row_ids.empty()) {
-        std::vector<Tuple> tuples;
-
-        for (auto& tuple : tuples) {
-            result->addTuple(std::move(tuple));
-        }
-    }
-
-    last_execution_row_count_ = result->getRowCount();
 }
 
 // ExecutionStats implementation

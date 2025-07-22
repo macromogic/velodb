@@ -60,7 +60,7 @@ add_dependencies(sqlparser sql-parser)
 add_subdirectory(thirdparty/argparse)
 
 # Add backward-cpp
-add_subdirectory(backward-cpp)
+add_subdirectory(thirdparty/backward-cpp)
 
 # Project source files
 add_subdirectory(src/common)

@@ -63,22 +63,19 @@ TEST_F(TableTest, InsertAndRetrieveTuple) {
     auto table_info = std::make_unique<TableInfo>("test_table", std::move(schema));
     Table table(std::move(table_info));
     
-    // Create a tuple
+    // Create values for insertion
     std::vector<Value> values;
     values.push_back(Value::createInteger(1));
     values.push_back(Value::createString("Alice"));
 
-    Tuple tuple(table.getSchema(), std::move(values));
-
-    // Insert the tuple
-    table.insertTuple(std::move(tuple));
+    // Insert the row using column-based API
+    table.insertRow(values);
 
     EXPECT_EQ(table.getRowCount(), 1);
 
-    // Retrieve the tuple
-    const auto& retrieved_tuple = table.getTuple(0);
-    EXPECT_EQ(retrieved_tuple.getValue(0).getInteger(), 1);
-    EXPECT_EQ(retrieved_tuple.getValue(1).getString(), "Alice");
+    // Retrieve values using column-based access
+    EXPECT_EQ(table.getValue(0, 0).getInteger(), 1);
+    EXPECT_EQ(table.getValue(0, 1).getString(), "Alice");
 }
 
 // TODO: Add more comprehensive table tests when table operations are implemented

@@ -83,7 +83,13 @@ std::unique_ptr<QueryResult> ProjectionOperator::execute()
             throw std::runtime_error("Source table is not a concrete Table - views not supported yet");
         }
         
-        Tuple full_tuple = table->getTuple(rid);
+        // Create a tuple by getting all column values for this row
+        std::vector<Value> full_values;
+        full_values.reserve(source_table->getSchema().getColumnCount());
+        for (size_t col_idx = 0; col_idx < source_table->getSchema().getColumnCount(); ++col_idx) {
+            full_values.push_back(table->getValue(rid, col_idx));
+        }
+        Tuple full_tuple(source_table->getSchema(), std::move(full_values));
         
         // Evaluate projection expressions on the materialized tuple
         std::vector<Value> projected_values;
@@ -94,9 +100,8 @@ std::unique_ptr<QueryResult> ProjectionOperator::execute()
             projected_values.push_back(std::move(projected_value));
         }
         
-        // Create projected tuple and add to result
-        Tuple projected_tuple(*output_schema_, std::move(projected_values));
-        result->addTuple(std::move(projected_tuple));
+        // Add projected row to result
+        result->addRow(std::move(projected_values));
     }
     
     return result;

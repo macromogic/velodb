@@ -24,18 +24,16 @@ protected:
         auto table_info = std::make_unique<TableInfo>("test_table", std::move(schema));
         test_table_ = std::make_unique<Table>(std::move(table_info));
         
-        // Insert some test data
+        // Insert some test data using column-based API
         std::vector<Value> values1;
         values1.push_back(Value::createInteger(1));
         values1.push_back(Value::createString("Alice"));
-        Tuple tuple1(test_table_->getSchema(), std::move(values1));
-        test_table_->insertTuple(std::move(tuple1));
+        test_table_->insertRow(values1);
         
         std::vector<Value> values2;
         values2.push_back(Value::createInteger(2));
         values2.push_back(Value::createString("Bob"));
-        Tuple tuple2(test_table_->getSchema(), std::move(values2));
-        test_table_->insertTuple(std::move(tuple2));
+        test_table_->insertRow(values2);
     }
 
     void TearDown() override {
@@ -66,10 +64,15 @@ TEST_F(OperatorTest, ScanFilterOperatorIteration) {
         row_ids.push_back(row_id);
     }
     
-    // Manually materialize the tuples from the table
+    // Manually materialize the tuples from the table using column-based access
     std::vector<Tuple> tuples;
     for (const RowId& rid : row_ids) {
-        tuples.push_back(test_table_->getTuple(rid));
+        std::vector<Value> values;
+        values.reserve(test_table_->getSchema().getColumnCount());
+        for (size_t col_idx = 0; col_idx < test_table_->getSchema().getColumnCount(); ++col_idx) {
+            values.push_back(test_table_->getValue(rid, col_idx));
+        }
+        tuples.emplace_back(test_table_->getSchema(), std::move(values));
     }
     
     // Check that we got both tuples
@@ -105,10 +108,15 @@ TEST_F(OperatorTest, ScanFilterOperatorWithPredicate) {
         row_ids.push_back(row_id);
     }
     
-    // Manually materialize the tuples from the table
+    // Manually materialize the tuples from the table using column-based access
     std::vector<Tuple> tuples;
     for (const RowId& rid : row_ids) {
-        tuples.push_back(test_table_->getTuple(rid));
+        std::vector<Value> values;
+        values.reserve(test_table_->getSchema().getColumnCount());
+        for (size_t col_idx = 0; col_idx < test_table_->getSchema().getColumnCount(); ++col_idx) {
+            values.push_back(test_table_->getValue(rid, col_idx));
+        }
+        tuples.emplace_back(test_table_->getSchema(), std::move(values));
     }
     
     // Should only get one tuple (id = 1)
