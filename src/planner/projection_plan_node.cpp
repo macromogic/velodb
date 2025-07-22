@@ -22,10 +22,7 @@ std::unique_ptr<AbstractOperator> ProjectionPlanNode::createOperator([[maybe_unu
 
     auto child_operator = children_[0]->createOperator(context);
 
-    // Move expressions to the operator (expressions_ is mutable)
-    auto expressions_copy = std::move(expressions_);
-
-    return std::make_unique<ProjectionOperator>(output_schema_->clone(), std::move(child_operator), std::move(expressions_copy));
+    return std::make_unique<ProjectionOperator>(output_schema_->clone(), std::move(child_operator), std::move(expressions_));
 }
 
 std::string ProjectionPlanNode::toString() const

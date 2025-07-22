@@ -283,50 +283,7 @@ std::unique_ptr<QueryResult> ExecutionEngine::executePlan(std::unique_ptr<Abstra
     
     // Execute the operator tree 
     // The ProjectionOperator at the root will handle materialization
-    return executeOperatorTree(std::move(op));
-}
-
-std::unique_ptr<QueryResult> ExecutionEngine::executeOperatorTree(std::unique_ptr<AbstractOperator> root_op)
-{
-    // NEW PROPER EXECUTION PIPELINE:
-    // The execute() method on any operator will traverse the tree and execute all children first
-    // This implements bottom-up execution with proper tree traversal
-    
-    return root_op->execute();
-}
-
-std::unique_ptr<QueryResult> ExecutionEngine::executeWithRowIdCollection(std::unique_ptr<AbstractOperator> op)
-{
-    // Simple execution: collect row IDs then materialize from the first table in catalog
-    // This is a simplified approach - in practice, the planner should set up proper materialization
-    
-    auto result = std::make_unique<QueryResult>(op->getOutputSchema().clone());
-    
-    // Initialize and collect row IDs
-    op->init();
-    std::vector<RowId> row_ids;
-    RowId row_id;
-    while (op->nextRowId(&row_id)) {
-        row_ids.push_back(row_id);
-    }
-    
-    // For now, just return empty result with collected row count
-    // TODO: Implement proper materialization logic
-    last_execution_row_count_ = row_ids.size();
-    
-    return result;
-}
-
-std::unique_ptr<QueryResult> ExecutionEngine::executeWithLateMaterialization(
-    std::unique_ptr<AbstractOperator> op,
-    [[maybe_unused]] const LateMaterializationOptimizer::MaterializationPlan& mat_plan)
-{
-    // TODO: Implement late materialization execution
-    auto result = std::make_unique<QueryResult>(
-        op->getOutputSchema().clone());
-
-    // collectResultsWithLateMaterialization(op.get(), result.get(), mat_plan);
-    return result;
+    return op->execute();
 }
 
 std::unique_ptr<AbstractOperator> ExecutionEngine::createOperatorTree(const AbstractPlanNode& plan_node)

@@ -132,8 +132,8 @@ void Schema::computeOffsets()
 std::unique_ptr<Schema> Schema::scanFilterSchema()
 {
     std::vector<Column> columns;
-    columns.emplace_back("._rowid", DataType::createType(DataTypeId::INTEGER), false);
-    columns.emplace_back("._mask", DataType::createType(DataTypeId::BOOLEAN), false);
+    columns.emplace_back("_rowid", DataType::createType(DataTypeId::INTEGER), false);
+    columns.emplace_back("_mask", DataType::createType(DataTypeId::BOOLEAN), false);
     return std::make_unique<Schema>(std::move(columns));
 }
 

@@ -105,6 +105,7 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::Exp
     }
 }
 
+// UNUSED
 std::unique_ptr<Schema> QueryPlanner::inferSelectSchema([[maybe_unused]] const hsql::SelectStatement* select_stmt,
     const Schema& input_schema)
 {
