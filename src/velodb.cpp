@@ -47,10 +47,10 @@ bool Database::hasTable(const std::string& table_name) const
     return catalog_->hasTable(table_name);
 }
 
-Table* Database::getTable(const std::string& table_name) const
+std::optional<std::reference_wrapper<Table>> Database::getTable(const std::string& table_name) const
 {
     if (!initialized_)
-        return nullptr;
+        return std::nullopt;
     return catalog_->getTable(table_name);
 }
 
@@ -58,8 +58,8 @@ bool Database::insertTuple(const std::string& table_name, const Tuple& tuple)
 {
     if (!initialized_)
         return false;
-    Table* table = catalog_->getTable(table_name);
-    if (table == nullptr)
+    auto table = catalog_->getTable(table_name);
+    if (!table)
         return false;
     
     // Convert tuple to values vector
@@ -68,7 +68,7 @@ bool Database::insertTuple(const std::string& table_name, const Tuple& tuple)
     for (size_t i = 0; i < tuple.getColumnCount(); ++i) {
         values.push_back(tuple.getValue(i));
     }
-    table->insertRow(values);
+    table->get().insertRow(values);
     return true;
 }
 
@@ -76,8 +76,8 @@ bool Database::insertTuple(const std::string& table_name, Tuple&& tuple)
 {
     if (!initialized_)
         return false;
-    Table* table = catalog_->getTable(table_name);
-    if (table == nullptr)
+    auto table = catalog_->getTable(table_name);
+    if (!table)
         return false;
     
     // Convert tuple to values vector
@@ -86,11 +86,11 @@ bool Database::insertTuple(const std::string& table_name, Tuple&& tuple)
     for (size_t i = 0; i < tuple.getColumnCount(); ++i) {
         values.push_back(std::move(const_cast<Tuple&>(tuple).getValue(i)));
     }
-    table->insertRow(std::move(values));
+    table->get().insertRow(std::move(values));
     return true;
 }
 
-View Database::executeQuery(const std::string& sql)
+Result<View> Database::executeQuery(const std::string& sql)
 {
     if (!initialized_) {
         throw std::runtime_error("Database not initialized");
@@ -214,11 +214,11 @@ void populateSampleData(Database* db)
         return;
     }
 
-    Table* table = db->getTable("employees");
-    if (table == nullptr)
+    auto table = db->getTable("employees");
+    if (!table)
         return;
 
-    const Schema& schema = table->getSchema();
+    const Schema& schema = table->get().getSchema();
 
     // Add sample employees
     std::vector<Value> values1 = {

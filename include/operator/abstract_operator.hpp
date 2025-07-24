@@ -3,8 +3,9 @@
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "catalog/catalog.hpp"
-#include "common/non_copyable.hpp"
+#include "common/copy_traits.hpp"
 #include "common/exception.hpp"
+#include "common/result.hpp"
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -23,22 +24,41 @@ public:
 
     const Schema& getOutputSchema() const { return *output_schema_; }
 
-    // Main execution interface - executes the entire operator tree
-    virtual View execute() = 0;
-
-    // Core operator interface - Late materialization only
-    virtual void init() = 0;
-    virtual bool nextRowId(RowId* row_id) = 0;
-    virtual void reset() = 0;
-
-    // Child operator management
-    virtual void addChild(std::unique_ptr<AbstractOperator> child);
-    const std::vector<std::unique_ptr<AbstractOperator>>& getChildren() const { return children_; }
+    virtual Result<View> execute() const = 0;
+    virtual bool isUnary() const = 0;
 
 protected:
     Catalog& catalog_; // Reference to the catalog for table access
     std::unique_ptr<Schema> output_schema_;
-    std::vector<std::unique_ptr<AbstractOperator>> children_;
+};
+
+class UnaryOperator : public AbstractOperator {
+public:
+    explicit UnaryOperator(Catalog& catalog, std::unique_ptr<Schema> output_schema, std::unique_ptr<AbstractOperator> child);
+
+    bool isUnary() const override { return true; }
+
+    const AbstractOperator* getChild() const { return child_.get(); }
+
+private:
+    std::unique_ptr<AbstractOperator> child_; // Child operator
+};
+
+class BinaryOperator : public AbstractOperator {
+public:
+    BinaryOperator(Catalog& catalog,
+        std::unique_ptr<Schema> output_schema,
+        std::unique_ptr<AbstractOperator> left_child,
+        std::unique_ptr<AbstractOperator> right_child);
+
+    bool isUnary() const override { return false; }
+
+    const AbstractOperator* getLeftChild() const { return left_child_.get(); }
+    const AbstractOperator* getRightChild() const { return right_child_.get(); }
+
+private:
+    std::unique_ptr<AbstractOperator> left_child_;
+    std::unique_ptr<AbstractOperator> right_child_;
 };
 
 } // namespace velodb

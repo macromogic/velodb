@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <optional>
 
 namespace velodb {
 
@@ -24,12 +25,10 @@ public:
     bool dropTable(const std::string& table_name);
     bool hasTable(const std::string& table_name) const;
 
-    Table* getTable(const std::string& table_name) const;
+    std::optional<std::reference_wrapper<Table>> getTable(const std::string& table_name) const;
+    std::optional<std::reference_wrapper<Table>> getTable(const char* table_name) const;
 
     ValueColumn& createTemporaryColumn(const std::string& column_name, std::unique_ptr<DataType> type);
-
-    // Schema management
-    const Schema* getTableSchema(const std::string& table_name) const;
 
     // Catalog information
     std::vector<std::string> getTableNames() const;

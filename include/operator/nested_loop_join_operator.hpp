@@ -1,7 +1,7 @@
 #pragma once
 
-#include "execution/operator/abstract_operator.hpp"
-#include "execution/operator/join_type.hpp"
+#include "operator/abstract_operator.hpp"
+#include "operator/join_type.hpp"
 #include <memory>
 #include <vector>
 
@@ -19,11 +19,7 @@ public:
         JoinType join_type = JoinType::INNER);
     ~NestedLoopJoinOperator() override = default;
 
-    void init() override;
-    void reset() override;
-
-    // Late materialization interface
-    bool nextRowId(RowId* row_id) override;
+    View execute() override;
 
 private:
     std::unique_ptr<AbstractOperator> left_child_;

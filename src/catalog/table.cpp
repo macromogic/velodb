@@ -88,6 +88,14 @@ TableInfo::TableInfo(std::string name, std::unique_ptr<Schema> schema)
 {
 }
 
+void TableInfo::addColumnInfo(ColumnInfo column)
+{
+    if (schema_->hasColumn(column.getName())) {
+        VELODB_THROW(CatalogError, "Column already exists: " + column.getName());
+    }
+    schema_->addColumnInfo(std::move(column));
+}
+
 // TableBase implementation
 TableBase::TableBase(std::unique_ptr<TableInfo> table_info)
     : table_info_(std::move(table_info))
@@ -165,7 +173,17 @@ View Table::view() const
     for (const auto& column : columns_) {
         columns.emplace_back(column.view());
     }
-    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().clone()), std::move(columns));
+    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()), std::move(columns));
+}
+
+View Table::viewAs(std::string alias) const
+{
+    std::vector<ViewColumn> columns;
+    columns.reserve(columns_.size());
+    for (const auto& column : columns_) {
+        columns.emplace_back(column.view());
+    }
+    return View(std::make_unique<TableInfo>(std::move(alias), table_info_->getSchema().cloneUnique()), std::move(columns));
 }
 
 void Table::insertRow(std::vector<Value>&& values)
@@ -279,12 +297,30 @@ View::View(std::unique_ptr<TableInfo> table_info, std::vector<ViewColumn> column
     }
 }
 
+View::View(std::string name)
+    : TableBase(std::make_unique<TableInfo>(std::move(name), std::make_unique<Schema>()))
+    , columns_()
+    , row_count_(0)
+{
+}
+
 void View::addColumn(ViewColumn column)
 {
     if (column.size() != row_count_) {
         VELODB_THROW(CatalogError, "New column size must match existing row count");
     }
+    table_info_->addColumnInfo({ column.getName(), column.getType().cloneUnique() });
     columns_.push_back(std::move(column));
+}
+
+ViewColumn View::getColumn(const std::string& name) const
+{
+    for (const auto& column : columns_) {
+        if (column.getName() == name) {
+            return column.view();
+        }
+    }
+    VELODB_THROW(CatalogError, "Column not found: " + name);
 }
 
 TableIterator View::begin() const
@@ -304,7 +340,20 @@ View View::view() const
     for (const auto& column : columns_) {
         columns.emplace_back(column.getType(), column.getName(), column.getValues());
     }
-    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().clone()), std::move(columns));
+    return {
+        std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
+        std::move(columns)
+    };
+}
+
+View View::viewAs(std::string alias) const
+{
+    std::vector<ViewColumn> columns;
+    columns.reserve(columns_.size());
+    for (const auto& column : columns_) {
+        columns.emplace_back(column.getType(), column.getName(), column.getValues());
+    }
+    return View(std::make_unique<TableInfo>(std::move(alias), table_info_->getSchema().cloneUnique()), std::move(columns));
 }
 
 // Column-based access methods

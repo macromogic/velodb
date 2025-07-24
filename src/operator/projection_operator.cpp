@@ -3,6 +3,7 @@
 #include "expression/expression.hpp"
 #include "execution/execution_engine.hpp"
 #include "catalog/table.hpp"
+#include "common/result.hpp"
 
 namespace velodb {
 
@@ -11,83 +12,49 @@ ProjectionOperator::ProjectionOperator(Catalog& catalog,
     std::unique_ptr<Schema> output_schema,
     std::unique_ptr<AbstractOperator> child,
     std::vector<std::unique_ptr<AbstractExpression>> expressions)
-    : AbstractOperator(catalog, std::move(output_schema))
+    : UnaryOperator(catalog, std::move(output_schema), std::move(child))
     , expressions_(std::move(expressions))
 {
-    // Add child to the children vector for proper tree structure
-    if (child) {
-        addChild(std::move(child));
-    }
 }
 
-void ProjectionOperator::init()
+Result<View> ProjectionOperator::execute() const
 {
-    // if (!children_.empty()) {
-    //     children_[0]->init();
-    // }
-}
-
-void ProjectionOperator::reset()
-{
-    if (!children_.empty()) {
-        children_[0]->reset();
+    auto* child = getChild();
+    if (!child) {
+        return Result<View>::failure("ProjectionOperator requires a child operator");
     }
-}
-
-bool ProjectionOperator::nextRowId(RowId* row_id)
-{
-    // ProjectionOperator in this design just passes through row IDs
-    // The actual projection evaluation happens during materialization
-    if (!children_.empty()) {
-        return children_[0]->nextRowId(row_id);
+    auto child_result = child->execute();
+    if (!child_result) {
+        return child_result; // Propagate error from child
     }
-    return false;
-}
+    auto& child_view = child_result.value();
 
-View ProjectionOperator::execute()
-{
-    // PROPER TREE TRAVERSAL EXECUTION:
-    // 1. First execute all children (bottom-up traversal)
-    // 2. Then execute this operator's logic
-    
-    init();
-    if (children_.empty()) {
-        // TODO: Handle case with no children; use Result or empty View
-        // return std::make_unique<View>(output_schema_->clone());
-    }
-    auto child_result = children_[0]->execute();
-    
-    // TODO: Do the actual projection logic here
-    
-    return child_result;
-}
-
-const TableBase* ProjectionOperator::findSourceTable() const
-{
-    // Walk down the operator tree to find the scan operator with the source table
-    // This is a simple implementation - could be enhanced for joins, etc.
-    
-    if (children_.empty()) {
-        return nullptr;
-    }
-    
-    AbstractOperator* current = children_[0].get(); // First child
-    
-    while (current) {
-        // Check if this is a scan filter operator
-        if (auto* scan_filter = dynamic_cast<const ScanFilterOperator*>(current)) {
-            return &scan_filter->getTable();
+    View view("projection_result");
+    Tuple dummy_tuple(*output_schema_);
+    size_t output_columns = output_schema_->getColumnCount();
+    for (size_t i = 0; i < output_columns; ++i) {
+        const auto& expr = expressions_[i];
+        const auto& column_info = output_schema_->getColumnInfo(i);
+        switch (expr->getExpressionType()) {
+        case ExpressionType::COLUMN_REF: {
+            const auto* column_ref = static_cast<ColumnRefExpression*>(expr.get());
+            view.addColumn(child_view.getColumn(column_ref->getColumnName()).viewAs(column_info.getName()));
+            break;
         }
-        
-        // For other operators, traverse their first child
-        if (!current->getChildren().empty()) {
-            current = current->getChildren()[0].get();
-        } else {
+        case ExpressionType::CONSTANT: {
+            ValueColumn& constant_col = catalog_.createTemporaryColumn(column_info.getName(), expr->getReturnType().cloneUnique());
+            constant_col.fill(expr->evaluate(dummy_tuple, child_view.getSchema()), child_view.getRowCount());
+            view.addColumn(constant_col.view());
+            break;
+        }
+        default:
+            VELODB_THROW(ExecutionError, "Unsupported expression type in projection: " + expr->toString());
             break;
         }
     }
-    
-    return nullptr;
+
+    return Result<View>::success(std::move(view));
 }
+
 
 } // namespace velodb

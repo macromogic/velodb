@@ -44,14 +44,14 @@ public:
     bool createTable(const std::string& table_name, std::unique_ptr<Schema> schema);
     bool dropTable(const std::string& table_name);
     bool hasTable(const std::string& table_name) const;
-    Table* getTable(const std::string& table_name) const;
+    std::optional<std::reference_wrapper<Table>> getTable(const std::string& table_name) const;
 
     // Data manipulation
     bool insertTuple(const std::string& table_name, const Tuple& tuple);
     bool insertTuple(const std::string& table_name, Tuple&& tuple);
 
     // Query execution
-    View executeQuery(const std::string& sql);
+    Result<View> executeQuery(const std::string& sql);
 
     // Statistics
     size_t getTableCount() const;

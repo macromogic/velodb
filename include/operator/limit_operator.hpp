@@ -1,6 +1,6 @@
 #pragma once
 
-#include "execution/operator/abstract_operator.hpp"
+#include "operator/abstract_operator.hpp"
 #include <memory>
 
 namespace velodb {
@@ -11,11 +11,7 @@ public:
     LimitOperator(std::unique_ptr<AbstractOperator> child, size_t limit, size_t offset = 0);
     ~LimitOperator() override = default;
 
-    void init() override;
-    void reset() override;
-
-    // Late materialization interface
-    bool nextRowId(RowId* row_id) override;
+    View execute() override;
 
 private:
     std::unique_ptr<AbstractOperator> child_;

@@ -8,14 +8,6 @@
 
 namespace velodb {
 
-/**
- * @brief Simple Result type for error handling without exceptions
- * 
- * This provides a basic alternative to std::expected for C++17.
- * 
- * @tparam T Success value type
- * @tparam E Error type (defaults to std::string)
- */
 template<typename T, typename E = std::string>
 class Result {
 public:
@@ -107,9 +99,6 @@ private:
 };
 
 // Convenience aliases
-template<typename T>
-using StringResult = Result<T, std::string>;
-
 template<typename T>
 using UniqueResult = Result<std::unique_ptr<T>, std::string>;
 

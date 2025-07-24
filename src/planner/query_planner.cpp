@@ -27,15 +27,15 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
     // Plan WHERE clause and merge with scan
     std::unique_ptr<AbstractExpression> predicate = nullptr;
     if (select_stmt->whereClause != nullptr) {
-        predicate = planExpression(select_stmt->whereClause);
+        predicate = planExpression(select_stmt->fromTable, select_stmt->whereClause);
     }
 
     auto plan = planTableRef(select_stmt->fromTable, std::move(predicate));
 
     // Plan SELECT list (projection)
     if (select_stmt->selectList && !select_stmt->selectList->empty()) {
-        auto projection_expressions = planSelectList(select_stmt->selectList);
-        auto& input_schema = catalog_.getTable(select_stmt->fromTable->name)->getSchema();
+        auto projection_expressions = planSelectList(select_stmt->fromTable, select_stmt->selectList);
+        auto& input_schema = catalog_.getTable(select_stmt->fromTable->name)->get().getSchema();
         auto projection_schema = inferProjectionSchema(projection_expressions, input_schema);
         auto projection_plan = std::make_unique<ProjectionPlanNode>(
             std::move(projection_schema), std::move(projection_expressions));
@@ -55,11 +55,11 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRe
     switch (table_ref->type) {
     case hsql::kTableName: {
         std::string const table_name = table_ref->name;
-        TableBase* table = catalog_.getTable(table_name);
-        if (table == nullptr) {
+        auto table = catalog_.getTable(table_name);
+        if (!table) {
             VELODB_THROW(CatalogError, "Table not found: " + table_name);
         }
-        return std::make_unique<ScanFilterPlanNode>(*table, inferScanFilterSchema(table->getSchema()), std::move(predicate));
+        return std::make_unique<ScanFilterPlanNode>(*table, inferScanFilterSchema(table->get().getSchema()), std::move(predicate));
     }
     case hsql::kTableSelect:
         // TODO: Handle subqueries
@@ -72,7 +72,7 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRe
     }
 }
 
-std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::Expr* expr)
+std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::TableRef* table_ref, const hsql::Expr* expr)
 {
     // TODO: Implement comprehensive expression planning
     switch (expr->type) {
@@ -83,9 +83,9 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::Exp
     case hsql::kExprLiteralString:
         return std::make_unique<ConstantExpression>(Value::createString(expr->name));
     case hsql::kExprColumnRef:
-        return planColumnRef(expr);
+        return planColumnRef(table_ref, expr);
     case hsql::kExprOperator:
-        return planOperator(expr);
+        return planOperator(table_ref, expr);
     case hsql::kExprStar:
         VELODB_THROW(ExecutionError, "* expression should be handled in planSelectList, not planExpression");
     default:
@@ -93,93 +93,72 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::Exp
     }
 }
 
-// UNUSED
-std::unique_ptr<Schema> QueryPlanner::inferSelectSchema([[maybe_unused]] const hsql::SelectStatement* select_stmt,
-    const Schema& input_schema)
+std::unique_ptr<AbstractExpression> QueryPlanner::planColumnRef(const hsql::TableRef* table_ref, const hsql::Expr* expr)
 {
-    // TODO: Implement schema inference from SELECT list
-    // For now, return a clone of the input schema
-    return input_schema.clone();
-}
-
-std::unique_ptr<AbstractExpression> QueryPlanner::planColumnRef(const hsql::Expr* expr)
-{
-    // TODO: Implement column reference planning with proper type inference
     std::string const column_name = expr->name;
-    auto type = std::make_unique<IntegerType>(); // TODO: Infer actual type
-    return std::make_unique<ColumnRefExpression>(column_name, std::move(type));
-}
-
-std::unique_ptr<AbstractExpression> QueryPlanner::planLiteral(const hsql::Expr* expr)
-{
-    // TODO: Implement literal planning
-    switch (expr->type) {
-    case hsql::kExprLiteralInt:
-        return std::make_unique<ConstantExpression>(Value::createInteger(expr->ival));
-    case hsql::kExprLiteralFloat:
-        return std::make_unique<ConstantExpression>(Value::createDouble(expr->fval));
-    case hsql::kExprLiteralString:
-        return std::make_unique<ConstantExpression>(Value::createString(expr->name));
-    default:
-        VELODB_THROW(ExecutionError, "Unsupported literal type");
+    auto table = catalog_.getTable(table_ref->name);
+    if (!table) {
+        VELODB_THROW(CatalogError, "Table not found for column reference: " + column_name);
     }
+    auto type = table->get().getSchema().getColumnInfo(column_name).getType().cloneUnique();
+    return std::make_unique<ColumnRefExpression>(expr->alias ? expr->alias : column_name, std::move(type));
 }
 
-std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Expr* expr)
+std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::TableRef* table_ref, const hsql::Expr* expr)
 {
     // Implement operator planning for all comparison operators
     switch (expr->opType) {
     case hsql::kOpEquals: {
-        auto left = planExpression(expr->expr);
-        auto right = planExpression(expr->expr2);
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
         return std::make_unique<ComparisonExpression>(
             ComparisonType::EQUAL, std::move(left), std::move(right));
     }
     case hsql::kOpNotEquals: {
-        auto left = planExpression(expr->expr);
-        auto right = planExpression(expr->expr2);
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
         return std::make_unique<ComparisonExpression>(
             ComparisonType::NOT_EQUAL, std::move(left), std::move(right));
     }
     case hsql::kOpLess: {
-        auto left = planExpression(expr->expr);
-        auto right = planExpression(expr->expr2);
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
         return std::make_unique<ComparisonExpression>(
             ComparisonType::LESS_THAN, std::move(left), std::move(right));
     }
     case hsql::kOpLessEq: {
-        auto left = planExpression(expr->expr);
-        auto right = planExpression(expr->expr2);
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
         return std::make_unique<ComparisonExpression>(
             ComparisonType::LESS_THAN_OR_EQUAL, std::move(left), std::move(right));
     }
     case hsql::kOpGreater: {
-        auto left = planExpression(expr->expr);
-        auto right = planExpression(expr->expr2);
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
         return std::make_unique<ComparisonExpression>(
             ComparisonType::GREATER_THAN, std::move(left), std::move(right));
     }
     case hsql::kOpGreaterEq: {
-        auto left = planExpression(expr->expr);
-        auto right = planExpression(expr->expr2);
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
         return std::make_unique<ComparisonExpression>(
             ComparisonType::GREATER_THAN_OR_EQUAL, std::move(left), std::move(right));
     }
     case hsql::kOpLike: {
-        auto left = planExpression(expr->expr);
-        auto right = planExpression(expr->expr2);
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
         return std::make_unique<ComparisonExpression>(
             ComparisonType::LIKE, std::move(left), std::move(right));
     }
     case hsql::kOpNotLike: {
-        auto left = planExpression(expr->expr);
-        auto right = planExpression(expr->expr2);
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
         return std::make_unique<ComparisonExpression>(
             ComparisonType::NOT_LIKE, std::move(left), std::move(right));
     }
     case hsql::kOpAnd: {
-        auto left = planExpression(expr->expr);
-        auto right = planExpression(expr->expr2);
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
         std::vector<std::unique_ptr<AbstractExpression>> children;
         children.push_back(std::move(left));
         children.push_back(std::move(right));
@@ -187,8 +166,8 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Expr*
             ConjunctionType::AND, std::move(children));
     }
     case hsql::kOpOr: {
-        auto left = planExpression(expr->expr);
-        auto right = planExpression(expr->expr2);
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
         std::vector<std::unique_ptr<AbstractExpression>> children;
         children.push_back(std::move(left));
         children.push_back(std::move(right));
@@ -202,19 +181,19 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Expr*
             VELODB_THROW(ExecutionError, "BETWEEN requires exactly 2 operands");
         }
 
-        auto low_expr = planExpression((*expr->exprList)[0]);
-        auto high_expr = planExpression((*expr->exprList)[1]);
+        auto low_expr = planExpression(table_ref, (*expr->exprList)[0]);
+        auto high_expr = planExpression(table_ref, (*expr->exprList)[1]);
 
         // Create (expr >= low)
         auto left_comparison = std::make_unique<ComparisonExpression>(
             ComparisonType::GREATER_THAN_OR_EQUAL,
-            planExpression(expr->expr),
+            planExpression(table_ref, expr->expr),
             std::move(low_expr));
 
         // Create (expr <= high)
         auto right_comparison = std::make_unique<ComparisonExpression>(
             ComparisonType::LESS_THAN_OR_EQUAL,
-            planExpression(expr->expr),
+            planExpression(table_ref, expr->expr),
             std::move(high_expr));
 
         // Combine with AND
@@ -234,13 +213,12 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Expr*
     }
 }
 
-std::vector<std::unique_ptr<AbstractExpression>> QueryPlanner::planSelectList(const std::vector<hsql::Expr*>* select_list)
+std::vector<std::unique_ptr<AbstractExpression>> QueryPlanner::planSelectList(const hsql::TableRef* table_ref, const std::vector<hsql::Expr*>* select_list)
 {
     std::vector<std::unique_ptr<AbstractExpression>> expressions;
 
     if (select_list == nullptr || select_list->empty()) {
-        // SELECT * case - return empty vector to indicate all columns
-        return expressions;
+        VELODB_THROW(ExecutionError, "SELECT list cannot be empty");
     }
 
     // Check if this is SELECT * (single kExprStar expression)
@@ -253,7 +231,7 @@ std::vector<std::unique_ptr<AbstractExpression>> QueryPlanner::planSelectList(co
         if (expr->type == hsql::kExprStar) {
             VELODB_THROW(ExecutionError, "* cannot be mixed with other expressions in SELECT list");
         }
-        expressions.push_back(planExpression(expr));
+        expressions.push_back(planExpression(table_ref, expr));
     }
 
     return expressions;
@@ -261,7 +239,7 @@ std::vector<std::unique_ptr<AbstractExpression>> QueryPlanner::planSelectList(co
 
 std::unique_ptr<Schema> QueryPlanner::inferScanFilterSchema(const Schema& input_schema)
 {
-    auto schema = input_schema.clone();
+    auto schema = input_schema.cloneUnique();
     schema->addColumnInfo({ "$_rowid", std::make_unique<IntegerType>(), false });
     schema->addColumnInfo({ "$_mask", std::make_unique<BooleanType>(), false });
     return schema;
@@ -273,20 +251,23 @@ std::unique_ptr<Schema> QueryPlanner::inferProjectionSchema(
 {
     if (expressions.empty()) {
         // SELECT * case - return clone of input schema
-        return input_schema.clone();
+        return input_schema.cloneUnique();
     }
 
-    // TODO: Implement proper schema inference from expressions
-    // For now, return a simple schema based on expression types
     std::vector<ColumnInfo> columns;
-
     for (size_t i = 0; i < expressions.size(); ++i) {
         const auto& expr = expressions[i];
-        std::string column_name = "col_" + std::to_string(i);
-        auto column_type = DataType::createType(expr->getReturnType().getTypeId());
-        columns.emplace_back(column_name, std::move(column_type), true);
+        auto return_type = expr->getReturnType().cloneUnique();
+        switch (expr->getExpressionType()) {
+        case ExpressionType::COLUMN_REF:
+            columns.emplace_back(static_cast<ColumnRefExpression*>(expr.get())->getColumnName(), std::move(return_type));
+            break;
+        case ExpressionType::CONSTANT:
+        default:
+            columns.emplace_back("col_" + std::to_string(i), std::move(return_type));
+            break;
+        }
     }
-
     return std::make_unique<Schema>(std::move(columns));
 }
 

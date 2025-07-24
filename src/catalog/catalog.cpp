@@ -32,28 +32,27 @@ bool Catalog::hasTable(const std::string& table_name) const
     return tables_.find(table_name) != tables_.end();
 }
 
-Table* Catalog::getTable(const std::string& table_name) const
+std::optional<std::reference_wrapper<Table>> Catalog::getTable(const std::string& table_name) const
 {
     auto it = tables_.find(table_name);
     if (it == tables_.end()) {
-        return nullptr;
+        return std::nullopt;
     }
-    return it->second.get();
+    return *it->second;
+}
+
+std::optional<std::reference_wrapper<Table>> Catalog::getTable(const char* table_name) const
+{
+    if (table_name == nullptr) {
+        return std::nullopt;
+    }
+    return getTable(std::string(table_name));
 }
 
 ValueColumn& Catalog::createTemporaryColumn(const std::string& column_name, std::unique_ptr<DataType> type)
 {
     temporary_columns_.emplace_back(column_name, std::move(type));
     return temporary_columns_.back();
-}
-
-const Schema* Catalog::getTableSchema(const std::string& table_name) const
-{
-    TableBase* table = getTable(table_name);
-    if (table != nullptr) {
-        return &table->getSchema();
-    }
-    return nullptr;
 }
 
 std::vector<std::string> Catalog::getTableNames() const
@@ -68,9 +67,9 @@ std::vector<std::string> Catalog::getTableNames() const
 
 size_t Catalog::getTableRowCount(const std::string& table_name) const
 {
-    TableBase* table = getTable(table_name);
-    if (table != nullptr) {
-        return table->getRowCount();
+    auto table = getTable(table_name);
+    if (table) {
+        return table->get().getRowCount();
     }
     return 0;
 }

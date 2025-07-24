@@ -7,19 +7,16 @@
 namespace velodb {
 
 ScanFilterOperator::ScanFilterOperator(Catalog& catalog, const TableBase& table, const std::unique_ptr<AbstractExpression>& predicate)
-    : AbstractOperator(catalog, table.getSchema().clone())
+    : UnaryOperator(catalog, table.getSchema().cloneUnique(), nullptr) // NOTE: May support child operators in future
     , table_(table)
     , predicate_(predicate)
 {
 }
 
-View ScanFilterOperator::execute()
+Result<View> ScanFilterOperator::execute() const
 {
-    // ScanFilterOperator is a leaf operator - no children to execute
-    // Just return row IDs that match the filter predicate
-    
-    ValueColumn& rowids = catalog_.createTemporaryColumn("rowids", std::make_unique<BigIntType>());
-    ValueColumn& masks = catalog_.createTemporaryColumn("masks", std::make_unique<BooleanType>());
+    ValueColumn& rowids = catalog_.createTemporaryColumn("$_rowid", std::make_unique<BigIntType>());
+    ValueColumn& masks = catalog_.createTemporaryColumn("$_mask", std::make_unique<BooleanType>());
     rowids.reserve(table_.getRowCount());
     masks.reserve(table_.getRowCount());
     
@@ -31,30 +28,10 @@ View ScanFilterOperator::execute()
         ++row_id;
     }
 
-    auto view = table_.view();
+    auto view = table_.viewAs("scan_filter_result");
     view.addColumn(rowids.view());
     view.addColumn(masks.view());
-    return view;
-}
-
-void ScanFilterOperator::init()
-{
-}
-
-void ScanFilterOperator::reset()
-{
-}
-
-bool ScanFilterOperator::nextRowId([[maybe_unused]] RowId* row_id)
-{
-    // // TODO: remove
-    // if (iterator_.hasNext()) {
-    //     iterator_.next();
-    //     *row_id = iterator_.getCurrentRowId();
-    //     return true;
-    // }
-    // return false;
-    return false;
+    return Result<View>::success(std::move(view));
 }
 
 std::string ScanFilterOperator::toString() const

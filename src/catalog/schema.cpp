@@ -48,7 +48,7 @@ bool Schema::hasColumn(const std::string& name) const
     return column_name_to_index_.find(name) != column_name_to_index_.end();
 }
 
-std::unique_ptr<Schema> Schema::clone() const
+std::unique_ptr<Schema> Schema::cloneUniqueImpl() const
 {
     std::vector<ColumnInfo> cloned_columns;
     cloned_columns.reserve(columns_.size());

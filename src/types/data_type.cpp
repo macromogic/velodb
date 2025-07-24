@@ -10,6 +10,11 @@ DataType::DataType(DataTypeId type_id, size_t size)
 {
 }
 
+std::unique_ptr<DataType> DataType::cloneUniqueImpl() const
+{
+    return createType(type_id_, size_);
+}
+
 std::unique_ptr<DataType> DataType::createType(DataTypeId type_id, size_t size)
 {
     switch (type_id) {

@@ -70,12 +70,12 @@ public:
     ExecutionEngine& operator=(const ExecutionEngine&) = delete;
 
     // Main execution interface
-    View executeQuery(const std::string& sql);
-    View executeStatement(const hsql::SQLStatement* statement);
-    View executeSelect(const hsql::SelectStatement* select_stmt);
+    Result<View> executeQuery(const std::string& sql);
+    Result<View> executeStatement(const hsql::SQLStatement* statement);
+    Result<View> executeSelect(const hsql::SelectStatement* select_stmt);
 
     // Plan execution
-    View executePlan(std::unique_ptr<AbstractPlanNode> plan);
+    Result<View> executePlan(std::unique_ptr<AbstractPlanNode> plan);
 
     size_t getLastExecutionRowCount() const { return last_execution_row_count_; }
     double getLastExecutionTimeMs() const { return last_execution_time_ms_; }

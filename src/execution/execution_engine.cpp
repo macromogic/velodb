@@ -167,21 +167,6 @@ std::vector<RowId> QueryResult::getAllRowIds() const
     return row_ids;
 }
 
-// std::unique_ptr<View> QueryResult::toView(const std::string& view_name) const
-// {
-//     // Create a copy of the schema for the view
-//     auto view_schema = schema_->clone();
-//     auto table_info = std::make_unique<TableInfo>(view_name, std::move(view_schema));
-    
-//     // Copy the column data
-//     std::vector<ViewColumn> view_columns;
-//     for (auto& column : columns_) {
-//         view_columns.emplace_back(column.view());
-//     }
-    
-//     return std::make_unique<View>(std::move(table_info), std::move(view_columns));
-// }
-
 std::string QueryResult::toString() const
 {
     std::stringstream ss;
@@ -209,7 +194,7 @@ ExecutionEngine::ExecutionEngine(Catalog& catalog)
     context_ = std::make_unique<ExecutionContext>(catalog);
 }
 
-View ExecutionEngine::executeQuery(const std::string& sql)
+Result<View> ExecutionEngine::executeQuery(const std::string& sql)
 {
     // TODO: Implement full SQL query execution
     hsql::SQLParserResult result;
@@ -226,7 +211,7 @@ View ExecutionEngine::executeQuery(const std::string& sql)
     return executeStatement(result.getStatement(0));
 }
 
-View ExecutionEngine::executeStatement(const hsql::SQLStatement* statement)
+Result<View> ExecutionEngine::executeStatement(const hsql::SQLStatement* statement)
 {
     // TODO: Implement statement type dispatch
     switch (statement->type()) {
@@ -237,20 +222,19 @@ View ExecutionEngine::executeStatement(const hsql::SQLStatement* statement)
     }
 }
 
-View ExecutionEngine::executeSelect(const hsql::SelectStatement* select_stmt)
+Result<View> ExecutionEngine::executeSelect(const hsql::SelectStatement* select_stmt)
 {
     // TODO: Implement SELECT statement execution
     auto plan = planner_->planSelect(select_stmt);
     return executePlan(std::move(plan));
 }
 
-View ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNode> plan)
+Result<View> ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNode> plan)
 {
     // Create the operator tree from the plan
     auto op = createOperatorTree(*plan);
-    
-    // Execute the operator tree 
-    // The ProjectionOperator at the root will handle materialization
+
+    // Execute the operator tree
     return op->execute();
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/copy_traits.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -22,7 +23,7 @@ enum class DataTypeId {
     DECIMAL
 };
 
-class DataType {
+class DataType : public UniqueCloneable<DataType> {
 public:
     explicit DataType(DataTypeId type_id, size_t size = 0);
     virtual ~DataType() = default;
@@ -33,15 +34,15 @@ public:
     virtual bool isFixedSize() const = 0;
     virtual bool isNumeric() const = 0;
 
-    std::unique_ptr<DataType> clone() const {
-        return std::unique_ptr<DataType>(createType(type_id_, size_));
-    }
-
     static std::unique_ptr<DataType> createType(DataTypeId type_id, size_t size = 0);
 
 protected:
     DataTypeId type_id_;
     size_t size_;
+
+private:
+    friend class UniqueCloneable<DataType>;
+    std::unique_ptr<DataType> cloneUniqueImpl() const;
 };
 
 // Concrete data type implementations

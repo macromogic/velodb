@@ -23,7 +23,7 @@ std::unique_ptr<AbstractOperator> ProjectionPlanNode::createOperator(ExecutionCo
 
     auto child_operator = children_[0]->createOperator(context);
 
-    return std::make_unique<ProjectionOperator>(context.getCatalog(), output_schema_->clone(), std::move(child_operator), std::move(expressions_));
+    return std::make_unique<ProjectionOperator>(context.getCatalog(), output_schema_->cloneUnique(), std::move(child_operator), std::move(expressions_));
 }
 
 std::string ProjectionPlanNode::toString() const

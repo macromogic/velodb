@@ -2,7 +2,7 @@
 
 namespace velodb {
 
-// TODO: Implement full operator execution system with late materialization
+// TODO: Remove?
 
 // ResultSet implementation
 ResultSet::ResultSet(std::unique_ptr<Schema> schema)

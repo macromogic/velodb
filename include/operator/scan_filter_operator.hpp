@@ -11,17 +11,12 @@ namespace velodb {
 class TableIterator;
 
 // Scan with filter operator
-class ScanFilterOperator : public AbstractOperator {
+class ScanFilterOperator : public UnaryOperator {
 public:
     explicit ScanFilterOperator(Catalog& catalog, const TableBase& table, const std::unique_ptr<AbstractExpression>& predicate);
     ~ScanFilterOperator() override = default;
 
-    // Main execution interface
-    View execute() override;
-
-    void init() override;
-    bool nextRowId(RowId* row_id) override;
-    void reset() override;
+    Result<View> execute() const override;
 
     // Access to the source table for materialization
     const TableBase& getTable() const { return table_; }

@@ -2,7 +2,7 @@
 
 #include "schema.hpp"
 #include "types/value.hpp"
-#include "common/non_copyable.hpp"
+#include "common/copy_traits.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -60,6 +60,7 @@ public:
     const std::string& getName() const { return name_; }
     const Schema& getSchema() const { return *schema_; }
     size_t getColumnCount() const { return schema_->getColumnCount(); }
+    void addColumnInfo(ColumnInfo column);
 
 private:
     std::string name_;
@@ -70,8 +71,11 @@ private:
 class TableBase : private NonCopyable {
 public:
     explicit TableBase(std::unique_ptr<TableInfo> table_info);
+
+    // Explicitly allow move semantics for abstract base class
     TableBase(TableBase&& other) = default;
     TableBase& operator=(TableBase&& other) = default;
+
     virtual ~TableBase() = default;
 
     const std::string& getName() const { return table_info_->getName(); }
@@ -84,12 +88,13 @@ public:
     virtual size_t getRowCount() const = 0;
     virtual bool isView() const = 0;
     virtual View view() const = 0;
+    virtual View viewAs(std::string alias) const = 0;
 
 protected:
     std::unique_ptr<TableInfo> table_info_;
 };
 
-// Concrete table implementation with column-based storage
+// Concrete table implementation
 class Table : public TableBase {
 public:
     explicit Table(std::unique_ptr<TableInfo> table_info);
@@ -101,6 +106,7 @@ public:
     size_t getRowCount() const override { return row_count_; }
     bool isView() const override { return false; }
     View view() const override;
+    View viewAs(std::string alias) const override;
 
     // Primary column-based insertion methods
     void insertRow(const std::vector<Value>& values);
@@ -124,14 +130,13 @@ private:
     friend class TableIterator; // Allow iterator access to private members
 };
 
-// View implementation (for derived tables from queries) - Column-based storage
+// View implementation (for derived tables from queries)
 class View : public TableBase {
 public:
-    // Column-based constructor
     View(std::unique_ptr<TableInfo> table_info, std::vector<ViewColumn> columns);
-    View(View&& other) = default;
-    View& operator=(View&& other) = default;
-
+    explicit View(std::string name); // For empty view creation
+    View(View&& other) noexcept = default;
+    View& operator=(View&& other) noexcept = default;
     ~View() override = default;
 
     // TableBase interface
@@ -140,8 +145,10 @@ public:
     size_t getRowCount() const override { return row_count_; }
     bool isView() const override { return true; }
     View view() const override;
+    View viewAs(std::string alias) const override;
 
     void addColumn(ViewColumn column);
+    ViewColumn getColumn(const std::string& name) const;
     // Column-based access methods (similar to Table)
     Value getValue(RowId row_id, size_t column_index) const;
     std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;

@@ -2,7 +2,7 @@
 
 #include "catalog/column.hpp"
 #include "types/data_type.hpp"
-#include "common/non_copyable.hpp"
+#include "common/copy_traits.hpp"
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -10,7 +10,7 @@
 
 namespace velodb {
 
-class Schema : private NonCopyable {
+class Schema : private NonCopyable, public UniqueCloneable<Schema> {
 public:
     Schema() = default;
     explicit Schema(std::vector<ColumnInfo> columns);
@@ -28,9 +28,6 @@ public:
 
     bool hasColumn(const std::string& name) const;
 
-    // Create a deep copy of this schema
-    std::unique_ptr<Schema> clone() const;
-
     std::string toString() const;
 
     // Iterator support
@@ -38,6 +35,8 @@ public:
     auto end() const { return columns_.end(); }
 
 private:
+    friend class UniqueCloneable<Schema>;
+    std::unique_ptr<Schema> cloneUniqueImpl() const;
 
     std::vector<ColumnInfo> columns_;
     std::unordered_map<std::string, size_t> column_name_to_index_;

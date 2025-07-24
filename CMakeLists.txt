@@ -40,13 +40,41 @@ include_directories(${CMAKE_SOURCE_DIR}/src)
 include(ExternalProject)
 
 # Build sql-parser as external project
+# Set build mode based on CMAKE_BUILD_TYPE
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(SQL_PARSER_BUILD_COMMAND make static=yes mode=debug relaxed_build=on)
+else()
+    set(SQL_PARSER_BUILD_COMMAND make static=yes)
+endif()
+
 ExternalProject_Add(sql-parser
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/thirdparty/sql-parser
     CONFIGURE_COMMAND ""
-    BUILD_COMMAND make static=yes
+    BUILD_COMMAND ${SQL_PARSER_BUILD_COMMAND}
     INSTALL_COMMAND ""
     BUILD_BYPRODUCTS ${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/libsqlparser.a
     BUILD_IN_SOURCE 1
+)
+
+# Configure clean target to include thirdparty libraries
+set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_MAKE_CLEAN_FILES
+    "${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/libsqlparser.a"
+    "${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/libsqlparser.so"
+)
+
+# Add custom target to clean sql-parser (can be called with ninja clean-sql-parser)
+add_custom_target(clean-sql-parser
+    COMMAND make clean
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/sql-parser
+    COMMENT "Cleaning sql-parser library"
+)
+
+# Add custom target that cleans everything including thirdparty
+add_custom_target(clean-all
+    COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target clean
+    COMMAND make clean
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/thirdparty/sql-parser
+    COMMENT "Cleaning project and all thirdparty libraries"
 )
 
 # Create imported library target
