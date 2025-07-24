@@ -1,8 +1,8 @@
 #pragma once
 
 #include "planner/abstract_plan_node.hpp"
-#include "execution/expression.hpp"
-#include "execution/operator.hpp"
+#include "expression/expression.hpp"
+#include "operator/operator.hpp"
 #include <memory>
 #include <string>
 
@@ -17,12 +17,12 @@ public:
         JoinType join_type = JoinType::INNER);
     ~MergeSortJoinPlanNode() override = default;
 
-    std::unique_ptr<AbstractOperator> createOperator(ExecutionContext* context) const override;
-    [[nodiscard]] std::string toString() const override;
+    std::unique_ptr<AbstractOperator> createOperator(ExecutionContext& context) const override;
+    std::string toString() const override;
 
-    [[nodiscard]] const AbstractExpression* getLeftKeyExpression() const { return left_key_expr_.get(); }
-    [[nodiscard]] const AbstractExpression* getRightKeyExpression() const { return right_key_expr_.get(); }
-    [[nodiscard]] JoinType getJoinType() const { return join_type_; }
+    const AbstractExpression* getLeftKeyExpression() const { return left_key_expr_.get(); }
+    const AbstractExpression* getRightKeyExpression() const { return right_key_expr_.get(); }
+    JoinType getJoinType() const { return join_type_; }
 
 private:
     std::unique_ptr<AbstractExpression> left_key_expr_;

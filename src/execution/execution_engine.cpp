@@ -1,6 +1,6 @@
 #include "execution/execution_engine.hpp"
-#include "execution/operator/projection_operator.hpp"
-#include "common/traced_exception.hpp"
+#include "operator/projection_operator.hpp"
+#include "common/exception.hpp"
 #include "SQLParser.h"
 #include <sstream>
 #include <stdexcept>
@@ -167,17 +167,20 @@ std::vector<RowId> QueryResult::getAllRowIds() const
     return row_ids;
 }
 
-std::unique_ptr<View> QueryResult::toView(const std::string& view_name) const
-{
-    // Create a copy of the schema for the view
-    auto view_schema = schema_->clone();
-    auto table_info = std::make_unique<TableInfo>(view_name, std::move(view_schema));
+// std::unique_ptr<View> QueryResult::toView(const std::string& view_name) const
+// {
+//     // Create a copy of the schema for the view
+//     auto view_schema = schema_->clone();
+//     auto table_info = std::make_unique<TableInfo>(view_name, std::move(view_schema));
     
-    // Copy the column data
-    std::vector<ValueVector> view_columns = columns_;
+//     // Copy the column data
+//     std::vector<ViewColumn> view_columns;
+//     for (auto& column : columns_) {
+//         view_columns.emplace_back(column.view());
+//     }
     
-    return std::make_unique<View>(std::move(table_info), std::move(view_columns));
-}
+//     return std::make_unique<View>(std::move(table_info), std::move(view_columns));
+// }
 
 std::string QueryResult::toString() const
 {
@@ -198,50 +201,15 @@ std::string QueryResult::toString() const
     return ss.str();
 }
 
-// LateMaterializationOptimizer implementation
-LateMaterializationOptimizer::MaterializationPlan
-LateMaterializationOptimizer::analyzePlan(const AbstractPlanNode& plan_node) const
-{
-    // TODO: Implement sophisticated late materialization analysis
-    MaterializationPlan plan;
-
-    std::vector<size_t> const required_columns = getRequiredColumns(plan_node);
-
-    // TODO: Determine which columns to materialize early vs late
-    // For now, materialize all columns late
-    plan.late_columns_ = required_columns;
-
-    return plan;
-}
-
-std::vector<size_t> LateMaterializationOptimizer::getRequiredColumns(const AbstractPlanNode& plan_node) const
-{
-    // TODO: Implement column requirement analysis
-    std::vector<size_t> required_columns;
-    analyzeNode(plan_node, required_columns);
-    return required_columns;
-}
-
-void LateMaterializationOptimizer::analyzeNode(const AbstractPlanNode& node,
-    std::vector<size_t>& required_columns)
-{
-    // TODO: Implement recursive analysis of plan nodes
-    // For now, assume all columns are required
-    for (size_t i = 0; i < node.getOutputSchema().getColumnCount(); ++i) {
-        required_columns.push_back(i);
-    }
-}
-
 // ExecutionEngine implementation
-ExecutionEngine::ExecutionEngine(Catalog* catalog)
+ExecutionEngine::ExecutionEngine(Catalog& catalog)
     : catalog_(catalog)
 {
     planner_ = std::make_unique<QueryPlanner>(catalog);
     context_ = std::make_unique<ExecutionContext>(catalog);
-    optimizer_ = std::make_unique<LateMaterializationOptimizer>();
 }
 
-std::unique_ptr<QueryResult> ExecutionEngine::executeQuery(const std::string& sql)
+View ExecutionEngine::executeQuery(const std::string& sql)
 {
     // TODO: Implement full SQL query execution
     hsql::SQLParserResult result;
@@ -258,7 +226,7 @@ std::unique_ptr<QueryResult> ExecutionEngine::executeQuery(const std::string& sq
     return executeStatement(result.getStatement(0));
 }
 
-std::unique_ptr<QueryResult> ExecutionEngine::executeStatement(const hsql::SQLStatement* statement)
+View ExecutionEngine::executeStatement(const hsql::SQLStatement* statement)
 {
     // TODO: Implement statement type dispatch
     switch (statement->type()) {
@@ -269,14 +237,14 @@ std::unique_ptr<QueryResult> ExecutionEngine::executeStatement(const hsql::SQLSt
     }
 }
 
-std::unique_ptr<QueryResult> ExecutionEngine::executeSelect(const hsql::SelectStatement* select_stmt)
+View ExecutionEngine::executeSelect(const hsql::SelectStatement* select_stmt)
 {
     // TODO: Implement SELECT statement execution
     auto plan = planner_->planSelect(select_stmt);
     return executePlan(std::move(plan));
 }
 
-std::unique_ptr<QueryResult> ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNode> plan)
+View ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNode> plan)
 {
     // Create the operator tree from the plan
     auto op = createOperatorTree(*plan);
@@ -289,7 +257,7 @@ std::unique_ptr<QueryResult> ExecutionEngine::executePlan(std::unique_ptr<Abstra
 std::unique_ptr<AbstractOperator> ExecutionEngine::createOperatorTree(const AbstractPlanNode& plan_node)
 {
     // TODO: Implement plan node to operator conversion
-    return plan_node.createOperator(context_.get());
+    return plan_node.createOperator(*context_);
 }
 
 // ExecutionStats implementation

@@ -12,7 +12,7 @@ namespace velodb {
 class NonCopyable {
 protected:
     NonCopyable() = default;
-    ~NonCopyable() = default;
+    virtual ~NonCopyable() = default;
     
     // Allow move construction and assignment
     NonCopyable(NonCopyable&&) = default;

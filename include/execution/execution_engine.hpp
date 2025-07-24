@@ -1,9 +1,9 @@
 #pragma once
 
 #include "catalog/catalog.hpp"
-#include "expression.hpp"
-#include "operator.hpp"
-#include "planner.hpp"
+#include "expression/expression.hpp"
+#include "operator/operator.hpp"
+#include "planner/planner.hpp"
 #include <memory>
 #include <vector>
 
@@ -27,24 +27,24 @@ public:
     void addBatchRows(const std::vector<std::vector<Value>>& rows);
     
     // Schema and basic info
-    [[nodiscard]] const Schema& getSchema() const { return *schema_; }
-    [[nodiscard]] size_t getRowCount() const { return row_count_; }
-    [[nodiscard]] bool isEmpty() const { return row_count_ == 0; }
+    const Schema& getSchema() const { return *schema_; }
+    size_t getRowCount() const { return row_count_; }
+    bool isEmpty() const { return row_count_ == 0; }
 
     // Column-based access methods
-    [[nodiscard]] Value getValue(RowId row_id, size_t column_index) const;
-    [[nodiscard]] std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
-    [[nodiscard]] const ValueVector& getColumn(size_t column_index) const;
-    [[nodiscard]] std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
-    [[nodiscard]] std::vector<ValueVector> getColumns(const std::vector<size_t>& column_indices) const;
+    Value getValue(RowId row_id, size_t column_index) const;
+    std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
+    const ValueVector& getColumn(size_t column_index) const;
+    std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
+    std::vector<ValueVector> getColumns(const std::vector<size_t>& column_indices) const;
     
     // Row ID management
-    [[nodiscard]] std::vector<RowId> getAllRowIds() const;
+    std::vector<RowId> getAllRowIds() const;
 
-    [[nodiscard]] std::string toString() const;
+    std::string toString() const;
 
     // Conversion to View for catalog integration
-    std::unique_ptr<View> toView(const std::string& view_name) const;
+    // std::unique_ptr<View> toView(const std::string& view_name) const;
 
 private:
     std::unique_ptr<Schema> schema_;
@@ -59,32 +59,10 @@ private:
     void insertRowInternal(const std::vector<Value>& values);
 };
 
-// Late materialization optimizer
-class LateMaterializationOptimizer {
-public:
-    LateMaterializationOptimizer() = default;
-    ~LateMaterializationOptimizer() = default;
-
-    // Analyze query plan and determine optimal materialization strategy
-    struct MaterializationPlan {
-        std::vector<size_t> late_columns_; // Columns to materialize late
-        bool use_late_materialization_ {}; // Whether to use late materialization
-    };
-
-    [[nodiscard]] MaterializationPlan analyzePlan(const AbstractPlanNode& plan_node) const;
-
-    // Determine which columns are needed at each operator
-    [[nodiscard]] std::vector<size_t> getRequiredColumns(const AbstractPlanNode& plan_node) const;
-
-private:
-    static void analyzeNode(const AbstractPlanNode& node,
-        std::vector<size_t>& required_columns);
-};
-
 // Main execution engine
 class ExecutionEngine {
 public:
-    explicit ExecutionEngine(Catalog* catalog);
+    explicit ExecutionEngine(Catalog& catalog);
     ~ExecutionEngine() = default;
 
     // Delete copy constructor and assignment
@@ -92,24 +70,23 @@ public:
     ExecutionEngine& operator=(const ExecutionEngine&) = delete;
 
     // Main execution interface
-    std::unique_ptr<QueryResult> executeQuery(const std::string& sql);
-    std::unique_ptr<QueryResult> executeStatement(const hsql::SQLStatement* statement);
-    std::unique_ptr<QueryResult> executeSelect(const hsql::SelectStatement* select_stmt);
+    View executeQuery(const std::string& sql);
+    View executeStatement(const hsql::SQLStatement* statement);
+    View executeSelect(const hsql::SelectStatement* select_stmt);
 
     // Plan execution
-    std::unique_ptr<QueryResult> executePlan(std::unique_ptr<AbstractPlanNode> plan);
+    View executePlan(std::unique_ptr<AbstractPlanNode> plan);
 
-    [[nodiscard]] size_t getLastExecutionRowCount() const { return last_execution_row_count_; }
-    [[nodiscard]] double getLastExecutionTimeMs() const { return last_execution_time_ms_; }
+    size_t getLastExecutionRowCount() const { return last_execution_row_count_; }
+    double getLastExecutionTimeMs() const { return last_execution_time_ms_; }
 
 private:
     // Helper methods
     std::unique_ptr<AbstractOperator> createOperatorTree(const AbstractPlanNode& plan_node);
     
-    Catalog* catalog_;
+    Catalog& catalog_;
     std::unique_ptr<QueryPlanner> planner_;
     std::unique_ptr<ExecutionContext> context_;
-    std::unique_ptr<LateMaterializationOptimizer> optimizer_;
 
     size_t last_execution_row_count_ { 0 };
     double last_execution_time_ms_ { 0.0 };
@@ -123,10 +100,10 @@ public:
     void setRowsProcessed(size_t rows) { rows_processed_ = rows; }
     void setExecutionTime(double time_ms) { execution_time_ms_ = time_ms; }
 
-    [[nodiscard]] size_t getRowsProcessed() const { return rows_processed_; }
-    [[nodiscard]] double getExecutionTime() const { return execution_time_ms_; }
+    size_t getRowsProcessed() const { return rows_processed_; }
+    double getExecutionTime() const { return execution_time_ms_; }
 
-    [[nodiscard]] std::string toString() const;
+    std::string toString() const;
 
 private:
     size_t rows_processed_ { 0 };

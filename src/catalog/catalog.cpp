@@ -32,7 +32,7 @@ bool Catalog::hasTable(const std::string& table_name) const
     return tables_.find(table_name) != tables_.end();
 }
 
-TableBase* Catalog::getTable(const std::string& table_name) const
+Table* Catalog::getTable(const std::string& table_name) const
 {
     auto it = tables_.find(table_name);
     if (it == tables_.end()) {
@@ -41,52 +41,10 @@ TableBase* Catalog::getTable(const std::string& table_name) const
     return it->second.get();
 }
 
-Table* Catalog::getMutableTable(const std::string& table_name) const
+ValueColumn& Catalog::createTemporaryColumn(const std::string& column_name, std::unique_ptr<DataType> type)
 {
-    auto it = tables_.find(table_name);
-    if (it == tables_.end()) {
-        return nullptr;
-    }
-    return it->second.get();
-}
-
-// View management - Column-based
-bool Catalog::createView(const std::string& view_name,
-    std::unique_ptr<Schema> schema,
-    std::vector<ValueVector> columns)
-{
-    if (hasView(view_name)) {
-        return false;
-    }
-
-    auto table_info = std::make_unique<TableInfo>(view_name, std::move(schema));
-    auto view = std::make_unique<View>(std::move(table_info), std::move(columns));
-    views_[view_name] = std::move(view);
-    return true;
-}
-
-bool Catalog::dropView(const std::string& view_name)
-{
-    auto it = views_.find(view_name);
-    if (it == views_.end()) {
-        return false;
-    }
-    views_.erase(it);
-    return true;
-}
-
-bool Catalog::hasView(const std::string& view_name) const
-{
-    return views_.find(view_name) != views_.end();
-}
-
-View* Catalog::getView(const std::string& view_name) const
-{
-    auto it = views_.find(view_name);
-    if (it == views_.end()) {
-        return nullptr;
-    }
-    return it->second.get();
+    temporary_columns_.emplace_back(column_name, std::move(type));
+    return temporary_columns_.back();
 }
 
 const Schema* Catalog::getTableSchema(const std::string& table_name) const
@@ -108,16 +66,6 @@ std::vector<std::string> Catalog::getTableNames() const
     return names;
 }
 
-std::vector<std::string> Catalog::getViewNames() const
-{
-    std::vector<std::string> names;
-    names.reserve(views_.size());
-    for (const auto& pair : views_) {
-        names.push_back(pair.first);
-    }
-    return names;
-}
-
 size_t Catalog::getTableRowCount(const std::string& table_name) const
 {
     TableBase* table = getTable(table_name);
@@ -130,20 +78,15 @@ size_t Catalog::getTableRowCount(const std::string& table_name) const
 void Catalog::clear()
 {
     tables_.clear();
-    views_.clear();
 }
 
 std::string Catalog::toString() const
 {
     std::stringstream ss;
-    ss << "Catalog: " << tables_.size() << " tables, " << views_.size() << " views\n";
+    ss << "Catalog: " << tables_.size() << " tables\n";
 
     for (const auto& pair : tables_) {
         ss << "  Table: " << pair.first << " " << pair.second->getSchema().toString() << "\n";
-    }
-
-    for (const auto& pair : views_) {
-        ss << "  View: " << pair.first << " " << pair.second->getSchema().toString() << "\n";
     }
 
     return ss.str();

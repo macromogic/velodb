@@ -1,6 +1,7 @@
-#include "common/traced_exception.hpp"
+#include "common/exception.hpp"
+#include "planner/execution_context.hpp"
 #include "planner/projection_plan_node.hpp"
-#include "execution/operator/projection_operator.hpp"
+#include "operator/projection_operator.hpp"
 #include <stdexcept>
 
 namespace velodb {
@@ -13,7 +14,7 @@ ProjectionPlanNode::ProjectionPlanNode(std::unique_ptr<Schema> output_schema,
 {
 }
 
-std::unique_ptr<AbstractOperator> ProjectionPlanNode::createOperator([[maybe_unused]] ExecutionContext* context) const
+std::unique_ptr<AbstractOperator> ProjectionPlanNode::createOperator(ExecutionContext& context) const
 {
     // Create child operator
     if (children_.size() != 1) {
@@ -22,7 +23,7 @@ std::unique_ptr<AbstractOperator> ProjectionPlanNode::createOperator([[maybe_unu
 
     auto child_operator = children_[0]->createOperator(context);
 
-    return std::make_unique<ProjectionOperator>(output_schema_->clone(), std::move(child_operator), std::move(expressions_));
+    return std::make_unique<ProjectionOperator>(context.getCatalog(), output_schema_->clone(), std::move(child_operator), std::move(expressions_));
 }
 
 std::string ProjectionPlanNode::toString() const

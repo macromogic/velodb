@@ -1,7 +1,7 @@
 #pragma once
 
 #include "result.hpp"
-#include "traced_exception.hpp"
+#include "exception.hpp"
 #include <memory>
 #include <optional>
 #include <functional>

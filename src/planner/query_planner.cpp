@@ -1,32 +1,20 @@
-#include "common/traced_exception.hpp"
 #include "planner/query_planner.hpp"
-#include "planner/scan_filter_plan_node.hpp"
-#include "planner/projection_plan_node.hpp"
-#include "execution/constant_expression.hpp"
-#include "execution/column_ref_expression.hpp"
-#include "execution/comparison_expression.hpp"
-#include "execution/conjunction_expression.hpp"
-#include "types/data_type.hpp"
-#include "catalog/catalog.hpp"
 #include "SQLParser.h"
-#include <stdexcept>
+#include "catalog/catalog.hpp"
+#include "catalog/column.hpp"
+#include "catalog/schema.hpp"
+#include "common/exception.hpp"
+#include "expression/expression.hpp"
+#include "planner/projection_plan_node.hpp"
+#include "planner/scan_filter_plan_node.hpp"
+#include "types/data_type.hpp"
 
 namespace velodb {
 
 // QueryPlanner implementation
-QueryPlanner::QueryPlanner(Catalog* catalog)
+QueryPlanner::QueryPlanner(Catalog& catalog)
     : catalog_(catalog)
 {
-}
-
-std::unique_ptr<AbstractPlanNode> QueryPlanner::planQuery(const hsql::SQLStatement* statement)
-{
-    switch (statement->type()) {
-    case hsql::kStmtSelect:
-        return planSelect(dynamic_cast<const hsql::SelectStatement*>(statement));
-    default:
-        VELODB_THROW(ExecutionError, "Statement type not supported in planner");
-    }
 }
 
 std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectStatement* select_stmt)
@@ -41,13 +29,13 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
     if (select_stmt->whereClause != nullptr) {
         predicate = planExpression(select_stmt->whereClause);
     }
-    
+
     auto plan = planTableRef(select_stmt->fromTable, std::move(predicate));
 
     // Plan SELECT list (projection)
     if (select_stmt->selectList && !select_stmt->selectList->empty()) {
         auto projection_expressions = planSelectList(select_stmt->selectList);
-        auto& input_schema = catalog_->getTable(select_stmt->fromTable->name)->getSchema();
+        auto& input_schema = catalog_.getTable(select_stmt->fromTable->name)->getSchema();
         auto projection_schema = inferProjectionSchema(projection_expressions, input_schema);
         auto projection_plan = std::make_unique<ProjectionPlanNode>(
             std::move(projection_schema), std::move(projection_expressions));
@@ -67,11 +55,11 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRe
     switch (table_ref->type) {
     case hsql::kTableName: {
         std::string const table_name = table_ref->name;
-        TableBase* table = catalog_->getTable(table_name);
+        TableBase* table = catalog_.getTable(table_name);
         if (table == nullptr) {
             VELODB_THROW(CatalogError, "Table not found: " + table_name);
         }
-        return std::make_unique<ScanFilterPlanNode>(*table, std::move(predicate));
+        return std::make_unique<ScanFilterPlanNode>(*table, inferScanFilterSchema(table->getSchema()), std::move(predicate));
     }
     case hsql::kTableSelect:
         // TODO: Handle subqueries
@@ -213,22 +201,22 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Expr*
         if (expr->exprList == nullptr || expr->exprList->size() != 2) {
             VELODB_THROW(ExecutionError, "BETWEEN requires exactly 2 operands");
         }
-        
+
         auto low_expr = planExpression((*expr->exprList)[0]);
         auto high_expr = planExpression((*expr->exprList)[1]);
-        
+
         // Create (expr >= low)
         auto left_comparison = std::make_unique<ComparisonExpression>(
-            ComparisonType::GREATER_THAN_OR_EQUAL, 
-            planExpression(expr->expr), 
+            ComparisonType::GREATER_THAN_OR_EQUAL,
+            planExpression(expr->expr),
             std::move(low_expr));
-        
+
         // Create (expr <= high)
         auto right_comparison = std::make_unique<ComparisonExpression>(
-            ComparisonType::LESS_THAN_OR_EQUAL, 
-            planExpression(expr->expr), 
+            ComparisonType::LESS_THAN_OR_EQUAL,
+            planExpression(expr->expr),
             std::move(high_expr));
-        
+
         // Combine with AND
         std::vector<std::unique_ptr<AbstractExpression>> children;
         children.push_back(std::move(left_comparison));
@@ -249,26 +237,34 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Expr*
 std::vector<std::unique_ptr<AbstractExpression>> QueryPlanner::planSelectList(const std::vector<hsql::Expr*>* select_list)
 {
     std::vector<std::unique_ptr<AbstractExpression>> expressions;
-    
+
     if (select_list == nullptr || select_list->empty()) {
         // SELECT * case - return empty vector to indicate all columns
         return expressions;
     }
-    
+
     // Check if this is SELECT * (single kExprStar expression)
     if (select_list->size() == 1 && (*select_list)[0]->type == hsql::kExprStar) {
         // SELECT * case - return empty vector to indicate all columns
         return expressions;
     }
-    
+
     for (const auto* expr : *select_list) {
         if (expr->type == hsql::kExprStar) {
             VELODB_THROW(ExecutionError, "* cannot be mixed with other expressions in SELECT list");
         }
         expressions.push_back(planExpression(expr));
     }
-    
+
     return expressions;
+}
+
+std::unique_ptr<Schema> QueryPlanner::inferScanFilterSchema(const Schema& input_schema)
+{
+    auto schema = input_schema.clone();
+    schema->addColumnInfo({ "$_rowid", std::make_unique<IntegerType>(), false });
+    schema->addColumnInfo({ "$_mask", std::make_unique<BooleanType>(), false });
+    return schema;
 }
 
 std::unique_ptr<Schema> QueryPlanner::inferProjectionSchema(
@@ -279,18 +275,18 @@ std::unique_ptr<Schema> QueryPlanner::inferProjectionSchema(
         // SELECT * case - return clone of input schema
         return input_schema.clone();
     }
-    
+
     // TODO: Implement proper schema inference from expressions
     // For now, return a simple schema based on expression types
-    std::vector<Column> columns;
-    
+    std::vector<ColumnInfo> columns;
+
     for (size_t i = 0; i < expressions.size(); ++i) {
         const auto& expr = expressions[i];
         std::string column_name = "col_" + std::to_string(i);
         auto column_type = DataType::createType(expr->getReturnType().getTypeId());
         columns.emplace_back(column_name, std::move(column_type), true);
     }
-    
+
     return std::make_unique<Schema>(std::move(columns));
 }
 

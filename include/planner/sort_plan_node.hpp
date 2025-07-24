@@ -16,11 +16,11 @@ public:
         std::vector<bool> ascending_flags);
     ~SortPlanNode() override = default;
 
-    std::unique_ptr<AbstractOperator> createOperator(ExecutionContext* context) const override;
-    [[nodiscard]] std::string toString() const override;
+    std::unique_ptr<AbstractOperator> createOperator(ExecutionContext& context) const override;
+    std::string toString() const override;
 
-    [[nodiscard]] const std::vector<std::unique_ptr<AbstractExpression>>& getSortExpressions() const { return sort_expressions_; }
-    [[nodiscard]] const std::vector<bool>& getAscendingFlags() const { return ascending_flags_; }
+    const std::vector<std::unique_ptr<AbstractExpression>>& getSortExpressions() const { return sort_expressions_; }
+    const std::vector<bool>& getAscendingFlags() const { return ascending_flags_; }
 
 private:
     std::vector<std::unique_ptr<AbstractExpression>> sort_expressions_;

@@ -67,6 +67,8 @@ add_subdirectory(src/common)
 add_subdirectory(src/types)
 add_subdirectory(src/catalog)
 add_subdirectory(src/execution)
+add_subdirectory(src/expression)
+add_subdirectory(src/operator)
 add_subdirectory(src/planner)
 
 # Tests
@@ -96,7 +98,6 @@ target_link_libraries(velodb
     sqlparser
     argparse::argparse
     backward
-    common
 )
 
 # Set executable properties

@@ -38,14 +38,14 @@ public:
     void insert(const std::vector<Value>& key_values, Tuple&& tuple);
 
     // Lookup tuples by key values
-    [[nodiscard]] std::optional<std::reference_wrapper<const std::vector<Tuple>>> lookup(const std::vector<Value>& key_values) const;
+    std::optional<std::reference_wrapper<const std::vector<Tuple>>> lookup(const std::vector<Value>& key_values) const;
 
     // Get all entries (for iteration)
-    [[nodiscard]] const std::vector<std::unique_ptr<HashTableEntry>>& getEntries() const { return entries_; }
+    const std::vector<std::unique_ptr<HashTableEntry>>& getEntries() const { return entries_; }
 
     // Statistics
-    [[nodiscard]] size_t getSize() const { return entries_.size(); }
-    [[nodiscard]] bool isEmpty() const { return entries_.empty(); }
+    size_t getSize() const { return entries_.size(); }
+    bool isEmpty() const { return entries_.empty(); }
 
     // Clear all entries
     void clear();
@@ -58,10 +58,10 @@ private:
     const Schema& value_schema_;
 
     // Hash function for key values
-    [[nodiscard]] static size_t hashKey(const std::vector<Value>& key_values);
+    static size_t hashKey(const std::vector<Value>& key_values);
 
     // Equality comparison for key values
-    [[nodiscard]] static bool keysEqual(const std::vector<Value>& key1, const std::vector<Value>& key2);
+    static bool keysEqual(const std::vector<Value>& key1, const std::vector<Value>& key2);
 };
 
 } // namespace velodb

@@ -11,11 +11,11 @@
 
 // Execution system
 #include "execution/execution_engine.hpp"
-#include "execution/expression.hpp"
-#include "execution/operator.hpp"
+#include "expression/expression.hpp"
+#include "operator/operator.hpp"
 
 // Query planning
-#include "planner.hpp"
+#include "planner/planner.hpp"
 
 // Version information (generated from CMakeLists.txt)
 #include "velodb_version.hpp"
@@ -43,20 +43,20 @@ public:
     // Table management
     bool createTable(const std::string& table_name, std::unique_ptr<Schema> schema);
     bool dropTable(const std::string& table_name);
-    [[nodiscard]] bool hasTable(const std::string& table_name) const;
-    [[nodiscard]] Table* getTable(const std::string& table_name) const;
+    bool hasTable(const std::string& table_name) const;
+    Table* getTable(const std::string& table_name) const;
 
     // Data manipulation
     bool insertTuple(const std::string& table_name, const Tuple& tuple);
     bool insertTuple(const std::string& table_name, Tuple&& tuple);
 
     // Query execution
-    std::unique_ptr<QueryResult> executeQuery(const std::string& sql);
+    View executeQuery(const std::string& sql);
 
     // Statistics
-    [[nodiscard]] size_t getTableCount() const;
-    [[nodiscard]] std::vector<std::string> getTableNames() const;
-    [[nodiscard]] std::string getDatabaseInfo() const;
+    size_t getTableCount() const;
+    std::vector<std::string> getTableNames() const;
+    std::string getDatabaseInfo() const;
 
 private:
     std::unique_ptr<Catalog> catalog_;
@@ -82,8 +82,7 @@ namespace util {
     Value createNullValue(DataTypeId type_id);
 
     // Schema builder helpers
-    std::unique_ptr<Schema> createSchema(std::vector<Column> columns);
-    Column createColumn(const std::string& name, std::unique_ptr<DataType> type, bool nullable = true);
+    std::unique_ptr<Schema> createSchema(std::vector<ColumnInfo> columns);
 
     // Sample data creation for testing
     std::unique_ptr<Database> createSampleDatabase();

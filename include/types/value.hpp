@@ -40,14 +40,14 @@ public:
     Value& operator=(Value&& other) = default;
 
     // Type information
-    [[nodiscard]] DataTypeId getTypeId() const { return type_id_; }
-    [[nodiscard]] bool isNull() const { return is_null_; }
+    DataTypeId getTypeId() const { return type_id_; }
+    bool isNull() const { return is_null_; }
 
-    [[nodiscard]] bool getBoolean() const;
-    [[nodiscard]] int32_t getInteger() const;
-    [[nodiscard]] int64_t getBigInt() const;
-    [[nodiscard]] double getDouble() const;
-    [[nodiscard]] std::string getString() const;
+    bool getBoolean() const;
+    int32_t getInteger() const;
+    int64_t getBigInt() const;
+    double getDouble() const;
+    std::string getString() const;
 
     // Comparison operators
     bool operator==(const Value& other) const;
@@ -58,7 +58,7 @@ public:
     bool operator>=(const Value& other) const;
 
     // String representation
-    [[nodiscard]] std::string toString() const;
+    std::string toString() const;
 
     // Static factory methods
     static Value createBoolean(bool value);

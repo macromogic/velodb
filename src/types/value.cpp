@@ -1,5 +1,5 @@
 #include "types/value.hpp"
-#include "common/traced_exception.hpp"
+#include "common/exception.hpp"
 #include <sstream>
 #include <stdexcept>
 #include <utility>

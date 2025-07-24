@@ -1,7 +1,8 @@
 #pragma once
 
 #include "catalog/schema.hpp"
-#include "execution/operator.hpp"
+#include "catalog/catalog.hpp"
+#include "operator/operator.hpp"
 #include "common/non_copyable.hpp"
 #include <memory>
 #include <string>
@@ -31,16 +32,16 @@ public:
     AbstractPlanNode(PlanType type, std::unique_ptr<Schema> output_schema);
     virtual ~AbstractPlanNode() = default;
 
-    [[nodiscard]] PlanType getPlanType() const { return type_; }
-    [[nodiscard]] const Schema& getOutputSchema() const { return *output_schema_; }
+    PlanType getPlanType() const { return type_; }
+    const Schema& getOutputSchema() const { return *output_schema_; }
 
-    [[nodiscard]] const std::vector<std::unique_ptr<AbstractPlanNode>>& getChildren() const { return children_; }
+    const std::vector<std::unique_ptr<AbstractPlanNode>>& getChildren() const { return children_; }
     void addChild(std::unique_ptr<AbstractPlanNode> child);
 
     // Convert plan to executable operator
-    virtual std::unique_ptr<AbstractOperator> createOperator(ExecutionContext* context) const = 0;
+    virtual std::unique_ptr<AbstractOperator> createOperator(ExecutionContext& context) const = 0;
 
-    [[nodiscard]] virtual std::string toString() const = 0;
+    virtual std::string toString() const = 0;
 
 protected:
     PlanType type_;

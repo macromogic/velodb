@@ -3,7 +3,7 @@
 namespace velodb {
 
 // ExecutionContext implementation
-ExecutionContext::ExecutionContext(Catalog* catalog)
+ExecutionContext::ExecutionContext(Catalog& catalog)
     : catalog_(catalog)
 {
 }

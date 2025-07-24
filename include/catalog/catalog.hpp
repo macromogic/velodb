@@ -24,27 +24,16 @@ public:
     bool dropTable(const std::string& table_name);
     bool hasTable(const std::string& table_name) const;
 
-    TableBase* getTable(const std::string& table_name) const;
-    Table* getMutableTable(const std::string& table_name) const;
+    Table* getTable(const std::string& table_name) const;
 
-    // View management - Column-based
-    bool createView(const std::string& view_name,
-        std::unique_ptr<Schema> schema,
-        std::vector<ValueVector> columns);
-    
-    bool dropView(const std::string& view_name);
-    bool hasView(const std::string& view_name) const;
-
-    View* getView(const std::string& view_name) const;
+    ValueColumn& createTemporaryColumn(const std::string& column_name, std::unique_ptr<DataType> type);
 
     // Schema management
     const Schema* getTableSchema(const std::string& table_name) const;
 
     // Catalog information
     std::vector<std::string> getTableNames() const;
-    std::vector<std::string> getViewNames() const;
     size_t getTableCount() const { return tables_.size(); }
-    size_t getViewCount() const { return views_.size(); }
 
     // Statistics (for query optimization)
     size_t getTableRowCount(const std::string& table_name) const;
@@ -55,7 +44,7 @@ public:
 
 private:
     std::unordered_map<std::string, std::unique_ptr<Table>> tables_;
-    std::unordered_map<std::string, std::unique_ptr<View>> views_;
+    std::vector<ValueColumn> temporary_columns_; // For temporary storage during operations
 };
 
 // Catalog builder for easy setup
@@ -82,7 +71,7 @@ public:
 
 private:
     std::unique_ptr<Catalog> catalog_;
-    std::vector<Column> current_columns_;
+    std::vector<ColumnInfo> current_columns_;
 };
 
 } // namespace velodb

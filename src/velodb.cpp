@@ -10,7 +10,7 @@ namespace velodb {
 Database::Database()
 {
     catalog_ = std::make_unique<Catalog>();
-    execution_engine_ = std::make_unique<ExecutionEngine>(catalog_.get());
+    execution_engine_ = std::make_unique<ExecutionEngine>(*catalog_);
 }
 
 bool Database::initialize()
@@ -51,14 +51,14 @@ Table* Database::getTable(const std::string& table_name) const
 {
     if (!initialized_)
         return nullptr;
-    return catalog_->getMutableTable(table_name);
+    return catalog_->getTable(table_name);
 }
 
 bool Database::insertTuple(const std::string& table_name, const Tuple& tuple)
 {
     if (!initialized_)
         return false;
-    Table* table = catalog_->getMutableTable(table_name);
+    Table* table = catalog_->getTable(table_name);
     if (table == nullptr)
         return false;
     
@@ -76,7 +76,7 @@ bool Database::insertTuple(const std::string& table_name, Tuple&& tuple)
 {
     if (!initialized_)
         return false;
-    Table* table = catalog_->getMutableTable(table_name);
+    Table* table = catalog_->getTable(table_name);
     if (table == nullptr)
         return false;
     
@@ -90,7 +90,7 @@ bool Database::insertTuple(const std::string& table_name, Tuple&& tuple)
     return true;
 }
 
-std::unique_ptr<QueryResult> Database::executeQuery(const std::string& sql)
+View Database::executeQuery(const std::string& sql)
 {
     if (!initialized_) {
         throw std::runtime_error("Database not initialized");
@@ -183,15 +183,11 @@ Value createNullValue(DataTypeId type_id)
     return Value::createNull(type_id);
 }
 
-std::unique_ptr<Schema> createSchema(std::vector<Column> columns)
+std::unique_ptr<Schema> createSchema(std::vector<ColumnInfo> columns)
 {
     return std::make_unique<Schema>(std::move(columns));
 }
 
-Column createColumn(const std::string& name, std::unique_ptr<DataType> type, bool nullable)
-{
-    return Column(name, std::move(type), nullable);
-}
 
 std::unique_ptr<Database> createSampleDatabase()
 {
@@ -199,7 +195,7 @@ std::unique_ptr<Database> createSampleDatabase()
     auto db = std::make_unique<Database>();
 
     // Create a sample table
-    std::vector<Column> columns;
+    std::vector<ColumnInfo> columns;
     columns.emplace_back("id", createIntegerType(), false);
     columns.emplace_back("name", createVarcharType(100), true);
     columns.emplace_back("age", createIntegerType(), true);

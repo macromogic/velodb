@@ -1,8 +1,8 @@
 #pragma once
 
 #include "planner/abstract_plan_node.hpp"
-#include "execution/expression.hpp"
-#include "execution/operator.hpp"
+#include "expression/expression.hpp"
+#include "operator/operator.hpp"
 #include <memory>
 #include <string>
 
@@ -16,11 +16,11 @@ public:
         JoinType join_type = JoinType::INNER);
     ~NestedLoopJoinPlanNode() override = default;
 
-    std::unique_ptr<AbstractOperator> createOperator(ExecutionContext* context) const override;
-    [[nodiscard]] std::string toString() const override;
+    std::unique_ptr<AbstractOperator> createOperator(ExecutionContext& context) const override;
+    std::string toString() const override;
 
-    [[nodiscard]] const AbstractExpression* getJoinPredicate() const { return join_predicate_.get(); }
-    [[nodiscard]] JoinType getJoinType() const { return join_type_; }
+    const AbstractExpression* getJoinPredicate() const { return join_predicate_.get(); }
+    JoinType getJoinType() const { return join_type_; }
 
 private:
     std::unique_ptr<AbstractExpression> join_predicate_;

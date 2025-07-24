@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/traced_exception.hpp"
+#include "common/exception.hpp"
 #include <memory>
 #include <optional>
 #include <string>
@@ -28,48 +28,48 @@ public:
     explicit Result(const E& error) : value_(error) {}
     
     // Query methods
-    [[nodiscard]] bool has_value() const noexcept {
+    bool has_value() const noexcept {
         return std::holds_alternative<T>(value_);
     }
     
-    [[nodiscard]] bool has_error() const noexcept {
+    bool has_error() const noexcept {
         return std::holds_alternative<E>(value_);
     }
     
-    [[nodiscard]] explicit operator bool() const noexcept {
+    explicit operator bool() const noexcept {
         return has_value();
     }
     
     // Access methods
-    [[nodiscard]] T& value() & {
+    T& value() & {
         if (!has_value()) {
             VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::get<T>(value_);
     }
     
-    [[nodiscard]] const T& value() const& {
+    const T& value() const& {
         if (!has_value()) {
             VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::get<T>(value_);
     }
     
-    [[nodiscard]] T&& value() && {
+    T&& value() && {
         if (!has_value()) {
             VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::move(std::get<T>(value_));
     }
     
-    [[nodiscard]] const E& error() const& {
+    const E& error() const& {
         if (!has_error()) {
             VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
         return std::get<E>(value_);
     }
     
-    [[nodiscard]] E&& error() && {
+    E&& error() && {
         if (!has_error()) {
             VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
@@ -77,11 +77,11 @@ public:
     }
     
     // Convenience methods
-    [[nodiscard]] T value_or(const T& default_value) const& {
+    T value_or(const T& default_value) const& {
         return has_value() ? value() : default_value;
     }
     
-    [[nodiscard]] T value_or(T&& default_value) && {
+    T value_or(T&& default_value) && {
         return has_value() ? std::move(value()) : std::move(default_value);
     }
     

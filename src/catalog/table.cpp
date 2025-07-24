@@ -1,5 +1,6 @@
 #include "catalog/table.hpp"
-#include "common/traced_exception.hpp"
+#include "catalog/column.hpp"
+#include "common/exception.hpp"
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -12,7 +13,7 @@ Tuple::Tuple(const Schema& schema)
 {
     values_.resize(schema.getColumnCount());
     for (size_t i = 0; i < schema.getColumnCount(); ++i) {
-        values_[i] = Value::createNull(schema.getColumn(i).getType().getTypeId());
+        values_[i] = Value::createNull(schema.getColumnInfo(i).getType().getTypeId());
     }
 }
 
@@ -104,23 +105,24 @@ Table::Table(std::unique_ptr<TableInfo> table_info)
 void Table::initializeColumns()
 {
     const size_t column_count = table_info_->getColumnCount();
-    columns_.resize(column_count);
-    // Each column vector starts empty and will grow as rows are inserted
+    auto& schema = table_info_->getSchema();
+    columns_.reserve(column_count);
+    for (auto& info : schema) {
+        columns_.emplace_back(info);
+    }
 }
 
 void Table::ensureColumnCapacity(size_t new_row_count)
 {
     for (auto& column : columns_) {
-        if (new_row_count > column.size()) {
+        const size_t old_size = column.size();
+        if (new_row_count > old_size) {
             // Resize columns to accommodate new rows
             // Fill with null values for the appropriate type
-            const size_t old_size = column.size();
             column.resize(new_row_count);
-            
-            // Initialize new slots with null values
-            for (size_t i = old_size; i < new_row_count; ++i) {
-                if (!column.empty()) {
-                    // Use the type from existing values in the column
+            if (old_size > 0) {
+                // Use the type from existing values in the column
+                for (size_t i = old_size; i < new_row_count; ++i) {
                     column[i] = Value::createNull(column[0].getTypeId());
                 }
             }
@@ -128,15 +130,42 @@ void Table::ensureColumnCapacity(size_t new_row_count)
     }
 }
 
-std::unique_ptr<TableIterator> Table::getIterator() const
+TableIterator Table::begin() const
 {
-    return std::make_unique<TableIterator>(*this);
+    return TableIterator(*this);
+}
+
+TableIterator Table::end() const
+{
+    return TableIterator(*this, row_count_);
 }
 
 // Primary column-based insertion methods
 void Table::insertRow(const std::vector<Value>& values)
 {
-    insertRowInternal(values);
+    if (values.size() != table_info_->getColumnCount()) {
+        VELODB_THROW(CatalogError, "Value count mismatch with schema");
+    }
+
+    const RowId new_row_id = row_count_;
+    ensureColumnCapacity(row_count_ + 1);
+
+    // Insert each value into its respective column
+    for (size_t col_idx = 0; col_idx < values.size(); ++col_idx) {
+        columns_[col_idx][new_row_id] = values[col_idx];
+    }
+
+    ++row_count_;
+}
+
+View Table::view() const
+{
+    std::vector<ViewColumn> columns;
+    columns.reserve(columns_.size());
+    for (const auto& column : columns_) {
+        columns.emplace_back(column.view());
+    }
+    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().clone()), std::move(columns));
 }
 
 void Table::insertRow(std::vector<Value>&& values)
@@ -144,15 +173,15 @@ void Table::insertRow(std::vector<Value>&& values)
     if (values.size() != table_info_->getColumnCount()) {
         VELODB_THROW(CatalogError, "Value count mismatch with schema");
     }
-    
+
     const RowId new_row_id = row_count_;
     ensureColumnCapacity(row_count_ + 1);
-    
+
     // Move each value into its respective column
     for (size_t col_idx = 0; col_idx < values.size(); ++col_idx) {
         columns_[col_idx][new_row_id] = std::move(values[col_idx]);
     }
-    
+
     ++row_count_;
 }
 
@@ -161,42 +190,25 @@ void Table::insertBatchRows(const std::vector<std::vector<Value>>& rows)
     if (rows.empty()) {
         return;
     }
-    
+
     const size_t old_row_count = row_count_;
     const size_t new_row_count = row_count_ + rows.size();
     ensureColumnCapacity(new_row_count);
-    
+
     // Insert all rows in batch for better performance
     for (size_t row_idx = 0; row_idx < rows.size(); ++row_idx) {
         const std::vector<Value>& values = rows[row_idx];
         if (values.size() != table_info_->getColumnCount()) {
             VELODB_THROW(CatalogError, "Value count mismatch with schema");
         }
-        
+
         const RowId row_id = old_row_count + row_idx;
         for (size_t col_idx = 0; col_idx < values.size(); ++col_idx) {
             columns_[col_idx][row_id] = values[col_idx];
         }
     }
-    
-    row_count_ = new_row_count;
-}
 
-void Table::insertRowInternal(const std::vector<Value>& values)
-{
-    if (values.size() != table_info_->getColumnCount()) {
-        VELODB_THROW(CatalogError, "Value count mismatch with schema");
-    }
-    
-    const RowId new_row_id = row_count_;
-    ensureColumnCapacity(row_count_ + 1);
-    
-    // Insert each value into its respective column
-    for (size_t col_idx = 0; col_idx < values.size(); ++col_idx) {
-        columns_[col_idx][new_row_id] = values[col_idx];
-    }
-    
-    ++row_count_;
+    row_count_ = new_row_count;
 }
 
 Value Table::getValue(RowId row_id, size_t column_index) const
@@ -207,7 +219,7 @@ Value Table::getValue(RowId row_id, size_t column_index) const
     if (column_index >= columns_.size()) {
         VELODB_THROW(CatalogError, "Column index out of range");
     }
-    
+
     return columns_[column_index][row_id];
 }
 
@@ -216,10 +228,10 @@ std::vector<Value> Table::getValues(RowId row_id, const std::vector<size_t>& col
     if (row_id >= row_count_) {
         VELODB_THROW(CatalogError, "Row ID out of range");
     }
-    
+
     std::vector<Value> values;
     values.reserve(column_indices.size());
-    
+
     for (size_t const col_idx : column_indices) {
         if (col_idx >= columns_.size()) {
             VELODB_THROW(CatalogError, "Column index out of range");
@@ -229,82 +241,27 @@ std::vector<Value> Table::getValues(RowId row_id, const std::vector<size_t>& col
     return values;
 }
 
-const ValueVector& Table::getColumn(size_t column_index) const
-{
-    if (column_index >= columns_.size()) {
-        VELODB_THROW(CatalogError, "Column index out of range");
-    }
-    return columns_[column_index];
-}
-
-ValueVector& Table::getColumn(size_t column_index)
-{
-    if (column_index >= columns_.size()) {
-        VELODB_THROW(CatalogError, "Column index out of range");
-    }
-    return columns_[column_index];
-}
-
 std::vector<Value> Table::getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const
 {
     if (column_index >= columns_.size()) {
         VELODB_THROW(CatalogError, "Column index out of range");
     }
-    
+
     std::vector<Value> values;
     values.reserve(row_ids.size());
-    
+
     for (RowId const row_id : row_ids) {
         if (row_id >= row_count_) {
             VELODB_THROW(CatalogError, "Row ID out of range");
         }
         values.push_back(columns_[column_index][row_id]);
     }
-    
+
     return values;
 }
 
-std::vector<ValueVector> Table::getColumns(const std::vector<size_t>& column_indices) const
-{
-    std::vector<ValueVector> result;
-    result.reserve(column_indices.size());
-    
-    for (size_t const col_idx : column_indices) {
-        if (col_idx >= columns_.size()) {
-            VELODB_THROW(CatalogError, "Column index out of range");
-        }
-        result.push_back(columns_[col_idx]);
-    }
-    
-    return result;
-}
-
-std::vector<RowId> Table::getAllRowIds() const
-{
-    std::vector<RowId> row_ids;
-    row_ids.reserve(row_count_);
-    
-    for (RowId row_id = 0; row_id < row_count_; ++row_id) {
-        row_ids.push_back(row_id);
-    }
-    
-    return row_ids;
-}
-
-std::vector<RowId> Table::getValidRowIds() const
-{
-    std::vector<RowId> row_ids;
-    row_ids.reserve(row_count_);
-    
-    for (RowId row_id = 0; row_id < row_count_; ++row_id) {
-        row_ids.push_back(row_id);
-    }
-    
-    return row_ids;
-}
-
 // View implementation - Column-based storage
-View::View(std::unique_ptr<TableInfo> table_info, std::vector<ValueVector> columns)
+View::View(std::unique_ptr<TableInfo> table_info, std::vector<ViewColumn> columns)
     : TableBase(std::move(table_info))
     , columns_(std::move(columns))
     , row_count_(0)
@@ -312,7 +269,7 @@ View::View(std::unique_ptr<TableInfo> table_info, std::vector<ValueVector> colum
     // Determine row count from the first column (all columns should have same size)
     if (!columns_.empty()) {
         row_count_ = columns_[0].size();
-        
+
         // Validate all columns have the same size
         for (size_t i = 1; i < columns_.size(); ++i) {
             if (columns_[i].size() != row_count_) {
@@ -322,43 +279,32 @@ View::View(std::unique_ptr<TableInfo> table_info, std::vector<ValueVector> colum
     }
 }
 
-void View::initializeFromTuples(const std::vector<Tuple>& tuples)
+void View::addColumn(ViewColumn column)
 {
-    if (tuples.empty()) {
-        initializeColumns();
-        return;
+    if (column.size() != row_count_) {
+        VELODB_THROW(CatalogError, "New column size must match existing row count");
     }
-    
-    const size_t column_count = table_info_->getColumnCount();
-    columns_.resize(column_count);
-    
-    // Reserve space for all columns
-    for (auto& column : columns_) {
-        column.reserve(tuples.size());
-    }
-    
-    // Convert tuples to column-based storage
-    for (const auto& tuple : tuples) {
-        if (tuple.getColumnCount() != column_count) {
-            VELODB_THROW(CatalogError, "Tuple column count does not match schema");
-        }
-        
-        for (size_t col_idx = 0; col_idx < column_count; ++col_idx) {
-            columns_[col_idx].push_back(tuple.getValue(col_idx));
-        }
-    }
+    columns_.push_back(std::move(column));
 }
 
-void View::initializeColumns()
+TableIterator View::begin() const
 {
-    const size_t column_count = table_info_->getColumnCount();
-    columns_.resize(column_count);
-    // Each column vector starts empty
+    return TableIterator(*this);
 }
 
-std::unique_ptr<TableIterator> View::getIterator() const
+TableIterator View::end() const
 {
-    return std::make_unique<TableIterator>(*this);
+    return TableIterator(*this, row_count_);
+}
+
+View View::view() const
+{
+    std::vector<ViewColumn> columns;
+    columns.reserve(columns_.size());
+    for (const auto& column : columns_) {
+        columns.emplace_back(column.getType(), column.getName(), column.getValues());
+    }
+    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().clone()), std::move(columns));
 }
 
 // Column-based access methods
@@ -370,7 +316,7 @@ Value View::getValue(RowId row_id, size_t column_index) const
     if (column_index >= columns_.size()) {
         VELODB_THROW(CatalogError, "Column index out of range");
     }
-    
+
     return columns_[column_index][row_id];
 }
 
@@ -379,10 +325,10 @@ std::vector<Value> View::getValues(RowId row_id, const std::vector<size_t>& colu
     if (row_id >= row_count_) {
         VELODB_THROW(CatalogError, "Row ID out of range");
     }
-    
+
     std::vector<Value> values;
     values.reserve(column_indices.size());
-    
+
     for (size_t const col_idx : column_indices) {
         if (col_idx >= columns_.size()) {
             VELODB_THROW(CatalogError, "Column index out of range");
@@ -392,134 +338,111 @@ std::vector<Value> View::getValues(RowId row_id, const std::vector<size_t>& colu
     return values;
 }
 
-const ValueVector& View::getColumn(size_t column_index) const
-{
-    if (column_index >= columns_.size()) {
-        VELODB_THROW(CatalogError, "Column index out of range");
-    }
-    return columns_[column_index];
-}
-
 std::vector<Value> View::getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const
 {
     if (column_index >= columns_.size()) {
         VELODB_THROW(CatalogError, "Column index out of range");
     }
-    
+
     std::vector<Value> values;
     values.reserve(row_ids.size());
-    
+
     for (RowId const row_id : row_ids) {
         if (row_id >= row_count_) {
             VELODB_THROW(CatalogError, "Row ID out of range");
         }
         values.push_back(columns_[column_index][row_id]);
     }
-    
+
     return values;
 }
 
-std::vector<ValueVector> View::getColumns(const std::vector<size_t>& column_indices) const
-{
-    std::vector<ValueVector> result;
-    result.reserve(column_indices.size());
-    
-    for (size_t const col_idx : column_indices) {
-        if (col_idx >= columns_.size()) {
-            VELODB_THROW(CatalogError, "Column index out of range");
-        }
-        result.push_back(columns_[col_idx]);
-    }
-    
-    return result;
-}
-
-std::vector<RowId> View::getAllRowIds() const
-{
-    std::vector<RowId> row_ids;
-    row_ids.reserve(row_count_);
-    
-    for (RowId row_id = 0; row_id < row_count_; ++row_id) {
-        row_ids.push_back(row_id);
-    }
-    
-    return row_ids;
-}
-
-std::vector<RowId> View::getValidRowIds() const
-{
-    // For views, all rows are valid (no deletion concept)
-    return getAllRowIds();
-}
-
 // TableIterator implementation
-TableIterator::TableIterator(const Table& table)
+TableIterator::TableIterator(const Table& table, RowId row_id)
     : table_(table)
-    , current_index_(0)
-    , current_row_id_(0)
+    , current_row_id_(row_id)
     , is_view_(false)
     , current_tuple_(nullptr)
 {
+    fetchCurrentTuple();
 }
 
-TableIterator::TableIterator(const View& view)
+TableIterator::TableIterator(const View& view, RowId row_id)
     : table_(view)
-    , current_index_(0)
-    , current_row_id_(0)
+    , current_row_id_(row_id)
     , is_view_(true)
     , current_tuple_(nullptr)
 {
+    fetchCurrentTuple();
 }
 
-bool TableIterator::hasNext() const
+bool TableIterator::operator==(const TableIterator& other) const
 {
-    if (is_view_) {
-        const View& view = dynamic_cast<const View&>(table_);
-        return current_index_ < view.getRowCount();
-    }
-    const Table& table = static_cast<const Table&>(table_);
-    return current_index_ < table.getRowCount();
+    return &table_ == &other.table_ && current_row_id_ == other.current_row_id_;
 }
 
-const Tuple& TableIterator::next()
+bool TableIterator::operator!=(const TableIterator& other) const
 {
-    if (!hasNext()) {
-        throw std::runtime_error("No more tuples available");
+    return !(*this == other);
+}
+
+TableIterator& TableIterator::operator++()
+{
+    if (current_row_id_ >= table_.getRowCount()) {
+        current_row_id_ = table_.getRowCount();
+        current_tuple_.reset();
     }
-    
-    // Set current row ID
-    current_row_id_ = current_index_;
-    
-    // Materialize the tuple from column-based storage
-    std::vector<Value> values;
-    values.reserve(table_.getSchema().getColumnCount());
-    
+
+    // Move to next row
+    ++current_row_id_;
+
+    return *this;
+}
+
+TableIterator TableIterator::operator++(int)
+{
+    TableIterator temp = *this;
+    ++(*this);
+    return temp;
+}
+
+const Tuple& TableIterator::operator*() const
+{
+    if (!current_tuple_) {
+        VELODB_THROW(CatalogError, "Dereferencing invalid iterator");
+    }
+    return *current_tuple_;
+}
+
+const Tuple* TableIterator::operator->() const
+{
+    if (!current_tuple_) {
+        VELODB_THROW(CatalogError, "Dereferencing invalid iterator");
+    }
+    return current_tuple_.get();
+}
+
+void TableIterator::fetchCurrentTuple()
+{
+    if (current_row_id_ >= table_.getRowCount()) {
+        current_tuple_.reset();
+        return;
+    }
+    if (!current_tuple_) {
+        current_tuple_ = std::make_shared<Tuple>(table_.getSchema());
+    }
+
     if (is_view_) {
         const View& view = dynamic_cast<const View&>(table_);
         for (size_t col_idx = 0; col_idx < table_.getSchema().getColumnCount(); ++col_idx) {
-            values.push_back(view.getValue(current_row_id_, col_idx));
+            current_tuple_->setValue(col_idx, view.getValue(current_row_id_, col_idx));
         }
     } else {
         const Table& table = static_cast<const Table&>(table_);
         for (size_t col_idx = 0; col_idx < table_.getSchema().getColumnCount(); ++col_idx) {
-            values.push_back(table.getValue(current_row_id_, col_idx));
+            current_tuple_->setValue(col_idx, table.getValue(current_row_id_, col_idx));
         }
     }
-    
-    // Create and store the tuple
-    current_tuple_ = std::make_unique<Tuple>(table_.getSchema(), std::move(values));
-    
-    // Move to next position
-    ++current_index_;
-    
-    return *current_tuple_;
-}
-
-void TableIterator::reset()
-{
-    current_index_ = 0;
-    current_row_id_ = 0;
-    current_tuple_.reset();
 }
 
 } // namespace velodb

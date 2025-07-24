@@ -1,7 +1,7 @@
 #pragma once
 
 #include "planner/abstract_plan_node.hpp"
-#include "execution/expression.hpp"
+#include "expression/expression.hpp"
 #include <memory>
 
 // Forward declarations for SQL parser
@@ -21,7 +21,7 @@ class Schema;
 // Query planner interface
 class QueryPlanner {
 public:
-    explicit QueryPlanner(Catalog* catalog);
+    explicit QueryPlanner(Catalog& catalog);
     ~QueryPlanner() = default;
 
     // Delete copy constructor and assignment
@@ -29,7 +29,6 @@ public:
     QueryPlanner& operator=(const QueryPlanner&) = delete;
 
     // Main planning interface
-    std::unique_ptr<AbstractPlanNode> planQuery(const hsql::SQLStatement* statement);
     std::unique_ptr<AbstractPlanNode> planSelect(const hsql::SelectStatement* select_stmt);
 
 private:
@@ -41,6 +40,7 @@ private:
 
     // SELECT list planning
     std::vector<std::unique_ptr<AbstractExpression>> planSelectList(const std::vector<hsql::Expr*>* select_list);
+    std::unique_ptr<Schema> inferScanFilterSchema(const Schema& input_schema);
     std::unique_ptr<Schema> inferProjectionSchema(const std::vector<std::unique_ptr<AbstractExpression>>& expressions,
         const Schema& input_schema);
 
@@ -49,7 +49,7 @@ private:
     static std::unique_ptr<AbstractExpression> planLiteral(const hsql::Expr* expr);
     std::unique_ptr<AbstractExpression> planOperator(const hsql::Expr* expr);
 
-    Catalog* catalog_;
+    Catalog& catalog_;
 };
 
 } // namespace velodb

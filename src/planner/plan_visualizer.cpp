@@ -129,7 +129,7 @@ void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPl
     result += prefix + "    Column Count: " + std::to_string(schema.getColumnCount()) + "\n";
     
     for (size_t i = 0; i < schema.getColumnCount(); ++i) {
-        const auto& column = schema.getColumn(i);
+        const auto& column = schema.getColumnInfo(i);
         result += prefix + "    [" + std::to_string(i) + "] " + column.getName() + 
                  " (" + column.getType().toString() + ")\n";
     }

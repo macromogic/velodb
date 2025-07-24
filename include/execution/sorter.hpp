@@ -1,7 +1,7 @@
 #pragma once
 
 #include "catalog/schema.hpp"
-#include "execution/expression.hpp"
+#include "expression/expression.hpp"
 #include "types/value.hpp"
 #include <functional>
 #include <memory>
@@ -47,7 +47,7 @@ public:
     void sort();
 
     // Get sorted tuples
-    [[nodiscard]] const std::vector<Tuple>& getSortedTuples() const { return sorted_tuples_; }
+    const std::vector<Tuple>& getSortedTuples() const { return sorted_tuples_; }
 
     // Iterator interface for sorted tuples
     class Iterator {
@@ -58,7 +58,7 @@ public:
         {
         }
 
-        [[nodiscard]] bool hasNext() const { return index_ < tuples_.size(); }
+        bool hasNext() const { return index_ < tuples_.size(); }
         const Tuple& next() { return tuples_[index_++]; }
         void reset() { index_ = 0; }
 
@@ -68,12 +68,12 @@ public:
     };
 
     // Get iterator for sorted tuples
-    [[nodiscard]] std::unique_ptr<Iterator> getIterator() const;
+    std::unique_ptr<Iterator> getIterator() const;
 
     // Statistics
-    [[nodiscard]] size_t getSize() const { return tuples_.size(); }
-    [[nodiscard]] bool isEmpty() const { return tuples_.empty(); }
-    [[nodiscard]] bool isSorted() const { return is_sorted_; }
+    size_t getSize() const { return tuples_.size(); }
+    bool isEmpty() const { return tuples_.empty(); }
+    bool isSorted() const { return is_sorted_; }
 
     // Clear all tuples
     void clear();
@@ -88,10 +88,10 @@ private:
     bool is_sorted_ { false };
 
     // Create sort keys for a tuple
-    [[nodiscard]] std::vector<Value> createSortKey(const Tuple& tuple) const;
+    std::vector<Value> createSortKey(const Tuple& tuple) const;
 
     // Create comparator function
-    [[nodiscard]] SortComparator createComparator() const;
+    SortComparator createComparator() const;
 
     // TODO: Implement external sorting for large datasets
     // TODO: Implement different sorting algorithms (quicksort, mergesort, etc.)

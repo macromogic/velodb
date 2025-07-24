@@ -8,13 +8,13 @@ class Catalog;
 // Execution context for operators
 class ExecutionContext {
 public:
-    explicit ExecutionContext(Catalog* catalog);
+    explicit ExecutionContext(Catalog& catalog);
     ~ExecutionContext() = default;
 
-    [[nodiscard]] Catalog* getCatalog() const { return catalog_; }
+    Catalog& getCatalog() const { return catalog_; }
 
 private:
-    Catalog* catalog_;
+    Catalog& catalog_;
 };
 
 } // namespace velodb

@@ -1,7 +1,7 @@
 #include "velodb.hpp"
 #include "planner/plan_visualizer.hpp"
 #include "catalog/mock_catalog_builder.hpp"
-#include "common/traced_exception.hpp"
+#include "common/exception.hpp"
 #include <argparse/argparse.hpp>
 #include <iostream>
 #include <memory>
@@ -75,7 +75,7 @@ int main(int argc, char* argv[])
         }
             
         if (result.getStatement(0)->type() == hsql::kStmtSelect) {
-            QueryPlanner planner(catalog.get());
+            QueryPlanner planner(*catalog);
             const auto* select_stmt = static_cast<const hsql::SelectStatement*>(result.getStatement(0));
                 
             try {

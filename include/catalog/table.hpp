@@ -12,6 +12,7 @@ namespace velodb {
 
 // Forward declarations
 class Tuple;
+class View;
 class TableIterator;
 
 // Row ID type for late materialization
@@ -30,17 +31,17 @@ public:
     Tuple& operator=(const Tuple& other) = default;
     Tuple& operator=(Tuple&& other) noexcept = default;
 
-    [[nodiscard]] const Value& getValue(size_t column_index) const;
-    [[nodiscard]] const Value& getValue(const std::string& column_name) const;
+    const Value& getValue(size_t column_index) const;
+    const Value& getValue(const std::string& column_name) const;
     void setValue(size_t column_index, const Value& value);
     void setValue(size_t column_index, Value&& value);
     void setValue(const std::string& column_name, const Value& value);
     void setValue(const std::string& column_name, Value&& value);
 
-    [[nodiscard]] const Schema& getSchema() const { return schema_.get(); }
-    [[nodiscard]] size_t getColumnCount() const { return values_.size(); }
+    const Schema& getSchema() const { return schema_.get(); }
+    size_t getColumnCount() const { return values_.size(); }
 
-    [[nodiscard]] std::string toString() const;
+    std::string toString() const;
 
 private:
     std::reference_wrapper<const Schema> schema_;
@@ -56,9 +57,9 @@ public:
     TableInfo(TableInfo&& other) noexcept = default;
     TableInfo& operator=(TableInfo&& other) noexcept = default;
 
-    [[nodiscard]] const std::string& getName() const { return name_; }
-    [[nodiscard]] const Schema& getSchema() const { return *schema_; }
-    [[nodiscard]] size_t getColumnCount() const { return schema_->getColumnCount(); }
+    const std::string& getName() const { return name_; }
+    const Schema& getSchema() const { return *schema_; }
+    size_t getColumnCount() const { return schema_->getColumnCount(); }
 
 private:
     std::string name_;
@@ -69,16 +70,20 @@ private:
 class TableBase : private NonCopyable {
 public:
     explicit TableBase(std::unique_ptr<TableInfo> table_info);
+    TableBase(TableBase&& other) = default;
+    TableBase& operator=(TableBase&& other) = default;
     virtual ~TableBase() = default;
 
-    [[nodiscard]] const std::string& getName() const { return table_info_->getName(); }
-    [[nodiscard]] const Schema& getSchema() const { return table_info_->getSchema(); }
-    [[nodiscard]] const TableInfo& getTableInfo() const { return *table_info_; }
+    const std::string& getName() const { return table_info_->getName(); }
+    const Schema& getSchema() const { return table_info_->getSchema(); }
+    const TableInfo& getTableInfo() const { return *table_info_; }
 
     // Pure virtual methods for table operations
-    virtual std::unique_ptr<TableIterator> getIterator() const = 0;
-    [[nodiscard]] virtual size_t getRowCount() const = 0;
-    [[nodiscard]] virtual bool isView() const = 0;
+    virtual TableIterator begin() const = 0;
+    virtual TableIterator end() const = 0;
+    virtual size_t getRowCount() const = 0;
+    virtual bool isView() const = 0;
+    virtual View view() const = 0;
 
 protected:
     std::unique_ptr<TableInfo> table_info_;
@@ -91,38 +96,30 @@ public:
     ~Table() override = default;
 
     // TableBase interface
-    std::unique_ptr<TableIterator> getIterator() const override;
-    [[nodiscard]] size_t getRowCount() const override { return row_count_; }
-    [[nodiscard]] bool isView() const override { return false; }
+    TableIterator begin() const override;
+    TableIterator end() const override;
+    size_t getRowCount() const override { return row_count_; }
+    bool isView() const override { return false; }
+    View view() const override;
 
     // Primary column-based insertion methods
     void insertRow(const std::vector<Value>& values);
     void insertRow(std::vector<Value>&& values);
     void insertBatchRows(const std::vector<std::vector<Value>>& rows);
-    
+
     // Efficient column-based access for late materialization
-    [[nodiscard]] Value getValue(RowId row_id, size_t column_index) const;
-    [[nodiscard]] std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
-    [[nodiscard]] const ValueVector& getColumn(size_t column_index) const;
-    [[nodiscard]] ValueVector& getColumn(size_t column_index);
-    [[nodiscard]] std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
-    
-    // Efficient batch column access
-    [[nodiscard]] std::vector<ValueVector> getColumns(const std::vector<size_t>& column_indices) const;
-    
-    // Row iteration without materializing tuples
-    [[nodiscard]] std::vector<RowId> getAllRowIds() const;
-    [[nodiscard]] std::vector<RowId> getValidRowIds() const; // Excludes deleted rows
+    Value getValue(RowId row_id, size_t column_index) const;
+    std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
+    std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
 
 private:
     // Column-based storage: each column is stored as a separate vector
-    std::vector<ValueVector> columns_;
+    std::vector<ValueColumn> columns_;
     size_t row_count_; // Current number of rows (including deleted)
     
     // Helper methods
     void ensureColumnCapacity(size_t new_row_count);
     void initializeColumns();
-    void insertRowInternal(const std::vector<Value>& values);
 
     friend class TableIterator; // Allow iterator access to private members
 };
@@ -131,54 +128,53 @@ private:
 class View : public TableBase {
 public:
     // Column-based constructor
-    View(std::unique_ptr<TableInfo> table_info, std::vector<ValueVector> columns);
-    
+    View(std::unique_ptr<TableInfo> table_info, std::vector<ViewColumn> columns);
+    View(View&& other) = default;
+    View& operator=(View&& other) = default;
+
     ~View() override = default;
 
     // TableBase interface
-    std::unique_ptr<TableIterator> getIterator() const override;
-    [[nodiscard]] size_t getRowCount() const override { return row_count_; }
-    [[nodiscard]] bool isView() const override { return true; }
+    TableIterator begin() const override;
+    TableIterator end() const override;
+    size_t getRowCount() const override { return row_count_; }
+    bool isView() const override { return true; }
+    View view() const override;
 
+    void addColumn(ViewColumn column);
     // Column-based access methods (similar to Table)
-    [[nodiscard]] Value getValue(RowId row_id, size_t column_index) const;
-    [[nodiscard]] std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
-    [[nodiscard]] const ValueVector& getColumn(size_t column_index) const;
-    [[nodiscard]] std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
-    [[nodiscard]] std::vector<ValueVector> getColumns(const std::vector<size_t>& column_indices) const;
-    
-    // Row ID management
-    [[nodiscard]] std::vector<RowId> getAllRowIds() const;
-    [[nodiscard]] std::vector<RowId> getValidRowIds() const;
+    Value getValue(RowId row_id, size_t column_index) const;
+    std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
+    std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
 
 private:
     // Column-based storage: each column is stored as a separate vector
-    std::vector<ValueVector> columns_;
+    std::vector<ViewColumn> columns_;
     size_t row_count_; // Current number of rows
-    
-    // Helper methods
-    void initializeFromTuples(const std::vector<Tuple>& tuples);
-    void initializeColumns();
 };
 
 // Iterator for table scanning
 class TableIterator {
 public:
-    explicit TableIterator(const Table& table);
-    explicit TableIterator(const View& view);
+    explicit TableIterator(const Table& table, RowId row_id = 0);
+    explicit TableIterator(const View& view, RowId row_id = 0);
     ~TableIterator() = default;
 
-    [[nodiscard]] bool hasNext() const;
-    const Tuple& next();
-    [[nodiscard]] RowId getCurrentRowId() const { return current_row_id_; }
-    void reset();
+    bool operator==(const TableIterator& other) const;
+    bool operator!=(const TableIterator& other) const;
+
+    TableIterator& operator++(); // Pre-increment
+    TableIterator operator++(int); // Post-increment
+    const Tuple& operator*() const; // Dereference to get current tuple
+    const Tuple* operator->() const; // Pointer to current tuple
 
 private:
     const TableBase& table_;
-    size_t current_index_;
     RowId current_row_id_;
     bool is_view_;
-    mutable std::unique_ptr<Tuple> current_tuple_; // Store tuple as unique_ptr
+    std::shared_ptr<Tuple> current_tuple_; // Store tuple as shared_ptr
+
+    void fetchCurrentTuple(); // Helper to fetch current tuple based on row ID
 };
 
 } // namespace velodb

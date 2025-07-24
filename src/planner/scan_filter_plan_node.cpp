@@ -1,20 +1,21 @@
+#include "planner/execution_context.hpp"
 #include "planner/scan_filter_plan_node.hpp"
-#include "execution/operator/scan_filter_operator.hpp"
+#include "operator/scan_filter_operator.hpp"
 #include <sstream>
 
 namespace velodb {
 
 // ScanFilterPlanNode implementation
-ScanFilterPlanNode::ScanFilterPlanNode(const TableBase& table, std::unique_ptr<AbstractExpression> predicate)
-    : AbstractPlanNode(PlanType::SCAN_FILTER, Schema::scanFilterSchema())
+ScanFilterPlanNode::ScanFilterPlanNode(const TableBase& table, std::unique_ptr<Schema> output_schema, std::unique_ptr<AbstractExpression> predicate)
+    : AbstractPlanNode(PlanType::SCAN_FILTER, std::move(output_schema))
     , table_(table)
     , predicate_(std::move(predicate))
 {
 }
 
-std::unique_ptr<AbstractOperator> ScanFilterPlanNode::createOperator([[maybe_unused]] ExecutionContext* context) const
+std::unique_ptr<AbstractOperator> ScanFilterPlanNode::createOperator(ExecutionContext& context) const
 {
-    return std::make_unique<ScanFilterOperator>(table_, predicate_);
+    return std::make_unique<ScanFilterOperator>(context.getCatalog(), table_, predicate_);
 }
 
 std::string ScanFilterPlanNode::toString() const

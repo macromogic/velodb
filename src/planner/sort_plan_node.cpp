@@ -1,4 +1,4 @@
-#include "common/traced_exception.hpp"
+#include "common/exception.hpp"
 #include "planner/sort_plan_node.hpp"
 #include <stdexcept>
 #include <sstream>
@@ -15,7 +15,7 @@ SortPlanNode::SortPlanNode(std::unique_ptr<Schema> output_schema,
 {
 }
 
-std::unique_ptr<AbstractOperator> SortPlanNode::createOperator([[maybe_unused]] ExecutionContext* context) const
+std::unique_ptr<AbstractOperator> SortPlanNode::createOperator([[maybe_unused]] ExecutionContext& context) const
 {
     // TODO: Implement sort operator creation
     VELODB_THROW(ExecutionError, "SortPlanNode::createOperator not implemented");

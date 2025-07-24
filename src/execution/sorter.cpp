@@ -80,14 +80,15 @@ void Sorter::clear()
     is_sorted_ = false;
 }
 
-std::vector<Value> Sorter::createSortKey(const Tuple& tuple) const
+std::vector<Value> Sorter::createSortKey([[maybe_unused]] const Tuple& tuple) const
 {
     std::vector<Value> key_values;
     key_values.reserve(sort_expressions_.size());
 
-    for (const auto& expr : sort_expressions_) {
-        Value const value = expr->evaluate(&tuple, &schema_);
-        key_values.push_back(value);
+    for ([[maybe_unused]] const auto& expr : sort_expressions_) {
+        // TODO: evaluate the expression against the tuple
+        // Value const value = expr->evaluate(&tuple, &schema_);
+        // key_values.push_back(value);
     }
 
     return key_values;

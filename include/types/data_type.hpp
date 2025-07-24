@@ -27,11 +27,15 @@ public:
     explicit DataType(DataTypeId type_id, size_t size = 0);
     virtual ~DataType() = default;
 
-    [[nodiscard]] DataTypeId getTypeId() const { return type_id_; }
-    [[nodiscard]] size_t getSize() const { return size_; }
-    [[nodiscard]] virtual std::string toString() const = 0;
-    [[nodiscard]] virtual bool isFixedSize() const = 0;
-    [[nodiscard]] virtual bool isNumeric() const = 0;
+    DataTypeId getTypeId() const { return type_id_; }
+    size_t getSize() const { return size_; }
+    virtual std::string toString() const = 0;
+    virtual bool isFixedSize() const = 0;
+    virtual bool isNumeric() const = 0;
+
+    std::unique_ptr<DataType> clone() const {
+        return std::unique_ptr<DataType>(createType(type_id_, size_));
+    }
 
     static std::unique_ptr<DataType> createType(DataTypeId type_id, size_t size = 0);
 
@@ -48,9 +52,9 @@ public:
         : DataType(DataTypeId::BOOLEAN, sizeof(bool))
     {
     }
-    [[nodiscard]] std::string toString() const override { return "BOOLEAN"; }
-    [[nodiscard]] bool isFixedSize() const override { return true; }
-    [[nodiscard]] bool isNumeric() const override { return false; }
+    std::string toString() const override { return "BOOLEAN"; }
+    bool isFixedSize() const override { return true; }
+    bool isNumeric() const override { return false; }
 };
 
 class IntegerType : public DataType {
@@ -59,9 +63,9 @@ public:
         : DataType(DataTypeId::INTEGER, sizeof(int32_t))
     {
     }
-    [[nodiscard]] std::string toString() const override { return "INTEGER"; }
-    [[nodiscard]] bool isFixedSize() const override { return true; }
-    [[nodiscard]] bool isNumeric() const override { return true; }
+    std::string toString() const override { return "INTEGER"; }
+    bool isFixedSize() const override { return true; }
+    bool isNumeric() const override { return true; }
 };
 
 class BigIntType : public DataType {
@@ -70,9 +74,9 @@ public:
         : DataType(DataTypeId::BIGINT, sizeof(int64_t))
     {
     }
-    [[nodiscard]] std::string toString() const override { return "BIGINT"; }
-    [[nodiscard]] bool isFixedSize() const override { return true; }
-    [[nodiscard]] bool isNumeric() const override { return true; }
+    std::string toString() const override { return "BIGINT"; }
+    bool isFixedSize() const override { return true; }
+    bool isNumeric() const override { return true; }
 };
 
 class DoubleType : public DataType {
@@ -81,9 +85,9 @@ public:
         : DataType(DataTypeId::DOUBLE, sizeof(double))
     {
     }
-    [[nodiscard]] std::string toString() const override { return "DOUBLE"; }
-    [[nodiscard]] bool isFixedSize() const override { return true; }
-    [[nodiscard]] bool isNumeric() const override { return true; }
+    std::string toString() const override { return "DOUBLE"; }
+    bool isFixedSize() const override { return true; }
+    bool isNumeric() const override { return true; }
 };
 
 class VarcharType : public DataType {
@@ -92,9 +96,9 @@ public:
         : DataType(DataTypeId::VARCHAR, max_length)
     {
     }
-    [[nodiscard]] std::string toString() const override { return "VARCHAR(" + std::to_string(size_) + ")"; }
-    [[nodiscard]] bool isFixedSize() const override { return false; }
-    [[nodiscard]] bool isNumeric() const override { return false; }
+    std::string toString() const override { return "VARCHAR(" + std::to_string(size_) + ")"; }
+    bool isFixedSize() const override { return false; }
+    bool isNumeric() const override { return false; }
 };
 
 } // namespace velodb
