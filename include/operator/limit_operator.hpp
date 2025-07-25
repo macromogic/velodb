@@ -6,15 +6,18 @@
 namespace velodb {
 
 // Limit operator
-class LimitOperator : public AbstractOperator {
+class LimitOperator : public UnaryOperator {
 public:
-    LimitOperator(std::unique_ptr<AbstractOperator> child, size_t limit, size_t offset = 0);
+    LimitOperator(Catalog& catalog,
+        std::unique_ptr<Schema> output_schema,
+        std::unique_ptr<AbstractOperator> child,
+        size_t limit,
+        size_t offset = 0);
     ~LimitOperator() override = default;
 
-    View execute() override;
+    Result<View> execute() const override;
 
 private:
-    std::unique_ptr<AbstractOperator> child_;
     size_t limit_;
     size_t offset_;
     size_t current_count_ { 0 };

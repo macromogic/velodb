@@ -1,7 +1,7 @@
 #pragma once
 
 #include "planner/abstract_plan_node.hpp"
-#include "execution/expression.hpp"
+#include "expression/expression.hpp"
 #include <memory>
 #include <string>
 #include <vector>

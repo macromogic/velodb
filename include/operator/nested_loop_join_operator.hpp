@@ -11,19 +11,19 @@ namespace velodb {
 class AbstractExpression;
 
 // Nested loop join operator
-class NestedLoopJoinOperator : public AbstractOperator {
+class NestedLoopJoinOperator : public BinaryOperator {
 public:
-    NestedLoopJoinOperator(std::unique_ptr<AbstractOperator> left_child,
+    NestedLoopJoinOperator(Catalog& catalog,
+        std::unique_ptr<Schema> output_schema,
+        std::unique_ptr<AbstractOperator> left_child,
         std::unique_ptr<AbstractOperator> right_child,
         std::unique_ptr<AbstractExpression> join_predicate,
         JoinType join_type = JoinType::INNER);
     ~NestedLoopJoinOperator() override = default;
 
-    View execute() override;
+    Result<View> execute() const override;
 
 private:
-    std::unique_ptr<AbstractOperator> left_child_;
-    std::unique_ptr<AbstractOperator> right_child_;
     std::unique_ptr<AbstractExpression> join_predicate_;
     JoinType join_type_;
 

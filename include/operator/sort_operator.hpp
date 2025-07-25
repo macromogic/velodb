@@ -10,24 +10,20 @@ namespace velodb {
 class AbstractExpression;
 
 // Sort operator
-class SortOperator : public AbstractOperator {
+class SortOperator : public UnaryOperator {
 public:
-    SortOperator(std::unique_ptr<AbstractOperator> child,
+    SortOperator(Catalog& catalog,
+        std::unique_ptr<Schema> output_schema,
+        std::unique_ptr<AbstractOperator> child,
         std::vector<std::unique_ptr<AbstractExpression>> sort_expressions,
         std::vector<bool> ascending_flags);
     ~SortOperator() override = default;
 
-    View execute() override;
+    Result<View> execute() const override;
 
 private:
-    std::unique_ptr<AbstractOperator> child_;
     std::vector<std::unique_ptr<AbstractExpression>> sort_expressions_;
     std::vector<bool> ascending_flags_;
-
-    // TODO: Add state for sort with late materialization
-    std::vector<RowId> sorted_row_ids_;
-    size_t current_index_ { 0 };
-    bool sorted_ { false };
 };
 
 } // namespace velodb

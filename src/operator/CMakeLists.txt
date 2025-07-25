@@ -1,8 +1,12 @@
 add_library(velodb_operator OBJECT
     abstract_operator.cpp
-    scan_filter_operator.cpp
+    hash_join_operator.cpp
+    limit_operator.cpp
+    merge_sort_join_operator.cpp
+    nested_loop_join_operator.cpp
     projection_operator.cpp
-    result_set.cpp
+    scan_filter_operator.cpp
+    sort_operator.cpp
 )
 
 target_include_directories(velodb_operator PRIVATE

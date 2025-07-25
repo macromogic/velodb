@@ -11,20 +11,20 @@ namespace velodb {
 class AbstractExpression;
 
 // Hash join operator
-class HashJoinOperator : public AbstractOperator {
+class HashJoinOperator : public BinaryOperator {
 public:
-    HashJoinOperator(std::unique_ptr<AbstractOperator> left_child,
+    HashJoinOperator(Catalog& catalog,
+        std::unique_ptr<Schema> output_schema,
+        std::unique_ptr<AbstractOperator> left_child,
         std::unique_ptr<AbstractOperator> right_child,
         std::unique_ptr<AbstractExpression> left_key_expr,
         std::unique_ptr<AbstractExpression> right_key_expr,
         JoinType join_type = JoinType::INNER);
     ~HashJoinOperator() override = default;
 
-    View execute() override;
+    Result<View> execute() const override;
 
 private:
-    std::unique_ptr<AbstractOperator> left_child_;
-    std::unique_ptr<AbstractOperator> right_child_;
     std::unique_ptr<AbstractExpression> left_key_expr_;
     std::unique_ptr<AbstractExpression> right_key_expr_;
     JoinType join_type_;
