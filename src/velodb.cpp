@@ -93,7 +93,7 @@ bool Database::insertTuple(const std::string& table_name, Tuple&& tuple)
 Result<View> Database::executeQuery(const std::string& sql)
 {
     if (!initialized_) {
-        throw std::runtime_error("Database not initialized");
+        return Result<View>::failure("Database not initialized");
     }
     return execution_engine_->executeQuery(sql);
 }

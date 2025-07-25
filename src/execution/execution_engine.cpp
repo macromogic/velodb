@@ -201,11 +201,11 @@ Result<View> ExecutionEngine::executeQuery(const std::string& sql)
     hsql::SQLParser::parse(sql, &result);
 
     if (!result.isValid()) {
-        throw std::runtime_error("Invalid SQL query: " + std::string(result.errorMsg()));
+        return Result<View>::failure("SQL parsing error: " + std::string(result.errorMsg()));
     }
 
     if (result.size() != 1) {
-        throw std::runtime_error("Multiple statements not supported");
+        return Result<View>::failure("Multiple statements not supported");
     }
 
     return executeStatement(result.getStatement(0));
@@ -218,7 +218,7 @@ Result<View> ExecutionEngine::executeStatement(const hsql::SQLStatement* stateme
     case hsql::kStmtSelect:
         return executeSelect(dynamic_cast<const hsql::SelectStatement*>(statement));
     default:
-        throw std::runtime_error("Statement type not supported");
+        return Result<View>::failure("Unsupported statement type: " + std::to_string(statement->type()));
     }
 }
 

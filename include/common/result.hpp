@@ -20,49 +20,49 @@ public:
     explicit Result(const E& error) : value_(error) {}
     
     // Query methods
-    bool has_value() const noexcept {
+    bool ok() const noexcept {
         return std::holds_alternative<T>(value_);
     }
     
-    bool has_error() const noexcept {
+    bool err() const noexcept {
         return std::holds_alternative<E>(value_);
     }
     
     explicit operator bool() const noexcept {
-        return has_value();
+        return ok();
     }
     
     // Access methods
     T& value() & {
-        if (!has_value()) {
+        if (!ok()) {
             VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::get<T>(value_);
     }
     
     const T& value() const& {
-        if (!has_value()) {
+        if (!ok()) {
             VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::get<T>(value_);
     }
     
     T&& value() && {
-        if (!has_value()) {
+        if (!ok()) {
             VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::move(std::get<T>(value_));
     }
     
     const E& error() const& {
-        if (!has_error()) {
+        if (!err()) {
             VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
         return std::get<E>(value_);
     }
     
     E&& error() && {
-        if (!has_error()) {
+        if (!err()) {
             VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
         return std::move(std::get<E>(value_));
@@ -70,11 +70,11 @@ public:
     
     // Convenience methods
     T value_or(const T& default_value) const& {
-        return has_value() ? value() : default_value;
+        return ok() ? value() : default_value;
     }
     
     T value_or(T&& default_value) && {
-        return has_value() ? std::move(value()) : std::move(default_value);
+        return ok() ? std::move(value()) : std::move(default_value);
     }
     
     // Factory methods
