@@ -43,7 +43,7 @@ public:
 
 private:
     std::unordered_map<std::string, std::unique_ptr<Table>> tables_;
-    std::vector<ValueColumn> temporary_columns_; // For temporary storage during operations
+    std::vector<std::unique_ptr<ValueColumn>> temporary_columns_; // For temporary storage during operations
 };
 
 // Catalog builder for easy setup

@@ -238,7 +238,7 @@ Value Table::getValue(RowId row_id, size_t column_index) const
         VELODB_THROW(CatalogError, "Column index out of range");
     }
 
-    return columns_[column_index][row_id];
+    return columns_[column_index].get(row_id);
 }
 
 std::vector<Value> Table::getValues(RowId row_id, const std::vector<size_t>& column_indices) const
@@ -254,7 +254,7 @@ std::vector<Value> Table::getValues(RowId row_id, const std::vector<size_t>& col
         if (col_idx >= columns_.size()) {
             VELODB_THROW(CatalogError, "Column index out of range");
         }
-        values.push_back(columns_[col_idx][row_id]);
+        values.push_back(columns_[col_idx].get(row_id));
     }
     return values;
 }
@@ -272,7 +272,7 @@ std::vector<Value> Table::getColumnValues(size_t column_index, const std::vector
         if (row_id >= row_count_) {
             VELODB_THROW(CatalogError, "Row ID out of range");
         }
-        values.push_back(columns_[column_index][row_id]);
+        values.push_back(columns_[column_index].get(row_id));
     }
 
     return values;
@@ -306,6 +306,9 @@ View::View(std::string name)
 
 void View::addColumn(ViewColumn column)
 {
+    if (row_count_ == 0 && columns_.empty()) {
+        row_count_ = column.size();
+    }
     if (column.size() != row_count_) {
         VELODB_THROW(CatalogError, "New column size must match existing row count");
     }
@@ -366,7 +369,7 @@ Value View::getValue(RowId row_id, size_t column_index) const
         VELODB_THROW(CatalogError, "Column index out of range");
     }
 
-    return columns_[column_index][row_id];
+    return columns_[column_index].get(row_id);
 }
 
 std::vector<Value> View::getValues(RowId row_id, const std::vector<size_t>& column_indices) const
@@ -382,7 +385,7 @@ std::vector<Value> View::getValues(RowId row_id, const std::vector<size_t>& colu
         if (col_idx >= columns_.size()) {
             VELODB_THROW(CatalogError, "Column index out of range");
         }
-        values.push_back(columns_[col_idx][row_id]);
+        values.push_back(columns_[col_idx].get(row_id));
     }
     return values;
 }
@@ -400,7 +403,7 @@ std::vector<Value> View::getColumnValues(size_t column_index, const std::vector<
         if (row_id >= row_count_) {
             VELODB_THROW(CatalogError, "Row ID out of range");
         }
-        values.push_back(columns_[column_index][row_id]);
+        values.push_back(columns_[column_index].get(row_id));
     }
 
     return values;

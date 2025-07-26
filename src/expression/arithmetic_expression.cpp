@@ -1,3 +1,4 @@
+#include "common/exception.hpp"
 #include "expression/arithmetic_expression.hpp"
 #include "types/type_checker.hpp"
 #include <stdexcept>
@@ -16,7 +17,7 @@ ArithmeticExpression::ArithmeticExpression(ArithmeticType arith_type,
 {
     // Validate the arithmetic operation at construction time
     if (!return_type_) {
-        throw std::runtime_error("Invalid arithmetic operation: " + g_type_checker.getLastError());
+        VELODB_THROW(TypeError, "Invalid arithmetic operation: " + g_type_checker.getLastError());
     }
 }
 

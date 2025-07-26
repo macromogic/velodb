@@ -76,11 +76,7 @@ TEST_F(ExpressionTest, ConjunctionExpression) {
     auto left_expr = std::make_unique<ConstantExpression>(left_val);
     auto right_expr = std::make_unique<ConstantExpression>(right_val);
     
-    std::vector<std::unique_ptr<AbstractExpression>> children;
-    children.push_back(std::move(left_expr));
-    children.push_back(std::move(right_expr));
-    
-    ConjunctionExpression conj_expr(ConjunctionType::AND, std::move(children));
+    ConjunctionExpression conj_expr(ConjunctionType::AND, std::move(left_expr), std::move(right_expr));
     
     EXPECT_EQ(conj_expr.getReturnType().getTypeId(), DataTypeId::BOOLEAN);
     EXPECT_EQ(conj_expr.getConjunctionType(), ConjunctionType::AND);

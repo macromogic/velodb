@@ -159,20 +159,14 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Table
     case hsql::kOpAnd: {
         auto left = planExpression(table_ref, expr->expr);
         auto right = planExpression(table_ref, expr->expr2);
-        std::vector<std::unique_ptr<AbstractExpression>> children;
-        children.push_back(std::move(left));
-        children.push_back(std::move(right));
         return std::make_unique<ConjunctionExpression>(
-            ConjunctionType::AND, std::move(children));
+            ConjunctionType::AND, std::move(left), std::move(right));
     }
     case hsql::kOpOr: {
         auto left = planExpression(table_ref, expr->expr);
         auto right = planExpression(table_ref, expr->expr2);
-        std::vector<std::unique_ptr<AbstractExpression>> children;
-        children.push_back(std::move(left));
-        children.push_back(std::move(right));
         return std::make_unique<ConjunctionExpression>(
-            ConjunctionType::OR, std::move(children));
+            ConjunctionType::OR, std::move(left), std::move(right));
     }
     case hsql::kOpBetween: {
         // BETWEEN is: expr BETWEEN low AND high
@@ -197,11 +191,8 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Table
             std::move(high_expr));
 
         // Combine with AND
-        std::vector<std::unique_ptr<AbstractExpression>> children;
-        children.push_back(std::move(left_comparison));
-        children.push_back(std::move(right_comparison));
         return std::make_unique<ConjunctionExpression>(
-            ConjunctionType::AND, std::move(children));
+            ConjunctionType::AND, std::move(left_comparison), std::move(right_comparison));
     }
     case hsql::kOpIn: {
         // TODO: Implement IN operator

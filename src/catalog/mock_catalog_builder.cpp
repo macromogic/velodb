@@ -481,7 +481,7 @@ std::map<std::string, std::vector<std::pair<std::string, DataTypeId>>> MockCatal
 {
     return {
         { "users", { { "id", DataTypeId::INTEGER }, { "name", DataTypeId::VARCHAR }, { "email", DataTypeId::VARCHAR }, { "age", DataTypeId::INTEGER }, { "created_at", DataTypeId::VARCHAR } } },
-        { "orders", { { "order_id", DataTypeId::INTEGER }, { "user_id", DataTypeId::INTEGER }, { "product_id", DataTypeId::INTEGER }, { "quantity", DataTypeId::INTEGER }, { "price", DataTypeId::DOUBLE }, { "order_date", DataTypeId::VARCHAR } } },
+        { "orders", { { "order_id", DataTypeId::INTEGER }, { "user_id", DataTypeId::INTEGER }, { "product_id", DataTypeId::INTEGER }, { "quantity", DataTypeId::INTEGER }, { "price", DataTypeId::DOUBLE }, { "total", DataTypeId::DOUBLE }, { "order_date", DataTypeId::VARCHAR } } },
         { "products", { { "product_id", DataTypeId::INTEGER }, { "name", DataTypeId::VARCHAR }, { "description", DataTypeId::VARCHAR }, { "price", DataTypeId::DOUBLE }, { "stock_quantity", DataTypeId::INTEGER }, { "category", DataTypeId::VARCHAR } } },
         { "customers", { { "customer_id", DataTypeId::INTEGER }, { "name", DataTypeId::VARCHAR }, { "email", DataTypeId::VARCHAR }, { "phone", DataTypeId::VARCHAR }, { "address", DataTypeId::VARCHAR } } },
         { "employees", { { "employee_id", DataTypeId::INTEGER }, { "name", DataTypeId::VARCHAR }, { "department", DataTypeId::VARCHAR }, { "salary", DataTypeId::DOUBLE }, { "hire_date", DataTypeId::VARCHAR } } }

@@ -32,24 +32,35 @@ Result<View> ProjectionOperator::execute() const
     View view("projection_result");
     Tuple dummy_tuple(*output_schema_);
     size_t output_columns = output_schema_->getColumnCount();
-    for (size_t i = 0; i < output_columns; ++i) {
-        const auto& expr = expressions_[i];
-        const auto& column_info = output_schema_->getColumnInfo(i);
-        switch (expr->getExpressionType()) {
-        case ExpressionType::COLUMN_REF: {
-            const auto* column_ref = static_cast<ColumnRefExpression*>(expr.get());
-            view.addColumn(child_view.getColumn(column_ref->getColumnName()).viewAs(column_info.getName()));
-            break;
+    if (expressions_.empty()) {
+        // TODO: handle select * case.
+        // For now, output all columns not starting with '$'
+        for (size_t i = 0; i < output_columns; ++i) {
+            const auto& column_info = output_schema_->getColumnInfo(i);
+            if (column_info.getName()[0] != '$') {
+                view.addColumn(child_view.getColumn(column_info.getName()).viewAs(column_info.getName()));
+            }
         }
-        case ExpressionType::CONSTANT: {
-            ValueColumn& constant_col = catalog_.createTemporaryColumn(column_info.getName(), expr->getReturnType().cloneUnique());
-            constant_col.fill(expr->evaluate(dummy_tuple, child_view.getSchema()), child_view.getRowCount());
-            view.addColumn(constant_col.view());
-            break;
-        }
-        default:
-            VELODB_THROW(ExecutionError, "Unsupported expression type in projection: " + expr->toString());
-            break;
+    } else {
+        for (size_t i = 0; i < output_columns; ++i) {
+            const auto& expr = expressions_[i];
+            const auto& column_info = output_schema_->getColumnInfo(i);
+            switch (expr->getExpressionType()) {
+            case ExpressionType::COLUMN_REF: {
+                const auto* column_ref = static_cast<ColumnRefExpression*>(expr.get());
+                view.addColumn(child_view.getColumn(column_ref->getColumnName()).viewAs(column_info.getName()));
+                break;
+            }
+            case ExpressionType::CONSTANT: {
+                ValueColumn& constant_col = catalog_.createTemporaryColumn(column_info.getName(), expr->getReturnType().cloneUnique());
+                constant_col.fill(expr->evaluate(dummy_tuple, child_view.getSchema()), child_view.getRowCount());
+                view.addColumn(constant_col.view());
+                break;
+            }
+            default:
+                VELODB_THROW(ExecutionError, "Unsupported expression type in projection: " + expr->toString());
+                break;
+            }
         }
     }
 

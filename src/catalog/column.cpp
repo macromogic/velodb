@@ -88,6 +88,14 @@ Value ValueColumn::get(size_t row) const
     return values_[row];
 }
 
+Value& ValueColumn::operator[](size_t row)
+{
+    if (row >= values_.size()) {
+        VELODB_THROW(CatalogError, "Row index out of range");
+    }
+    return values_[row];
+}
+
 void ValueColumn::append(const Value& value)
 {
     if (value.getTypeId() != type_->getTypeId()) {

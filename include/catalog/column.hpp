@@ -38,7 +38,6 @@ class Column : private NonCopyable {
 public:
     virtual size_t size() const = 0;
     virtual Value get(size_t row) const = 0;
-    virtual Value operator[](size_t row) const { return get(row); }
 
     virtual DataType& getType() const = 0;
     std::string getName() const { return name_; }
@@ -78,6 +77,7 @@ public:
     void reserve(size_t new_capacity);
     size_t size() const override;
     Value get(size_t row) const override;
+    Value& operator[](size_t row);
     void append(const Value& value);
     void fill(const Value& value, size_t count);
 

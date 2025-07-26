@@ -9,7 +9,8 @@ namespace velodb {
 class ConjunctionExpression : public AbstractExpression {
 public:
     ConjunctionExpression(ConjunctionType conj_type,
-        std::vector<std::unique_ptr<AbstractExpression>> children);
+        std::unique_ptr<AbstractExpression> left,
+        std::unique_ptr<AbstractExpression> right);
     ~ConjunctionExpression() override = default;
 
     Value evaluate(const Tuple& tuple, const Schema& schema) const override;
@@ -17,11 +18,11 @@ public:
     std::string toString() const override;
 
     ConjunctionType getConjunctionType() const { return conj_type_; }
-    const std::vector<std::unique_ptr<AbstractExpression>>& getChildren() const { return children_; }
 
 private:
     ConjunctionType conj_type_;
-    std::vector<std::unique_ptr<AbstractExpression>> children_;
+    std::unique_ptr<AbstractExpression> left_;
+    std::unique_ptr<AbstractExpression> right_;
 };
 
 } // namespace velodb

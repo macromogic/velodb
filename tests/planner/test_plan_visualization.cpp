@@ -45,7 +45,7 @@ TEST_F(PlanVisualizationTest, TextVisualizationSimpleSelect) {
     std::cout << text_output << std::endl;
     
     EXPECT_FALSE(text_output.empty());
-    EXPECT_NE(text_output.find("SeqScan"), std::string::npos);
+    EXPECT_NE(text_output.find("ScanFilter"), std::string::npos);
     EXPECT_NE(text_output.find("users"), std::string::npos);
 }
 
@@ -70,7 +70,7 @@ TEST_F(PlanVisualizationTest, TextVisualizationSelectWithWhere) {
     std::cout << text_output << std::endl;
     
     EXPECT_FALSE(text_output.empty());
-    EXPECT_NE(text_output.find("SeqScan"), std::string::npos);
+    EXPECT_NE(text_output.find("ScanFilter"), std::string::npos);
 }
 
 TEST_F(PlanVisualizationTest, TextVisualizationSelectWithProjection) {
@@ -119,7 +119,7 @@ TEST_F(PlanVisualizationTest, GraphvizVisualizationSimpleSelect) {
     EXPECT_FALSE(graphviz_output.empty());
     EXPECT_NE(graphviz_output.find("digraph SimpleSelect"), std::string::npos);
     EXPECT_NE(graphviz_output.find("node"), std::string::npos);
-    EXPECT_NE(graphviz_output.find("cylinder"), std::string::npos); // SeqScan shape
+    EXPECT_NE(graphviz_output.find("diamond"), std::string::npos); // ScanFilter
 }
 
 TEST_F(PlanVisualizationTest, GraphvizVisualizationComplexQuery) {
