@@ -13,7 +13,6 @@ ScanFilterOperator::ScanFilterOperator(Catalog& catalog, const TableBase& table,
 {
 }
 
-#include <iostream> 
 Result<View> ScanFilterOperator::execute() const
 {
     ValueColumn& rowids = catalog_.createTemporaryColumn("$_rowid", std::make_unique<BigIntType>());
@@ -32,9 +31,6 @@ Result<View> ScanFilterOperator::execute() const
     auto view = table_.viewAs("scan_filter_result");
     view.addColumn(rowids.view());
     view.addColumn(masks.view());
-    std::cout << "ScanFilterOperator executed on table: " << table_.getName() << std::endl;
-    std::cout << "Row count: " << view.getRowCount() << std::endl;
-    std::cout << view.toString() << std::endl;
     return Result<View>::success(std::move(view));
 }
 
