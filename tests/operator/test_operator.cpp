@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "operator/scan_filter_operator.hpp"
+#include "operator/compaction_operator.hpp"
 #include "expression/expression.hpp"
 #include "catalog/table.hpp"
 #include "catalog/schema.hpp"
@@ -59,9 +60,10 @@ TEST_F(OperatorTest, ScanFilterOperatorWithPredicate) {
         ComparisonType::EQUAL, std::move(col_expr), std::move(const_expr));
     
     auto& test_table = catalog_->getTable("test_table").value().get();
-    ScanFilterOperator scan_op(*catalog_, test_table, nullptr);
+    auto scan_op = std::make_unique<ScanFilterOperator>(*catalog_, test_table, std::move(predicate));
+    auto compaction_op = std::make_unique<CompactionOperator>(*catalog_, scan_op->getOutputSchema().cloneUnique(), std::move(scan_op));
 
-    auto view_result = scan_op.execute();
+    auto view_result = compaction_op->execute();
     EXPECT_TRUE(view_result.ok());
     auto view = std::move(view_result.value());
     

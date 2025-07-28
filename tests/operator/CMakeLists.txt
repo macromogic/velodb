@@ -1,5 +1,5 @@
 add_executable(test_operator
-    test_scan_filter_operator.cpp
+    test_operator.cpp
     ../test_main.cpp
 )
 
