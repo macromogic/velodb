@@ -108,6 +108,36 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Table
 {
     // Implement operator planning for all comparison operators
     switch (expr->opType) {
+    case hsql::kOpPlus: {
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
+        return std::make_unique<ArithmeticExpression>(
+            ArithmeticType::PLUS, std::move(left), std::move(right));
+    }
+    case hsql::kOpMinus: {
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
+        return std::make_unique<ArithmeticExpression>(
+            ArithmeticType::MINUS, std::move(left), std::move(right));
+    }
+    case hsql::kOpAsterisk: {
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
+        return std::make_unique<ArithmeticExpression>(
+            ArithmeticType::MULTIPLY, std::move(left), std::move(right));
+    }
+    case hsql::kOpSlash: {
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
+        return std::make_unique<ArithmeticExpression>(
+            ArithmeticType::DIVIDE, std::move(left), std::move(right));
+    }
+    case hsql::kOpPercentage: {
+        auto left = planExpression(table_ref, expr->expr);
+        auto right = planExpression(table_ref, expr->expr2);
+        return std::make_unique<ArithmeticExpression>(
+            ArithmeticType::MODULO, std::move(left), std::move(right));
+    }
     case hsql::kOpEquals: {
         auto left = planExpression(table_ref, expr->expr);
         auto right = planExpression(table_ref, expr->expr2);
@@ -159,14 +189,18 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Table
     case hsql::kOpAnd: {
         auto left = planExpression(table_ref, expr->expr);
         auto right = planExpression(table_ref, expr->expr2);
-        return std::make_unique<ConjunctionExpression>(
-            ConjunctionType::AND, std::move(left), std::move(right));
+        return std::make_unique<BinaryLogicalExpression>(
+            ConnectiveType::AND, std::move(left), std::move(right));
     }
     case hsql::kOpOr: {
         auto left = planExpression(table_ref, expr->expr);
         auto right = planExpression(table_ref, expr->expr2);
-        return std::make_unique<ConjunctionExpression>(
-            ConjunctionType::OR, std::move(left), std::move(right));
+        return std::make_unique<BinaryLogicalExpression>(
+            ConnectiveType::OR, std::move(left), std::move(right));
+    }
+    case hsql::kOpNot: {
+        auto operand = planExpression(table_ref, expr->expr);
+        return std::make_unique<LogicalNotExpression>(std::move(operand));
     }
     case hsql::kOpBetween: {
         // BETWEEN is: expr BETWEEN low AND high
@@ -191,8 +225,8 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Table
             std::move(high_expr));
 
         // Combine with AND
-        return std::make_unique<ConjunctionExpression>(
-            ConjunctionType::AND, std::move(left_comparison), std::move(right_comparison));
+        return std::make_unique<BinaryLogicalExpression>(
+            ConnectiveType::AND, std::move(left_comparison), std::move(right_comparison));
     }
     case hsql::kOpIn: {
         // TODO: Implement IN operator

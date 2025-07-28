@@ -73,9 +73,20 @@ Value ComparisonExpression::compareValues(const Value& left_val, const Value& ri
     case ComparisonType::NOT_EQUAL:
         result = (left_val != right_val);
         break;
-    // TODO: Implement other comparison operators
+    case ComparisonType::LESS_THAN:
+        result = (left_val < right_val);
+        break;
+    case ComparisonType::LESS_THAN_OR_EQUAL:
+        result = (left_val <= right_val);
+        break;
+    case ComparisonType::GREATER_THAN:
+        result = (left_val > right_val);
+        break;
+    case ComparisonType::GREATER_THAN_OR_EQUAL:
+        result = (left_val >= right_val);
+        break;
     default:
-        VELODB_THROW(ExecutionError, "Comparison operator not implemented");
+        VELODB_THROW(ExecutionError, "Comparison operator not implemented: " + std::to_string(static_cast<int>(comp_type_)));
     }
 
     return Value::createBoolean(result);

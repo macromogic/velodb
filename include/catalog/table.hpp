@@ -90,6 +90,8 @@ public:
     virtual View view() const = 0;
     virtual View viewAs(std::string alias) const = 0;
 
+    std::string toString() const;
+
 protected:
     std::unique_ptr<TableInfo> table_info_;
 };

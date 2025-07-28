@@ -19,7 +19,7 @@ enum class ExpressionType {
     CONSTANT,
     COLUMN_REF,
     COMPARISON,
-    CONJUNCTION,
+    LOGICAL,
     ARITHMETIC,
     FUNCTION_CALL,
     CAST,
@@ -43,8 +43,8 @@ enum class ComparisonType {
     IS_NOT_NULL
 };
 
-// Conjunction types
-enum class ConjunctionType {
+// Logical connective types
+enum class ConnectiveType {
     AND,
     OR
 };
@@ -85,7 +85,7 @@ protected:
 class ConstantExpression;
 class ColumnRefExpression;
 class ComparisonExpression;
-class ConjunctionExpression;
+class BinaryLogicalExpression;
 class ArithmeticExpression;
 class CastExpression;
 class FunctionCallExpression;
@@ -97,6 +97,6 @@ class FunctionCallExpression;
 #include "cast_expression.hpp"
 #include "column_ref_expression.hpp"
 #include "comparison_expression.hpp"
-#include "conjunction_expression.hpp"
+#include "logical_expression.hpp"
 #include "constant_expression.hpp"
 #include "function_call_expression.hpp"

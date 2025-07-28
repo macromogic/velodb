@@ -3,7 +3,7 @@ add_library(velodb_expression OBJECT
     constant_expression.cpp
     column_ref_expression.cpp
     comparison_expression.cpp
-    conjunction_expression.cpp
+    logical_expression.cpp
     arithmetic_expression.cpp
     cast_expression.cpp
     function_call_expression.cpp

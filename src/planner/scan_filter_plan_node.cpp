@@ -1,5 +1,6 @@
 #include "planner/execution_context.hpp"
 #include "planner/scan_filter_plan_node.hpp"
+#include "operator/compaction_operator.hpp"
 #include "operator/scan_filter_operator.hpp"
 #include <sstream>
 
@@ -15,7 +16,8 @@ ScanFilterPlanNode::ScanFilterPlanNode(const TableBase& table, std::unique_ptr<S
 
 std::unique_ptr<AbstractOperator> ScanFilterPlanNode::createOperator(ExecutionContext& context) const
 {
-    return std::make_unique<ScanFilterOperator>(context.getCatalog(), table_, predicate_);
+    auto scan_filter_op = std::make_unique<ScanFilterOperator>(context.getCatalog(), table_, predicate_);
+    return std::make_unique<CompactionOperator>(context.getCatalog(), scan_filter_op->getOutputSchema().cloneUnique(), std::move(scan_filter_op));
 }
 
 std::string ScanFilterPlanNode::toString() const

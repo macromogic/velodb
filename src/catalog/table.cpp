@@ -102,6 +102,17 @@ TableBase::TableBase(std::unique_ptr<TableInfo> table_info)
 {
 }
 
+std::string TableBase::toString() const
+{
+    std::stringstream ss;
+    ss << "Table: " << getName() << "\n";
+    ss << "Schema: " << getSchema().toString() << "\n";
+    for (const auto& tuple : *this) {
+        ss << tuple.toString() << "\n";
+    }
+    return ss.str();
+}
+
 // Table implementation with column-based storage
 Table::Table(std::unique_ptr<TableInfo> table_info)
     : TableBase(std::move(table_info))
@@ -447,6 +458,7 @@ TableIterator& TableIterator::operator++()
 
     // Move to next row
     ++current_row_id_;
+    fetchCurrentTuple();
 
     return *this;
 }

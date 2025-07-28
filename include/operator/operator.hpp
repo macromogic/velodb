@@ -1,6 +1,7 @@
 #pragma once
 
 #include "operator/abstract_operator.hpp"
+#include "operator/compaction_operator.hpp"
 #include "operator/hash_join_operator.hpp"
 #include "operator/join_type.hpp"
 #include "operator/limit_operator.hpp"

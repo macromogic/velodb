@@ -69,19 +69,19 @@ TEST_F(ExpressionTest, ArithmeticExpression) {
     EXPECT_NE(expr_str.find("+"), std::string::npos);
 }
 
-TEST_F(ExpressionTest, ConjunctionExpression) {
+TEST_F(ExpressionTest, BinaryLogicalExpression) {
     Value left_val = Value::createBoolean(true);
     Value right_val = Value::createBoolean(false);
     
     auto left_expr = std::make_unique<ConstantExpression>(left_val);
     auto right_expr = std::make_unique<ConstantExpression>(right_val);
     
-    ConjunctionExpression conj_expr(ConjunctionType::AND, std::move(left_expr), std::move(right_expr));
+    BinaryLogicalExpression and_expr(ConnectiveType::AND, std::move(left_expr), std::move(right_expr));
     
-    EXPECT_EQ(conj_expr.getReturnType().getTypeId(), DataTypeId::BOOLEAN);
-    EXPECT_EQ(conj_expr.getConjunctionType(), ConjunctionType::AND);
+    EXPECT_EQ(and_expr.getReturnType().getTypeId(), DataTypeId::BOOLEAN);
+    EXPECT_EQ(and_expr.getConjunctionType(), ConnectiveType::AND);
     
-    std::string expr_str = conj_expr.toString();
+    std::string expr_str = and_expr.toString();
     EXPECT_FALSE(expr_str.empty());
     EXPECT_NE(expr_str.find("AND"), std::string::npos);
 }

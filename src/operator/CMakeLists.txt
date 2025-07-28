@@ -1,5 +1,6 @@
 add_library(velodb_operator OBJECT
     abstract_operator.cpp
+    compaction_operator.cpp
     hash_join_operator.cpp
     limit_operator.cpp
     merge_sort_join_operator.cpp
