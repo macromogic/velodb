@@ -72,9 +72,7 @@ void PlanVisualizer::visualizeTextRecursive(const std::unique_ptr<AbstractPlanNo
     
     // Add schema information
     const auto& schema = plan_node->getOutputSchema();
-    result += " (cols: " + std::to_string(schema.getColumnCount()) + ")";
-    
-    result += "\n";
+    result += " (cols: " + std::to_string(schema.getColumnCount()) + ")\n";
 
     // Recursively process children
     const auto& children = plan_node->getChildren();

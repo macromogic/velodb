@@ -1,3 +1,4 @@
+#include "common/exception.hpp"
 #include "expression/cast_expression.hpp"
 #include "types/type_checker.hpp"
 #include <stdexcept>
@@ -16,7 +17,7 @@ CastExpression::CastExpression(std::unique_ptr<AbstractExpression> operand, std:
 {
     // Validate the cast operation at construction time
     if (!g_type_checker.validateCast(operand_->getReturnType(), *target_type_)) {
-        throw std::runtime_error("Invalid cast operation: " + g_type_checker.getLastError());
+        VELODB_THROW(TypeError, "Invalid cast operation: " + g_type_checker.getLastError());
     }
 }
 
@@ -62,10 +63,10 @@ Value CastExpression::performCast(const Value& value, const DataType& target_typ
             case DataTypeId::TIMESTAMP:
                 return castToTimestamp(value);
             default:
-                throw std::runtime_error("Unsupported cast target type: " + target_type.toString());
+                VELODB_THROW(TypeError, "Unsupported cast target type: " + target_type.toString());
         }
     } catch (const std::exception& e) {
-        throw std::runtime_error("Cast operation failed: " + std::string(e.what()));
+        VELODB_THROW(TypeError, "Cast operation failed: " + std::string(e.what()));
     }
 }
 
@@ -88,11 +89,11 @@ Value CastExpression::castToBoolean(const Value& value)
             } else if (str == "false" || str == "f" || str == "0") {
                 return Value::createBoolean(false);
             } else {
-                throw std::runtime_error("Cannot convert string '" + value.getString() + "' to boolean");
+                VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to boolean");
             }
         }
         default:
-            throw std::runtime_error("Cannot cast " + value.toString() + " to boolean");
+            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to boolean");
     }
 }
 
@@ -106,14 +107,14 @@ Value CastExpression::castToInteger(const Value& value)
         case DataTypeId::BIGINT: {
             int64_t bigint_val = value.getBigInt();
             if (bigint_val > INT32_MAX || bigint_val < INT32_MIN) {
-                throw std::runtime_error("BigInt value out of range for Integer");
+                VELODB_THROW(TypeError, "BigInt value out of range for Integer");
             }
             return Value::createInteger(static_cast<int32_t>(bigint_val));
         }
         case DataTypeId::DOUBLE: {
             double double_val = value.getDouble();
             if (double_val > INT32_MAX || double_val < INT32_MIN) {
-                throw std::runtime_error("Double value out of range for Integer");
+                VELODB_THROW(TypeError, "Double value out of range for Integer");
             }
             return Value::createInteger(static_cast<int32_t>(double_val));
         }
@@ -122,11 +123,11 @@ Value CastExpression::castToInteger(const Value& value)
                 int32_t int_val = std::stoi(value.getString());
                 return Value::createInteger(int_val);
             } catch (const std::exception&) {
-                throw std::runtime_error("Cannot convert string '" + value.getString() + "' to integer");
+                VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to integer");
             }
         }
         default:
-            throw std::runtime_error("Cannot cast " + value.toString() + " to integer");
+            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to integer");
     }
 }
 
@@ -142,7 +143,7 @@ Value CastExpression::castToBigInt(const Value& value)
         case DataTypeId::DOUBLE: {
             double double_val = value.getDouble();
             if (double_val > INT64_MAX || double_val < INT64_MIN) {
-                throw std::runtime_error("Double value out of range for BigInt");
+                VELODB_THROW(TypeError, "Double value out of range for BigInt");
             }
             return Value::createBigInt(static_cast<int64_t>(double_val));
         }
@@ -151,11 +152,11 @@ Value CastExpression::castToBigInt(const Value& value)
                 int64_t bigint_val = std::stoll(value.getString());
                 return Value::createBigInt(bigint_val);
             } catch (const std::exception&) {
-                throw std::runtime_error("Cannot convert string '" + value.getString() + "' to bigint");
+                VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to bigint");
             }
         }
         default:
-            throw std::runtime_error("Cannot cast " + value.toString() + " to bigint");
+            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to bigint");
     }
 }
 
@@ -175,11 +176,11 @@ Value CastExpression::castToDouble(const Value& value)
                 double double_val = std::stod(value.getString());
                 return Value::createDouble(double_val);
             } catch (const std::exception&) {
-                throw std::runtime_error("Cannot convert string '" + value.getString() + "' to double");
+                VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to double");
             }
         }
         default:
-            throw std::runtime_error("Cannot cast " + value.toString() + " to double");
+            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to double");
     }
 }
 
@@ -211,14 +212,14 @@ Value CastExpression::castToDate(const Value& value)
             if (std::regex_match(date_str, date_pattern)) {
                 return Value::createString(date_str); // Simplified - store as string for now
             } else {
-                throw std::runtime_error("Invalid date format: " + date_str);
+                VELODB_THROW(TypeError, "Invalid date format: " + date_str);
             }
         }
         case DataTypeId::TIMESTAMP:
             // Extract date part from timestamp
             return Value::createString(value.getString().substr(0, 10)); // Simplified
         default:
-            throw std::runtime_error("Cannot cast " + value.toString() + " to date");
+            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to date");
     }
 }
 
@@ -232,14 +233,14 @@ Value CastExpression::castToTimestamp(const Value& value)
             if (std::regex_match(timestamp_str, timestamp_pattern)) {
                 return Value::createString(timestamp_str); // Simplified - store as string for now
             } else {
-                throw std::runtime_error("Invalid timestamp format: " + timestamp_str);
+                VELODB_THROW(TypeError, "Invalid timestamp format: " + timestamp_str);
             }
         }
         case DataTypeId::DATE:
             // Add default time to date
             return Value::createString(value.getString() + " 00:00:00"); // Simplified
         default:
-            throw std::runtime_error("Cannot cast " + value.toString() + " to timestamp");
+            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to timestamp");
     }
 }
 

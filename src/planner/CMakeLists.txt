@@ -9,6 +9,7 @@ add_library(velodb_planner OBJECT
     projection_plan_node.cpp
     query_planner.cpp
     scan_filter_plan_node.cpp
+    sort_plan_node.cpp
 )
 
 target_include_directories(velodb_planner PRIVATE

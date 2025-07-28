@@ -64,30 +64,4 @@ private:
     bool initialized_ { false };
 };
 
-namespace util {
-
-    // Create common data types
-    std::unique_ptr<DataType> createIntegerType();
-    std::unique_ptr<DataType> createBigIntType();
-    std::unique_ptr<DataType> createDoubleType();
-    std::unique_ptr<DataType> createBooleanType();
-    std::unique_ptr<DataType> createVarcharType(size_t max_length);
-
-    // Create common values
-    Value createIntegerValue(int32_t value);
-    Value createBigIntValue(int64_t value);
-    Value createDoubleValue(double value);
-    Value createBooleanValue(bool value);
-    Value createStringValue(const std::string& value);
-    Value createNullValue(DataTypeId type_id);
-
-    // Schema builder helpers
-    std::unique_ptr<Schema> createSchema(std::vector<ColumnInfo> columns);
-
-    // Sample data creation for testing
-    std::unique_ptr<Database> createSampleDatabase();
-    void populateSampleData(Database* db);
-
-} // namespace util
-
 } // namespace velodb

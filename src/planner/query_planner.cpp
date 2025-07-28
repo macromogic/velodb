@@ -234,7 +234,7 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Table
     }
     case hsql::kOpIn: {
         // TODO: Implement IN operator
-        VELODB_THROW(ExecutionError, "IN operator not yet implemented");
+        VELODB_THROW(ExecutionError, "IN operator not implemented");
     }
     // TODO: Implement other complex operators
     default:

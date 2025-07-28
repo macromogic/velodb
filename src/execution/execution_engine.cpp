@@ -173,16 +173,6 @@ std::string QueryResult::toString() const
     ss << "QueryResult: " << row_count_ << " rows\n";
     ss << "Schema: " << schema_->toString() << "\n";
 
-    // // Show first few rows for demonstration
-    // size_t const max_rows = std::min(row_count_, static_cast<size_t>(10));
-    // for (RowId row_id = 0; row_id < max_rows; ++row_id) {
-    //     ss << getTuple(row_id).toString() << "\n";
-    // }
-    
-    // if (row_count_ > max_rows) {
-    //     ss << "... and " << (row_count_ - max_rows) << " more rows\n";
-    // }
-
     return ss.str();
 }
 
@@ -218,7 +208,7 @@ Result<View> ExecutionEngine::executeStatement(const hsql::SQLStatement* stateme
     case hsql::kStmtSelect:
         return executeSelect(dynamic_cast<const hsql::SelectStatement*>(statement));
     default:
-        return Result<View>::failure("Unsupported statement type: " + std::to_string(statement->type()));
+        return Result<View>::failure("Non-select statements not supported");
     }
 }
 

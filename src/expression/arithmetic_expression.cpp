@@ -89,9 +89,9 @@ Value ArithmeticExpression::computeArithmetic(const Value& left_val, const Value
         *DataType::createType(right_type), 
         op_type
     );
-    
+
     if (!result_type) {
-        throw std::runtime_error("Invalid arithmetic operation");
+        VELODB_THROW(TypeError, "Invalid arithmetic operation");
     }
     
     // Perform the computation based on result type
@@ -118,10 +118,10 @@ Value ArithmeticExpression::computeArithmetic(const Value& left_val, const Value
                 return Value::createDouble(result);
             }
             default:
-                throw std::runtime_error("Unsupported arithmetic result type");
+                VELODB_THROW(TypeError, "Unsupported arithmetic result type");
         }
     } catch (const std::exception& e) {
-        throw std::runtime_error("Arithmetic operation failed: " + std::string(e.what()));
+        VELODB_THROW(ExecutionError, "Arithmetic operation failed: " + std::string(e.what()));
     }
 }
 
@@ -135,7 +135,7 @@ int32_t ArithmeticExpression::convertToInteger(const Value& val)
         case DataTypeId::DOUBLE:
             return static_cast<int32_t>(val.getDouble());
         default:
-            throw std::runtime_error("Cannot convert value to integer");
+            VELODB_THROW(TypeError, "Cannot convert value to integer");
     }
 }
 
@@ -149,7 +149,7 @@ int64_t ArithmeticExpression::convertToBigInt(const Value& val)
         case DataTypeId::DOUBLE:
             return static_cast<int64_t>(val.getDouble());
         default:
-            throw std::runtime_error("Cannot convert value to bigint");
+            VELODB_THROW(TypeError, "Cannot convert value to bigint");
     }
 }
 
@@ -163,7 +163,7 @@ double ArithmeticExpression::convertToDouble(const Value& val)
         case DataTypeId::DOUBLE:
             return val.getDouble();
         default:
-            throw std::runtime_error("Cannot convert value to double");
+            VELODB_THROW(TypeError, "Cannot convert value to double");
     }
 }
 
@@ -178,16 +178,16 @@ int32_t ArithmeticExpression::performIntegerArithmetic(int32_t left, int32_t rig
             return left * right;
         case ArithmeticType::DIVIDE:
             if (right == 0) {
-                throw std::runtime_error("Division by zero");
+                VELODB_THROW(ExecutionError, "Division by zero");
             }
             return left / right;
         case ArithmeticType::MODULO:
             if (right == 0) {
-                throw std::runtime_error("Modulo by zero");
+                VELODB_THROW(ExecutionError, "Modulo by zero");
             }
             return left % right;
         default:
-            throw std::runtime_error("Unknown arithmetic operation");
+            VELODB_THROW(ExecutionError, "Unknown arithmetic operation");
     }
 }
 
@@ -202,16 +202,16 @@ int64_t ArithmeticExpression::performBigIntArithmetic(int64_t left, int64_t righ
             return left * right;
         case ArithmeticType::DIVIDE:
             if (right == 0) {
-                throw std::runtime_error("Division by zero");
+                VELODB_THROW(ExecutionError, "Division by zero");
             }
             return left / right;
         case ArithmeticType::MODULO:
             if (right == 0) {
-                throw std::runtime_error("Modulo by zero");
+                VELODB_THROW(ExecutionError, "Modulo by zero");
             }
             return left % right;
         default:
-            throw std::runtime_error("Unknown arithmetic operation");
+            VELODB_THROW(ExecutionError, "Unknown arithmetic operation");
     }
 }
 
@@ -226,13 +226,13 @@ double ArithmeticExpression::performDoubleArithmetic(double left, double right, 
             return left * right;
         case ArithmeticType::DIVIDE:
             if (right == 0.0) {
-                throw std::runtime_error("Division by zero");
+                VELODB_THROW(ExecutionError, "Division by zero");
             }
             return left / right;
         case ArithmeticType::MODULO:
-            throw std::runtime_error("Modulo operation not supported for floating-point numbers");
+            VELODB_THROW(ExecutionError, "Modulo operation not supported for floating-point numbers");
         default:
-            throw std::runtime_error("Unknown arithmetic operation");
+            VELODB_THROW(ExecutionError, "Unknown arithmetic operation");
     }
 }
 

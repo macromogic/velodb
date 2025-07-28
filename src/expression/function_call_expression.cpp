@@ -1,3 +1,4 @@
+#include "common/exception.hpp"
 #include "expression/function_call_expression.hpp"
 #include <stdexcept>
 #include <utility>
@@ -15,8 +16,8 @@ FunctionCallExpression::FunctionCallExpression(std::string function_name,
 
 Value FunctionCallExpression::evaluate([[maybe_unused]] const Tuple& tuple, [[maybe_unused]] const Schema& schema) const
 {
-    // TODO: Implement function call evaluation
-    throw std::runtime_error("FunctionCallExpression::evaluate not implemented");
+    // TODO: Implement function call evaluation logic
+    VELODB_THROW(ExecutionError, "FunctionCallExpression::evaluate not implemented yet");
 }
 
 std::vector<size_t> FunctionCallExpression::getRequiredColumns(const Schema& schema) const

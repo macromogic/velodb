@@ -6,8 +6,6 @@ compile_commands.json
 *.swp
 *.tmp
 *.csv
-.clinerules
-cline_tasks
-.github
-copilot_tasks
 *.bak
+*.md
+!README.md

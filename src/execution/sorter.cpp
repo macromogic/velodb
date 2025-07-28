@@ -1,3 +1,4 @@
+#include "common/exception.hpp"
 #include "execution/sorter.hpp"
 #include "catalog/table.hpp"
 #include <algorithm>
@@ -16,7 +17,7 @@ Sorter::Sorter(const Schema& schema,
 {
 
     if (sort_expressions_.size() != ascending_flags_.size()) {
-        throw std::runtime_error("Sort expressions and ascending flags must have the same size");
+        VELODB_THROW(ExecutionError, "Sort expressions and ascending flags must have the same size");
     }
 }
 
@@ -38,7 +39,6 @@ void Sorter::sort()
         return;
     }
 
-    // TODO: Implement external sorting for large datasets
     // For now, use in-memory sorting
 
     // Create sort keys for all tuples
@@ -68,7 +68,7 @@ void Sorter::sort()
 std::unique_ptr<Sorter::Iterator> Sorter::getIterator() const
 {
     if (!is_sorted_) {
-        throw std::runtime_error("Sorter must be sorted before getting iterator");
+        VELODB_THROW(ExecutionError, "Sorter must be sorted before getting iterator");
     }
     return std::make_unique<Iterator>(sorted_tuples_, 0);
 }
@@ -80,15 +80,14 @@ void Sorter::clear()
     is_sorted_ = false;
 }
 
-std::vector<Value> Sorter::createSortKey([[maybe_unused]] const Tuple& tuple) const
+std::vector<Value> Sorter::createSortKey(const Tuple& tuple) const
 {
     std::vector<Value> key_values;
     key_values.reserve(sort_expressions_.size());
 
-    for ([[maybe_unused]] const auto& expr : sort_expressions_) {
-        // TODO: evaluate the expression against the tuple
-        // Value const value = expr->evaluate(&tuple, &schema_);
-        // key_values.push_back(value);
+    for (const auto& expr : sort_expressions_) {
+        Value const value = expr->evaluate(tuple, schema_);
+        key_values.push_back(value);
     }
 
     return key_values;
