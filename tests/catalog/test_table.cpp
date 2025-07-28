@@ -3,8 +3,6 @@
 #include "catalog/schema.hpp"
 #include "types/data_type.hpp"
 
-#include <iostream>
-
 using namespace velodb;
 
 class TableTest : public ::testing::Test {
@@ -62,7 +60,6 @@ TEST_F(TableTest, InsertAndRetrieveTuple) {
     table.insertRow(std::move(values));
 
     EXPECT_EQ(table.getRowCount(), 1);
-    std::cout << table.getValue(0, 0).toString() << std::endl;
 
     // Retrieve values using column-based access
     EXPECT_EQ(table.getValue(0, 0).getInteger(), 1);
