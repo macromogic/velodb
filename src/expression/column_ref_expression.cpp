@@ -19,7 +19,7 @@ ColumnRefExpression::ColumnRefExpression(size_t column_index, std::unique_ptr<Da
 {
 }
 
-Value ColumnRefExpression::evaluate(const Tuple& tuple, [[maybe_unused]] const Schema& schema) const
+Value ColumnRefExpression::evaluate(const Tuple& tuple, const Schema& /* schema */) const
 {
     if (has_column_index_) {
         return tuple.getValue(column_index_);

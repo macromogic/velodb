@@ -12,16 +12,39 @@ BinaryLogicalExpression::BinaryLogicalExpression(ConnectiveType connective_type,
 {
 }
 
-Value BinaryLogicalExpression::evaluate([[maybe_unused]] const Tuple& tuple, [[maybe_unused]] const Schema& schema) const
+Value BinaryLogicalExpression::evaluate(const Tuple& tuple, const Schema& schema) const
 {
-    // TODO: Implement and/or evaluation
-    return Value::createNull(DataTypeId::BOOLEAN);
+    Value left_value = left_->evaluate(tuple, schema);
+    Value right_value = right_->evaluate(tuple, schema);
+
+    if (left_value.isNull() || right_value.isNull()) {
+        return Value::createNull(DataTypeId::BOOLEAN);
+    }
+
+    bool left_bool = left_value.getBoolean();
+    bool right_bool = right_value.getBoolean();
+
+    if (connective_type_ == ConnectiveType::AND) {
+        return Value::createBoolean(left_bool && right_bool);
+    } else { // OR
+        return Value::createBoolean(left_bool || right_bool);
+    }
 }
 
-std::vector<size_t> BinaryLogicalExpression::getRequiredColumns([[maybe_unused]] const Schema& schema) const
+std::vector<size_t> BinaryLogicalExpression::getRequiredColumns(const Schema& schema) const
 {
-    // TODO: Implement required columns collection
-    return {};
+    std::vector<size_t> required_columns;
+    auto left_columns = left_->getRequiredColumns(schema);
+    required_columns.insert(required_columns.end(), left_columns.begin(), left_columns.end());
+    
+    auto right_columns = right_->getRequiredColumns(schema);
+    required_columns.insert(required_columns.end(), right_columns.begin(), right_columns.end());
+    
+    // Remove duplicates
+    std::sort(required_columns.begin(), required_columns.end());
+    required_columns.erase(std::unique(required_columns.begin(), required_columns.end()), required_columns.end());
+    
+    return required_columns;
 }
 
 std::string BinaryLogicalExpression::toString() const

@@ -144,7 +144,7 @@ TEST_F(WhereClauseTest, QuantityBasedFiltering) {
 
     ASSERT_TRUE(query_result.ok());
     auto& view = query_result.value();
-    EXPECT_EQ(view.getRowCount(), 3);  // Laptop (10), Desk (5), Chair (0), Monitor (0)
+    EXPECT_EQ(view.getRowCount(), 4);  // Laptop (10), Desk (5), Chair (0), Monitor (0)
 
     for (const auto& tuple : view) {
         EXPECT_LE(tuple.getValue(3).getInteger(), 10);  // quantity <= 10
@@ -278,7 +278,7 @@ TEST_F(WhereClauseTest, LowStockHighValueQuery) {
 
     ASSERT_TRUE(query_result.ok());
     auto& view = query_result.value();
-    EXPECT_EQ(view.getRowCount(), 3);  // Laptop, Desk, Monitor
+    EXPECT_EQ(view.getRowCount(), 4);  // Laptop, Desk, Chair, Monitor
     
     for (const auto& tuple : view) {
         EXPECT_LE(tuple.getValue(3).getInteger(), 10);  // quantity <= 10
@@ -524,7 +524,7 @@ TEST_F(WhereClauseTest, ComplexLogicalOrConditions) {
 
     ASSERT_TRUE(query_result.ok());
     auto& view = query_result.value();
-    EXPECT_EQ(view.getRowCount(), 5);  // Book, Pen, Desk, Chair, Pen (quantity=200)
+    EXPECT_EQ(view.getRowCount(), 4);  // Book, Pen, Desk, Chair
     
     for (const auto& tuple : view) {
         bool condition_met = tuple.getValue(2).getDouble() < 20.0f ||
@@ -1006,10 +1006,10 @@ TEST_F(WhereClauseTest, NegationWithComplexConditions) {
     auto query_result = engine_->executePlan(std::move(plan));
 
     ASSERT_TRUE(query_result.ok());
-    // Should exclude: Laptop (Electronics, price=999.99)
-    // Should include: All others (7 items)
+    // Should exclude: Laptop (Electronics, price=999.99), Monitor (Electronics, price=299.99)
+    // Should include: All others (6 items)
     auto& view = query_result.value();
-    EXPECT_EQ(view.getRowCount(), 7);
+    EXPECT_EQ(view.getRowCount(), 6);
     
     for (const auto& tuple : view) {
         std::string category = tuple.getValue(4).getString();

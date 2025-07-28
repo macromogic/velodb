@@ -19,10 +19,17 @@ Value FunctionCallExpression::evaluate([[maybe_unused]] const Tuple& tuple, [[ma
     throw std::runtime_error("FunctionCallExpression::evaluate not implemented");
 }
 
-std::vector<size_t> FunctionCallExpression::getRequiredColumns([[maybe_unused]] const Schema& schema) const
+std::vector<size_t> FunctionCallExpression::getRequiredColumns(const Schema& schema) const
 {
-    // TODO: Implement required columns collection
-    return {};
+    std::vector<size_t> required_columns;
+    for (const auto& arg : arguments_) {
+        auto arg_columns = arg->getRequiredColumns(schema);
+        required_columns.insert(required_columns.end(), arg_columns.begin(), arg_columns.end());
+    }
+    // Remove duplicates
+    std::sort(required_columns.begin(), required_columns.end());
+    required_columns.erase(std::unique(required_columns.begin(), required_columns.end()), required_columns.end());
+    return required_columns;
 }
 
 std::string FunctionCallExpression::toString() const

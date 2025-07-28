@@ -77,7 +77,11 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::Tab
     // TODO: Implement comprehensive expression planning
     switch (expr->type) {
     case hsql::kExprLiteralInt:
-        return std::make_unique<ConstantExpression>(Value::createInteger(expr->ival));
+        if (expr->isBoolLiteral) {
+            return std::make_unique<ConstantExpression>(Value::createBoolean(expr->ival != 0));
+        } else {
+            return std::make_unique<ConstantExpression>(Value::createInteger(expr->ival));
+        }
     case hsql::kExprLiteralFloat:
         return std::make_unique<ConstantExpression>(Value::createDouble(expr->fval));
     case hsql::kExprLiteralString:
