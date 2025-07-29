@@ -1,12 +1,11 @@
 #include "planner/query_planner.hpp"
+#include "planner/planner.hpp"
 #include "SQLParser.h"
 #include "catalog/catalog.hpp"
 #include "catalog/column.hpp"
 #include "catalog/schema.hpp"
 #include "common/exception.hpp"
 #include "expression/expression.hpp"
-#include "planner/projection_plan_node.hpp"
-#include "planner/scan_filter_plan_node.hpp"
 #include "types/data_type.hpp"
 
 namespace velodb {
@@ -59,7 +58,11 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRe
         if (!table) {
             VELODB_THROW(CatalogError, "Table not found: " + table_name);
         }
-        return std::make_unique<ScanFilterPlanNode>(*table, inferScanFilterSchema(table->get().getSchema()), std::move(predicate));
+        auto output_schema = inferScanFilterSchema(table->get().getSchema());
+        auto scan_filter_plan = std::make_unique<ScanFilterPlanNode>(*table, output_schema->cloneUnique(), std::move(predicate));
+        auto compaction_plan = std::make_unique<CompactionPlanNode>(std::move(output_schema));
+        compaction_plan->addChild(std::move(scan_filter_plan));
+        return compaction_plan;
     }
     case hsql::kTableSelect:
         // TODO: Handle subqueries
@@ -269,7 +272,7 @@ std::vector<std::unique_ptr<AbstractExpression>> QueryPlanner::planSelectList(co
 std::unique_ptr<Schema> QueryPlanner::inferScanFilterSchema(const Schema& input_schema)
 {
     auto schema = input_schema.cloneUnique();
-    schema->addColumnInfo({ "$_rowid", std::make_unique<IntegerType>(), false });
+    schema->addColumnInfo({ "$_rowid", std::make_unique<BigIntType>(), false });
     schema->addColumnInfo({ "$_mask", std::make_unique<BooleanType>(), false });
     return schema;
 }

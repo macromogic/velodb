@@ -2,6 +2,7 @@
 
 // Include all plan node headers
 #include "planner/abstract_plan_node.hpp"
+#include "planner/compaction_plan_node.hpp"
 #include "planner/execution_context.hpp"
 #include "planner/hash_join_plan_node.hpp"
 #include "planner/limit_plan_node.hpp"

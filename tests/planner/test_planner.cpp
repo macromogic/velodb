@@ -54,7 +54,7 @@ TEST_F(PlannerTest, PlanSimpleSelect) {
     EXPECT_EQ(plan->getPlanType(), PlanType::PROJECTION);
     auto& children = plan->getChildren();
     EXPECT_EQ(children.size(), 1);
-    EXPECT_EQ(children[0]->getPlanType(), PlanType::SCAN_FILTER);
+    EXPECT_EQ(children[0]->getPlanType(), PlanType::COMPACTION);
     EXPECT_EQ(plan->getOutputSchema().getColumnCount(), 2);
 }
 
@@ -76,7 +76,10 @@ TEST_F(PlannerTest, PlanSelectWithWhere) {
     EXPECT_EQ(plan->getPlanType(), PlanType::PROJECTION);
     auto& children = plan->getChildren();
     EXPECT_EQ(children.size(), 1);
-    EXPECT_EQ(children[0]->getPlanType(), PlanType::SCAN_FILTER);
+    EXPECT_EQ(children[0]->getPlanType(), PlanType::COMPACTION);
+    auto& grand_children = children[0]->getChildren();
+    EXPECT_EQ(grand_children.size(), 1);
+    EXPECT_EQ(grand_children[0]->getPlanType(), PlanType::SCAN_FILTER);
 }
 
 TEST_F(PlannerTest, PlanSelectWithProjection) {

@@ -17,6 +17,7 @@ class ExecutionContext;
 enum class PlanType {
     INVALID = 0,
     SCAN_FILTER,
+    COMPACTION,
     PROJECTION,
     NESTED_LOOP_JOIN,
     HASH_JOIN,

@@ -28,7 +28,6 @@ Result<View> CompactionOperator::execute() const {
         return child_result; // Propagate error from child
     }
     const auto& input_view = child_result.value();
-    // std::cout << "input_view: " << input_view.toString() << std::endl;
     const auto& schema = input_view.getTableInfo().getSchema();
     bool has_mask_column = schema.hasColumn("$_mask");
     if (!has_mask_column) {
@@ -44,7 +43,6 @@ Result<View> CompactionOperator::execute() const {
         columns.push_back(catalog_.createTemporaryColumn(column_info.getName(), column_info.getType().cloneUnique()));
     }
     for (const auto& tuple : input_view) {
-        // std::cout << "Scan: " << tuple.toString() << std::endl;
         // Check if the row should be included based on $_mask
         const Value& mask_value = tuple.getValue("$_mask");
         if (mask_value.isNull() || !mask_value.getBoolean()) {

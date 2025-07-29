@@ -16,8 +16,7 @@ ScanFilterPlanNode::ScanFilterPlanNode(const TableBase& table, std::unique_ptr<S
 
 std::unique_ptr<AbstractOperator> ScanFilterPlanNode::createOperator(ExecutionContext& context) const
 {
-    auto scan_filter_op = std::make_unique<ScanFilterOperator>(context.getCatalog(), table_, predicate_);
-    return std::make_unique<CompactionOperator>(context.getCatalog(), scan_filter_op->getOutputSchema().cloneUnique(), std::move(scan_filter_op));
+    return std::make_unique<ScanFilterOperator>(context.getCatalog(), table_, predicate_);
 }
 
 std::string ScanFilterPlanNode::toString() const
