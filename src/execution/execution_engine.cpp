@@ -1,7 +1,7 @@
 #include "execution/execution_engine.hpp"
-#include "operator/projection_operator.hpp"
-#include "common/exception.hpp"
 #include "SQLParser.h"
+#include "common/exception.hpp"
+#include "operator/projection_operator.hpp"
 #include <sstream>
 #include <stdexcept>
 
@@ -73,7 +73,8 @@ void QueryResult::addRow(std::vector<Value>&& values)
 
 void QueryResult::addBatchRows(const std::vector<std::vector<Value>>& rows)
 {
-    if (rows.empty()) return;
+    if (rows.empty())
+        return;
 
     ensureColumnCapacity(row_count_ + rows.size());
 

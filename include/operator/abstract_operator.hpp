@@ -1,8 +1,8 @@
 #pragma once
 
+#include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
-#include "catalog/catalog.hpp"
 #include "common/copy_traits.hpp"
 #include "common/exception.hpp"
 #include "common/result.hpp"

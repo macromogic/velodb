@@ -1,12 +1,12 @@
-#include "common/exception.hpp"
 #include "expression/cast_expression.hpp"
+#include "common/exception.hpp"
 #include "types/type_checker.hpp"
-#include <stdexcept>
-#include <sstream>
-#include <regex>
 #include <algorithm>
 #include <cctype>
 #include <climits>
+#include <regex>
+#include <sstream>
+#include <stdexcept>
 
 namespace velodb {
 
@@ -48,22 +48,22 @@ Value CastExpression::performCast(const Value& value, const DataType& target_typ
 
     try {
         switch (target_type_id) {
-            case DataTypeId::BOOLEAN:
-                return castToBoolean(value);
-            case DataTypeId::INTEGER:
-                return castToInteger(value);
-            case DataTypeId::BIGINT:
-                return castToBigInt(value);
-            case DataTypeId::DOUBLE:
-                return castToDouble(value);
-            case DataTypeId::VARCHAR:
-                return castToString(value);
-            case DataTypeId::DATE:
-                return castToDate(value);
-            case DataTypeId::TIMESTAMP:
-                return castToTimestamp(value);
-            default:
-                VELODB_THROW(TypeError, "Unsupported cast target type: " + target_type.toString());
+        case DataTypeId::BOOLEAN:
+            return castToBoolean(value);
+        case DataTypeId::INTEGER:
+            return castToInteger(value);
+        case DataTypeId::BIGINT:
+            return castToBigInt(value);
+        case DataTypeId::DOUBLE:
+            return castToDouble(value);
+        case DataTypeId::VARCHAR:
+            return castToString(value);
+        case DataTypeId::DATE:
+            return castToDate(value);
+        case DataTypeId::TIMESTAMP:
+            return castToTimestamp(value);
+        default:
+            VELODB_THROW(TypeError, "Unsupported cast target type: " + target_type.toString());
         }
     } catch (const std::exception& e) {
         VELODB_THROW(TypeError, "Cast operation failed: " + std::string(e.what()));
@@ -73,174 +73,174 @@ Value CastExpression::performCast(const Value& value, const DataType& target_typ
 Value CastExpression::castToBoolean(const Value& value)
 {
     switch (value.getTypeId()) {
-        case DataTypeId::BOOLEAN:
-            return value;
-        case DataTypeId::INTEGER:
-            return Value::createBoolean(value.getInteger() != 0);
-        case DataTypeId::BIGINT:
-            return Value::createBoolean(value.getBigInt() != 0);
-        case DataTypeId::DOUBLE:
-            return Value::createBoolean(value.getDouble() != 0.0);
-        case DataTypeId::VARCHAR: {
-            std::string str = value.getString();
-            std::transform(str.begin(), str.end(), str.begin(), ::tolower);
-            if (str == "true" || str == "t" || str == "1") {
-                return Value::createBoolean(true);
-            } else if (str == "false" || str == "f" || str == "0") {
-                return Value::createBoolean(false);
-            } else {
-                VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to boolean");
-            }
+    case DataTypeId::BOOLEAN:
+        return value;
+    case DataTypeId::INTEGER:
+        return Value::createBoolean(value.getInteger() != 0);
+    case DataTypeId::BIGINT:
+        return Value::createBoolean(value.getBigInt() != 0);
+    case DataTypeId::DOUBLE:
+        return Value::createBoolean(value.getDouble() != 0.0);
+    case DataTypeId::VARCHAR: {
+        std::string str = value.getString();
+        std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+        if (str == "true" || str == "t" || str == "1") {
+            return Value::createBoolean(true);
+        } else if (str == "false" || str == "f" || str == "0") {
+            return Value::createBoolean(false);
+        } else {
+            VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to boolean");
         }
-        default:
-            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to boolean");
+    }
+    default:
+        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to boolean");
     }
 }
 
 Value CastExpression::castToInteger(const Value& value)
 {
     switch (value.getTypeId()) {
-        case DataTypeId::BOOLEAN:
-            return Value::createInteger(value.getBoolean() ? 1 : 0);
-        case DataTypeId::INTEGER:
-            return value;
-        case DataTypeId::BIGINT: {
-            int64_t bigint_val = value.getBigInt();
-            if (bigint_val > INT32_MAX || bigint_val < INT32_MIN) {
-                VELODB_THROW(TypeError, "BigInt value out of range for Integer");
-            }
-            return Value::createInteger(static_cast<int32_t>(bigint_val));
+    case DataTypeId::BOOLEAN:
+        return Value::createInteger(value.getBoolean() ? 1 : 0);
+    case DataTypeId::INTEGER:
+        return value;
+    case DataTypeId::BIGINT: {
+        int64_t bigint_val = value.getBigInt();
+        if (bigint_val > INT32_MAX || bigint_val < INT32_MIN) {
+            VELODB_THROW(TypeError, "BigInt value out of range for Integer");
         }
-        case DataTypeId::DOUBLE: {
-            double double_val = value.getDouble();
-            if (double_val > INT32_MAX || double_val < INT32_MIN) {
-                VELODB_THROW(TypeError, "Double value out of range for Integer");
-            }
-            return Value::createInteger(static_cast<int32_t>(double_val));
+        return Value::createInteger(static_cast<int32_t>(bigint_val));
+    }
+    case DataTypeId::DOUBLE: {
+        double double_val = value.getDouble();
+        if (double_val > INT32_MAX || double_val < INT32_MIN) {
+            VELODB_THROW(TypeError, "Double value out of range for Integer");
         }
-        case DataTypeId::VARCHAR: {
-            try {
-                int32_t int_val = std::stoi(value.getString());
-                return Value::createInteger(int_val);
-            } catch (const std::exception&) {
-                VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to integer");
-            }
+        return Value::createInteger(static_cast<int32_t>(double_val));
+    }
+    case DataTypeId::VARCHAR: {
+        try {
+            int32_t int_val = std::stoi(value.getString());
+            return Value::createInteger(int_val);
+        } catch (const std::exception&) {
+            VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to integer");
         }
-        default:
-            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to integer");
+    }
+    default:
+        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to integer");
     }
 }
 
 Value CastExpression::castToBigInt(const Value& value)
 {
     switch (value.getTypeId()) {
-        case DataTypeId::BOOLEAN:
-            return Value::createBigInt(value.getBoolean() ? 1L : 0L);
-        case DataTypeId::INTEGER:
-            return Value::createBigInt(static_cast<int64_t>(value.getInteger()));
-        case DataTypeId::BIGINT:
-            return value;
-        case DataTypeId::DOUBLE: {
-            double double_val = value.getDouble();
-            if (double_val > INT64_MAX || double_val < INT64_MIN) {
-                VELODB_THROW(TypeError, "Double value out of range for BigInt");
-            }
-            return Value::createBigInt(static_cast<int64_t>(double_val));
+    case DataTypeId::BOOLEAN:
+        return Value::createBigInt(value.getBoolean() ? 1L : 0L);
+    case DataTypeId::INTEGER:
+        return Value::createBigInt(static_cast<int64_t>(value.getInteger()));
+    case DataTypeId::BIGINT:
+        return value;
+    case DataTypeId::DOUBLE: {
+        double double_val = value.getDouble();
+        if (double_val > INT64_MAX || double_val < INT64_MIN) {
+            VELODB_THROW(TypeError, "Double value out of range for BigInt");
         }
-        case DataTypeId::VARCHAR: {
-            try {
-                int64_t bigint_val = std::stoll(value.getString());
-                return Value::createBigInt(bigint_val);
-            } catch (const std::exception&) {
-                VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to bigint");
-            }
+        return Value::createBigInt(static_cast<int64_t>(double_val));
+    }
+    case DataTypeId::VARCHAR: {
+        try {
+            int64_t bigint_val = std::stoll(value.getString());
+            return Value::createBigInt(bigint_val);
+        } catch (const std::exception&) {
+            VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to bigint");
         }
-        default:
-            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to bigint");
+    }
+    default:
+        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to bigint");
     }
 }
 
 Value CastExpression::castToDouble(const Value& value)
 {
     switch (value.getTypeId()) {
-        case DataTypeId::BOOLEAN:
-            return Value::createDouble(value.getBoolean() ? 1.0 : 0.0);
-        case DataTypeId::INTEGER:
-            return Value::createDouble(static_cast<double>(value.getInteger()));
-        case DataTypeId::BIGINT:
-            return Value::createDouble(static_cast<double>(value.getBigInt()));
-        case DataTypeId::DOUBLE:
-            return value;
-        case DataTypeId::VARCHAR: {
-            try {
-                double double_val = std::stod(value.getString());
-                return Value::createDouble(double_val);
-            } catch (const std::exception&) {
-                VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to double");
-            }
+    case DataTypeId::BOOLEAN:
+        return Value::createDouble(value.getBoolean() ? 1.0 : 0.0);
+    case DataTypeId::INTEGER:
+        return Value::createDouble(static_cast<double>(value.getInteger()));
+    case DataTypeId::BIGINT:
+        return Value::createDouble(static_cast<double>(value.getBigInt()));
+    case DataTypeId::DOUBLE:
+        return value;
+    case DataTypeId::VARCHAR: {
+        try {
+            double double_val = std::stod(value.getString());
+            return Value::createDouble(double_val);
+        } catch (const std::exception&) {
+            VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to double");
         }
-        default:
-            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to double");
+    }
+    default:
+        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to double");
     }
 }
 
 Value CastExpression::castToString(const Value& value)
 {
     switch (value.getTypeId()) {
-        case DataTypeId::BOOLEAN:
-            return Value::createString(value.getBoolean() ? "true" : "false");
-        case DataTypeId::INTEGER:
-            return Value::createString(std::to_string(value.getInteger()));
-        case DataTypeId::BIGINT:
-            return Value::createString(std::to_string(value.getBigInt()));
-        case DataTypeId::DOUBLE:
-            return Value::createString(std::to_string(value.getDouble()));
-        case DataTypeId::VARCHAR:
-            return value;
-        default:
-            return Value::createString(value.toString());
+    case DataTypeId::BOOLEAN:
+        return Value::createString(value.getBoolean() ? "true" : "false");
+    case DataTypeId::INTEGER:
+        return Value::createString(std::to_string(value.getInteger()));
+    case DataTypeId::BIGINT:
+        return Value::createString(std::to_string(value.getBigInt()));
+    case DataTypeId::DOUBLE:
+        return Value::createString(std::to_string(value.getDouble()));
+    case DataTypeId::VARCHAR:
+        return value;
+    default:
+        return Value::createString(value.toString());
     }
 }
 
 Value CastExpression::castToDate(const Value& value)
 {
     switch (value.getTypeId()) {
-        case DataTypeId::VARCHAR: {
-            // Basic date parsing - in a real implementation, you'd use a proper date library
-            std::string date_str = value.getString();
-            std::regex date_pattern(R"(\d{4}-\d{2}-\d{2})");
-            if (std::regex_match(date_str, date_pattern)) {
-                return Value::createString(date_str); // Simplified - store as string for now
-            } else {
-                VELODB_THROW(TypeError, "Invalid date format: " + date_str);
-            }
+    case DataTypeId::VARCHAR: {
+        // Basic date parsing - in a real implementation, you'd use a proper date library
+        std::string date_str = value.getString();
+        std::regex date_pattern(R"(\d{4}-\d{2}-\d{2})");
+        if (std::regex_match(date_str, date_pattern)) {
+            return Value::createString(date_str); // Simplified - store as string for now
+        } else {
+            VELODB_THROW(TypeError, "Invalid date format: " + date_str);
         }
-        case DataTypeId::TIMESTAMP:
-            // Extract date part from timestamp
-            return Value::createString(value.getString().substr(0, 10)); // Simplified
-        default:
-            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to date");
+    }
+    case DataTypeId::TIMESTAMP:
+        // Extract date part from timestamp
+        return Value::createString(value.getString().substr(0, 10)); // Simplified
+    default:
+        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to date");
     }
 }
 
 Value CastExpression::castToTimestamp(const Value& value)
 {
     switch (value.getTypeId()) {
-        case DataTypeId::VARCHAR: {
-            // Basic timestamp parsing
-            std::string timestamp_str = value.getString();
-            std::regex timestamp_pattern(R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})");
-            if (std::regex_match(timestamp_str, timestamp_pattern)) {
-                return Value::createString(timestamp_str); // Simplified - store as string for now
-            } else {
-                VELODB_THROW(TypeError, "Invalid timestamp format: " + timestamp_str);
-            }
+    case DataTypeId::VARCHAR: {
+        // Basic timestamp parsing
+        std::string timestamp_str = value.getString();
+        std::regex timestamp_pattern(R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})");
+        if (std::regex_match(timestamp_str, timestamp_pattern)) {
+            return Value::createString(timestamp_str); // Simplified - store as string for now
+        } else {
+            VELODB_THROW(TypeError, "Invalid timestamp format: " + timestamp_str);
         }
-        case DataTypeId::DATE:
-            // Add default time to date
-            return Value::createString(value.getString() + " 00:00:00"); // Simplified
-        default:
-            VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to timestamp");
+    }
+    case DataTypeId::DATE:
+        // Add default time to date
+        return Value::createString(value.getString() + " 00:00:00"); // Simplified
+    default:
+        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to timestamp");
     }
 }
 

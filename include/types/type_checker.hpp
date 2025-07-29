@@ -16,18 +16,18 @@ enum class ComparisonType;
 
 // Type conversion result
 enum class ConversionResult {
-    VALID,           // Conversion is valid and safe
+    VALID, // Conversion is valid and safe
     VALID_WITH_LOSS, // Conversion is valid but may lose precision
-    INVALID,         // Conversion is not allowed
-    RUNTIME_CHECK    // Conversion validity depends on runtime value
+    INVALID, // Conversion is not allowed
+    RUNTIME_CHECK // Conversion validity depends on runtime value
 };
 
 // Type compatibility for operations
 enum class TypeCompatibility {
-    COMPATIBLE,      // Types are directly compatible
-    PROMOTABLE,      // Types can be promoted to compatible types
-    CASTABLE,        // Types require explicit cast
-    INCOMPATIBLE     // Types cannot be used together
+    COMPATIBLE, // Types are directly compatible
+    PROMOTABLE, // Types can be promoted to compatible types
+    CASTABLE, // Types require explicit cast
+    INCOMPATIBLE // Types cannot be used together
 };
 
 class TypeChecker {

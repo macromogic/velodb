@@ -1,23 +1,26 @@
-#include <gtest/gtest.h>
-#include "types/type_checker.hpp"
 #include "expression/expression.hpp"
 #include "types/data_type.hpp"
+#include "types/type_checker.hpp"
 #include "types/value.hpp"
+#include <gtest/gtest.h>
 
 using namespace velodb;
 
 class TypeCheckerTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         // Setup code if needed
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         // Cleanup code if needed
     }
 };
 
-TEST_F(TypeCheckerTest, ArithmeticTypeDeduction) {
+TEST_F(TypeCheckerTest, ArithmeticTypeDeduction)
+{
     // Test integer + integer = integer
     auto int_type = std::make_unique<IntegerType>();
     auto result = g_type_checker.deduceArithmeticType(*int_type, *int_type, ArithmeticType::PLUS);
@@ -42,7 +45,8 @@ TEST_F(TypeCheckerTest, ArithmeticTypeDeduction) {
     EXPECT_EQ(result->getTypeId(), DataTypeId::DOUBLE);
 }
 
-TEST_F(TypeCheckerTest, ArithmeticTypeValidation) {
+TEST_F(TypeCheckerTest, ArithmeticTypeValidation)
+{
     auto int_type = std::make_unique<IntegerType>();
     auto varchar_type = std::make_unique<VarcharType>(50);
 
@@ -52,7 +56,8 @@ TEST_F(TypeCheckerTest, ArithmeticTypeValidation) {
     EXPECT_FALSE(g_type_checker.getLastError().empty());
 }
 
-TEST_F(TypeCheckerTest, ModuloTypeValidation) {
+TEST_F(TypeCheckerTest, ModuloTypeValidation)
+{
     auto int_type = std::make_unique<IntegerType>();
     auto double_type = std::make_unique<DoubleType>();
 
@@ -67,7 +72,8 @@ TEST_F(TypeCheckerTest, ModuloTypeValidation) {
     EXPECT_FALSE(g_type_checker.getLastError().empty());
 }
 
-TEST_F(TypeCheckerTest, ComparisonValidation) {
+TEST_F(TypeCheckerTest, ComparisonValidation)
+{
     auto int_type = std::make_unique<IntegerType>();
     auto double_type = std::make_unique<DoubleType>();
     auto varchar_type = std::make_unique<VarcharType>(50);
@@ -85,7 +91,8 @@ TEST_F(TypeCheckerTest, ComparisonValidation) {
     EXPECT_FALSE(g_type_checker.validateComparison(*int_type, *varchar_type, ComparisonType::LIKE));
 }
 
-TEST_F(TypeCheckerTest, TypeConversion) {
+TEST_F(TypeCheckerTest, TypeConversion)
+{
     auto int_type = std::make_unique<IntegerType>();
     auto bigint_type = std::make_unique<BigIntType>();
     auto double_type = std::make_unique<DoubleType>();
@@ -106,7 +113,8 @@ TEST_F(TypeCheckerTest, TypeConversion) {
     EXPECT_EQ(g_type_checker.canConvert(*bool_type, *varchar_type), ConversionResult::VALID);
 }
 
-TEST_F(TypeCheckerTest, CastValidation) {
+TEST_F(TypeCheckerTest, CastValidation)
+{
     auto int_type = std::make_unique<IntegerType>();
     auto varchar_type = std::make_unique<VarcharType>(50);
     auto bool_type = std::make_unique<BooleanType>();
@@ -121,7 +129,8 @@ TEST_F(TypeCheckerTest, CastValidation) {
     EXPECT_TRUE(g_type_checker.validateCast(*double_type, *int_type));
 }
 
-TEST_F(TypeCheckerTest, TypePromotion) {
+TEST_F(TypeCheckerTest, TypePromotion)
+{
     auto int_type = std::make_unique<IntegerType>();
     auto bigint_type = std::make_unique<BigIntType>();
     auto double_type = std::make_unique<DoubleType>();
@@ -141,7 +150,8 @@ TEST_F(TypeCheckerTest, TypePromotion) {
     EXPECT_EQ(result->getTypeId(), DataTypeId::INTEGER);
 }
 
-TEST_F(TypeCheckerTest, TypeUtilities) {
+TEST_F(TypeCheckerTest, TypeUtilities)
+{
     auto int_type = std::make_unique<IntegerType>();
     auto varchar_type = std::make_unique<VarcharType>(50);
     auto bool_type = std::make_unique<BooleanType>();

@@ -1,7 +1,7 @@
-#include "planner/execution_context.hpp"
 #include "planner/scan_filter_plan_node.hpp"
 #include "operator/compaction_operator.hpp"
 #include "operator/scan_filter_operator.hpp"
+#include "planner/execution_context.hpp"
 #include <sstream>
 
 namespace velodb {

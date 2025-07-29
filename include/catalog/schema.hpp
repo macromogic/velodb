@@ -1,8 +1,8 @@
 #pragma once
 
 #include "catalog/column.hpp"
-#include "types/data_type.hpp"
 #include "common/copy_traits.hpp"
+#include "types/data_type.hpp"
 #include <memory>
 #include <string>
 #include <unordered_map>

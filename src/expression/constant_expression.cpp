@@ -4,7 +4,7 @@ namespace velodb {
 
 ConstantExpression::ConstantExpression(const Value& value)
     : AbstractExpression(ExpressionType::CONSTANT,
-        DataType::createType(value.getTypeId()))
+          DataType::createType(value.getTypeId()))
     , value_(value)
 {
 }

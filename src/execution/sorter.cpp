@@ -1,6 +1,6 @@
-#include "common/exception.hpp"
 #include "execution/sorter.hpp"
 #include "catalog/table.hpp"
+#include "common/exception.hpp"
 #include <algorithm>
 #include <stdexcept>
 

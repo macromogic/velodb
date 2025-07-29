@@ -4,30 +4,36 @@
 namespace velodb {
 
 TracedException::TracedException(const std::string& message)
-    : message_(message) {
+    : message_(message)
+{
     capture_stack_trace(32);
     format_full_message();
 }
 
 TracedException::TracedException(const std::string& message, size_t trace_depth)
-    : message_(message) {
+    : message_(message)
+{
     capture_stack_trace(trace_depth);
     format_full_message();
 }
 
-const char* TracedException::what() const noexcept {
+const char* TracedException::what() const noexcept
+{
     return full_message_.c_str();
 }
 
-const std::string& TracedException::message() const noexcept {
+const std::string& TracedException::message() const noexcept
+{
     return message_;
 }
 
-const std::string& TracedException::stack_trace() const noexcept {
+const std::string& TracedException::stack_trace() const noexcept
+{
     return stack_trace_;
 }
 
-void TracedException::capture_stack_trace(size_t trace_depth) {
+void TracedException::capture_stack_trace(size_t trace_depth)
+{
     // Capture the stack trace
     stack_trace_obj_.load_here(trace_depth);
     stack_trace_obj_.skip_n_firsts(5);
@@ -43,12 +49,14 @@ void TracedException::capture_stack_trace(size_t trace_depth) {
     stack_trace_ = oss.str();
 }
 
-void TracedException::format_full_message() {
+void TracedException::format_full_message()
+{
     std::ostringstream oss;
     oss << message_;
 
     if (!stack_trace_.empty()) {
-        oss << "\n\n" << stack_trace_;
+        oss << "\n\n"
+            << stack_trace_;
     }
 
     full_message_ = oss.str();

@@ -2,8 +2,8 @@
 
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
-#include "types/value.hpp"
 #include "common/copy_traits.hpp"
+#include "types/value.hpp"
 #include <memory>
 #include <string>
 #include <vector>
@@ -97,6 +97,6 @@ class FunctionCallExpression;
 #include "cast_expression.hpp"
 #include "column_ref_expression.hpp"
 #include "comparison_expression.hpp"
-#include "logical_expression.hpp"
 #include "constant_expression.hpp"
 #include "function_call_expression.hpp"
+#include "logical_expression.hpp"

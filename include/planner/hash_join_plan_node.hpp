@@ -1,8 +1,8 @@
 #pragma once
 
-#include "planner/abstract_plan_node.hpp"
 #include "expression/expression.hpp"
 #include "operator/operator.hpp"
+#include "planner/abstract_plan_node.hpp"
 #include <memory>
 #include <string>
 

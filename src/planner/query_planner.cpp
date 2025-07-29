@@ -1,11 +1,11 @@
 #include "planner/query_planner.hpp"
-#include "planner/planner.hpp"
 #include "SQLParser.h"
 #include "catalog/catalog.hpp"
 #include "catalog/column.hpp"
 #include "catalog/schema.hpp"
 #include "common/exception.hpp"
 #include "expression/expression.hpp"
+#include "planner/planner.hpp"
 #include "types/data_type.hpp"
 
 namespace velodb {

@@ -1,14 +1,14 @@
 #pragma once
 
 #include "catalog/catalog.hpp"
-#include "catalog/table.hpp"
 #include "catalog/schema.hpp"
+#include "catalog/table.hpp"
 #include "types/data_type.hpp"
+#include <map>
 #include <memory>
+#include <set>
 #include <string>
 #include <vector>
-#include <map>
-#include <set>
 
 // Forward declaration for SQL parser
 namespace hsql {
@@ -53,9 +53,9 @@ public:
      * @param inferred_types Optional type hints from query context
      */
     static void createDynamicTable(Catalog& catalog,
-                                  const std::string& table_name,
-                                  const std::vector<std::string>& column_names = {},
-                                  const std::map<std::string, DataTypeId>& inferred_types = {});
+        const std::string& table_name,
+        const std::vector<std::string>& column_names = {},
+        const std::map<std::string, DataTypeId>& inferred_types = {});
 
     /**
      * @brief Create a table with generic schema for testing
@@ -64,8 +64,8 @@ public:
      * @param column_count Number of columns (default: 5)
      */
     static void createGenericTable(Catalog& catalog,
-                                  const std::string& table_name,
-                                  size_t column_count = 5);
+        const std::string& table_name,
+        size_t column_count = 5);
 
     // Original predefined table creation methods
     static void createUsersTable(Catalog& catalog);
@@ -91,8 +91,8 @@ private:
     static std::unique_ptr<Schema> createComplexSchema();
     static std::unique_ptr<Schema> createGenericSchema(const std::string& table_name, size_t column_count);
     static std::unique_ptr<Schema> createDynamicSchema(const std::string& table_name,
-                                                      const std::vector<std::string>& column_names,
-                                                      const std::map<std::string, DataTypeId>& inferred_types);
+        const std::vector<std::string>& column_names,
+        const std::map<std::string, DataTypeId>& inferred_types);
 
     // Default column types for common column names
     static std::map<std::string, DataTypeId> getDefaultColumnTypes();

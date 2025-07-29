@@ -1,5 +1,5 @@
-#include "common/exception.hpp"
 #include "planner/hash_join_plan_node.hpp"
+#include "common/exception.hpp"
 #include <stdexcept>
 
 namespace velodb {

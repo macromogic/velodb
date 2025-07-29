@@ -22,7 +22,8 @@ private:
 template <typename T>
 class Cloneable {
 public:
-    T clone() const {
+    T clone() const
+    {
         return static_cast<const T*>(this)->cloneImpl();
     }
 };
@@ -30,7 +31,8 @@ public:
 template <typename T>
 class UniqueCloneable {
 public:
-    std::unique_ptr<T> cloneUnique() const {
+    std::unique_ptr<T> cloneUnique() const
+    {
         return static_cast<const T*>(this)->cloneUniqueImpl();
     }
 };

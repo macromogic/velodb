@@ -1,9 +1,9 @@
 #include "operator/projection_operator.hpp"
-#include "operator/scan_filter_operator.hpp"
-#include "expression/expression.hpp"
-#include "execution/execution_engine.hpp"
 #include "catalog/table.hpp"
 #include "common/result.hpp"
+#include "execution/execution_engine.hpp"
+#include "expression/expression.hpp"
+#include "operator/scan_filter_operator.hpp"
 
 namespace velodb {
 
@@ -66,6 +66,5 @@ Result<View> ProjectionOperator::execute() const
 
     return Result<View>::success(std::move(view));
 }
-
 
 } // namespace velodb

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "catalog/schema.hpp"
 #include "catalog/catalog.hpp"
-#include "operator/operator.hpp"
+#include "catalog/schema.hpp"
 #include "common/copy_traits.hpp"
+#include "operator/operator.hpp"
 #include <memory>
 #include <string>
 #include <vector>

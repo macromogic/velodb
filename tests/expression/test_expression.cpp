@@ -1,22 +1,25 @@
-#include <gtest/gtest.h>
 #include "expression/expression.hpp"
 #include "types/data_type.hpp"
 #include "types/value.hpp"
+#include <gtest/gtest.h>
 
 using namespace velodb;
 
 class ExpressionTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         // Setup code if needed
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         // Cleanup code if needed
     }
 };
 
-TEST_F(ExpressionTest, ConstantExpression) {
+TEST_F(ExpressionTest, ConstantExpression)
+{
     Value int_val = Value::createInteger(42);
     ConstantExpression const_expr(int_val);
 
@@ -26,7 +29,8 @@ TEST_F(ExpressionTest, ConstantExpression) {
     // TODO: Test Evaluate when execution context is available
 }
 
-TEST_F(ExpressionTest, ColumnRefExpression) {
+TEST_F(ExpressionTest, ColumnRefExpression)
+{
     auto int_type = std::make_unique<IntegerType>();
     ColumnRefExpression col_expr("user_id", std::move(int_type));
 
@@ -35,7 +39,8 @@ TEST_F(ExpressionTest, ColumnRefExpression) {
     EXPECT_EQ(col_expr.toString(), "user_id");
 }
 
-TEST_F(ExpressionTest, ComparisonExpression) {
+TEST_F(ExpressionTest, ComparisonExpression)
+{
     Value left_val = Value::createInteger(10);
     Value right_val = Value::createInteger(20);
 
@@ -52,7 +57,8 @@ TEST_F(ExpressionTest, ComparisonExpression) {
     EXPECT_NE(expr_str.find("="), std::string::npos);
 }
 
-TEST_F(ExpressionTest, ArithmeticExpression) {
+TEST_F(ExpressionTest, ArithmeticExpression)
+{
     Value left_val = Value::createInteger(5);
     Value right_val = Value::createInteger(3);
 
@@ -69,7 +75,8 @@ TEST_F(ExpressionTest, ArithmeticExpression) {
     EXPECT_NE(expr_str.find("+"), std::string::npos);
 }
 
-TEST_F(ExpressionTest, BinaryLogicalExpression) {
+TEST_F(ExpressionTest, BinaryLogicalExpression)
+{
     Value left_val = Value::createBoolean(true);
     Value right_val = Value::createBoolean(false);
 
@@ -86,7 +93,8 @@ TEST_F(ExpressionTest, BinaryLogicalExpression) {
     EXPECT_NE(expr_str.find("AND"), std::string::npos);
 }
 
-TEST_F(ExpressionTest, NestedExpressions) {
+TEST_F(ExpressionTest, NestedExpressions)
+{
     // Create (5 + 3) > 7
     Value val5 = Value::createInteger(5);
     Value val3 = Value::createInteger(3);

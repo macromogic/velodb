@@ -1,17 +1,18 @@
-#include <gtest/gtest.h>
-#include "planner/planner.hpp"
-#include "catalog/catalog.hpp"
-#include "catalog/table.hpp"
-#include "catalog/schema.hpp"
-#include "types/data_type.hpp"
-#include "common/exception.hpp"
 #include "SQLParser.h"
+#include "catalog/catalog.hpp"
+#include "catalog/schema.hpp"
+#include "catalog/table.hpp"
+#include "common/exception.hpp"
+#include "planner/planner.hpp"
+#include "types/data_type.hpp"
+#include <gtest/gtest.h>
 
 using namespace velodb;
 
 class PlannerTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         catalog_ = std::make_unique<Catalog>();
         planner_ = std::make_unique<QueryPlanner>(*catalog_);
 
@@ -22,7 +23,8 @@ protected:
         catalog_->createTable("users", std::move(schema));
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         // Cleanup code if needed
     }
 
@@ -30,11 +32,13 @@ protected:
     std::unique_ptr<QueryPlanner> planner_;
 };
 
-TEST_F(PlannerTest, CreateQueryPlanner) {
+TEST_F(PlannerTest, CreateQueryPlanner)
+{
     EXPECT_NE(planner_, nullptr);
 }
 
-TEST_F(PlannerTest, PlanSimpleSelect) {
+TEST_F(PlannerTest, PlanSimpleSelect)
+{
     std::string sql = "SELECT * FROM users";
 
     hsql::SQLParserResult result;
@@ -58,7 +62,8 @@ TEST_F(PlannerTest, PlanSimpleSelect) {
     EXPECT_EQ(plan->getOutputSchema().getColumnCount(), 2);
 }
 
-TEST_F(PlannerTest, PlanSelectWithWhere) {
+TEST_F(PlannerTest, PlanSelectWithWhere)
+{
     std::string sql = "SELECT * FROM users WHERE id = 1";
 
     hsql::SQLParserResult result;
@@ -82,7 +87,8 @@ TEST_F(PlannerTest, PlanSelectWithWhere) {
     EXPECT_EQ(grand_children[0]->getPlanType(), PlanType::SCAN_FILTER);
 }
 
-TEST_F(PlannerTest, PlanSelectWithProjection) {
+TEST_F(PlannerTest, PlanSelectWithProjection)
+{
     std::string sql = "SELECT id FROM users";
 
     hsql::SQLParserResult result;
@@ -101,7 +107,8 @@ TEST_F(PlannerTest, PlanSelectWithProjection) {
     EXPECT_NE(plan->getPlanType(), PlanType::INVALID);
 }
 
-TEST_F(PlannerTest, PlanInvalidTable) {
+TEST_F(PlannerTest, PlanInvalidTable)
+{
     std::string sql = "SELECT * FROM nonexistent_table";
 
     hsql::SQLParserResult result;
@@ -117,7 +124,8 @@ TEST_F(PlannerTest, PlanInvalidTable) {
     EXPECT_THROW(planner_->planSelect(select_stmt), CatalogError);
 }
 
-TEST_F(PlannerTest, PlanComplexWhere) {
+TEST_F(PlannerTest, PlanComplexWhere)
+{
     std::string sql = "SELECT * FROM users WHERE id > 0 AND name = 'Alice'";
 
     hsql::SQLParserResult result;

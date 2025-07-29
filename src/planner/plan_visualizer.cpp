@@ -1,19 +1,21 @@
 #include "planner/plan_visualizer.hpp"
-#include <sstream>
 #include <iomanip>
 #include <map>
+#include <sstream>
 
 namespace velodb {
 
 // Static method implementations
-std::string PlanVisualizer::visualizeAsText(const std::unique_ptr<AbstractPlanNode>& plan_node, int indent) {
+std::string PlanVisualizer::visualizeAsText(const std::unique_ptr<AbstractPlanNode>& plan_node, int indent)
+{
     std::string result;
     visualizeTextRecursive(plan_node, result, indent);
     return result;
 }
 
 std::string PlanVisualizer::visualizeAsGraphviz(const std::unique_ptr<AbstractPlanNode>& plan_node,
-                                               const std::string& graph_name) {
+    const std::string& graph_name)
+{
     std::string result;
     result += "digraph " + graph_name + " {\n";
     result += "  rankdir=TB;\n";
@@ -27,7 +29,8 @@ std::string PlanVisualizer::visualizeAsGraphviz(const std::unique_ptr<AbstractPl
     return result;
 }
 
-std::string PlanVisualizer::visualizeDetailed(const std::unique_ptr<AbstractPlanNode>& plan_node) {
+std::string PlanVisualizer::visualizeDetailed(const std::unique_ptr<AbstractPlanNode>& plan_node)
+{
     std::string result;
     result += "=== Query Plan Analysis ===\n\n";
     visualizeDetailedRecursive(plan_node, result, 0);
@@ -35,24 +38,26 @@ std::string PlanVisualizer::visualizeDetailed(const std::unique_ptr<AbstractPlan
 }
 
 void PlanVisualizer::printPlan(const std::unique_ptr<AbstractPlanNode>& plan_node,
-                              std::ostream& out,
-                              OutputFormat format) {
+    std::ostream& out,
+    OutputFormat format)
+{
     switch (format) {
-        case OutputFormat::TEXT_TREE:
-            out << visualizeAsText(plan_node);
-            break;
-        case OutputFormat::GRAPHVIZ_DOT:
-            out << visualizeAsGraphviz(plan_node);
-            break;
-        case OutputFormat::DETAILED:
-            out << visualizeDetailed(plan_node);
-            break;
+    case OutputFormat::TEXT_TREE:
+        out << visualizeAsText(plan_node);
+        break;
+    case OutputFormat::GRAPHVIZ_DOT:
+        out << visualizeAsGraphviz(plan_node);
+        break;
+    case OutputFormat::DETAILED:
+        out << visualizeDetailed(plan_node);
+        break;
     }
 }
 
 // Private helper methods
 void PlanVisualizer::visualizeTextRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-                                           std::string& result, int indent) {
+    std::string& result, int indent)
+{
     if (!plan_node) {
         return;
     }
@@ -82,7 +87,8 @@ void PlanVisualizer::visualizeTextRecursive(const std::unique_ptr<AbstractPlanNo
 }
 
 void PlanVisualizer::visualizeGraphvizRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-                                               std::string& result, int& node_counter) {
+    std::string& result, int& node_counter)
+{
     if (!plan_node) {
         return;
     }
@@ -108,7 +114,8 @@ void PlanVisualizer::visualizeGraphvizRecursive(const std::unique_ptr<AbstractPl
 }
 
 void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-                                               std::string& result, int level) {
+    std::string& result, int level)
+{
     if (!plan_node) {
         return;
     }
@@ -128,8 +135,7 @@ void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPl
 
     for (size_t i = 0; i < schema.getColumnCount(); ++i) {
         const auto& column = schema.getColumnInfo(i);
-        result += prefix + "    [" + std::to_string(i) + "] " + column.getName() +
-                 " (" + column.getType().toString() + ")\n";
+        result += prefix + "    [" + std::to_string(i) + "] " + column.getName() + " (" + column.getType().toString() + ")\n";
     }
 
     // Children info
@@ -147,54 +153,83 @@ void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPl
     result += "\n";
 }
 
-std::string PlanVisualizer::planTypeToString(PlanType type) {
+std::string PlanVisualizer::planTypeToString(PlanType type)
+{
     switch (type) {
-        case PlanType::SCAN_FILTER: return "Scan Filter";
-        case PlanType::PROJECTION: return "Projection";
-        case PlanType::NESTED_LOOP_JOIN: return "Nested Loop Join";
-        case PlanType::HASH_JOIN: return "Hash Join";
-        case PlanType::MERGE_SORT_JOIN: return "Merge Sort Join";
-        case PlanType::SORT: return "Sort";
-        case PlanType::LIMIT: return "Limit";
-        case PlanType::AGGREGATE: return "Aggregate";
-        case PlanType::INVALID: return "Invalid";
-        default: return "Unknown";
+    case PlanType::SCAN_FILTER:
+        return "Scan Filter";
+    case PlanType::PROJECTION:
+        return "Projection";
+    case PlanType::NESTED_LOOP_JOIN:
+        return "Nested Loop Join";
+    case PlanType::HASH_JOIN:
+        return "Hash Join";
+    case PlanType::MERGE_SORT_JOIN:
+        return "Merge Sort Join";
+    case PlanType::SORT:
+        return "Sort";
+    case PlanType::LIMIT:
+        return "Limit";
+    case PlanType::AGGREGATE:
+        return "Aggregate";
+    case PlanType::INVALID:
+        return "Invalid";
+    default:
+        return "Unknown";
     }
 }
 
-std::string PlanVisualizer::getNodeLabel(const AbstractPlanNode& node) {
+std::string PlanVisualizer::getNodeLabel(const AbstractPlanNode& node)
+{
     return node.toString();
 }
 
-std::string PlanVisualizer::getNodeShape(PlanType type) {
+std::string PlanVisualizer::getNodeShape(PlanType type)
+{
     switch (type) {
-        case PlanType::SCAN_FILTER: return "diamond";
-        case PlanType::PROJECTION: return "ellipse";
-        case PlanType::NESTED_LOOP_JOIN:
-        case PlanType::HASH_JOIN:
-        case PlanType::MERGE_SORT_JOIN: return "hexagon";
-        case PlanType::SORT: return "parallelogram";
-        case PlanType::LIMIT: return "trapezium";
-        case PlanType::AGGREGATE: return "octagon";
-        default: return "box";
+    case PlanType::SCAN_FILTER:
+        return "diamond";
+    case PlanType::PROJECTION:
+        return "ellipse";
+    case PlanType::NESTED_LOOP_JOIN:
+    case PlanType::HASH_JOIN:
+    case PlanType::MERGE_SORT_JOIN:
+        return "hexagon";
+    case PlanType::SORT:
+        return "parallelogram";
+    case PlanType::LIMIT:
+        return "trapezium";
+    case PlanType::AGGREGATE:
+        return "octagon";
+    default:
+        return "box";
     }
 }
 
-std::string PlanVisualizer::getNodeColor(PlanType type) {
+std::string PlanVisualizer::getNodeColor(PlanType type)
+{
     switch (type) {
-        case PlanType::SCAN_FILTER: return "yellow";
-        case PlanType::PROJECTION: return "lightgreen";
-        case PlanType::NESTED_LOOP_JOIN:
-        case PlanType::HASH_JOIN:
-        case PlanType::MERGE_SORT_JOIN: return "orange";
-        case PlanType::SORT: return "purple";
-        case PlanType::LIMIT: return "pink";
-        case PlanType::AGGREGATE: return "red";
-        default: return "white";
+    case PlanType::SCAN_FILTER:
+        return "yellow";
+    case PlanType::PROJECTION:
+        return "lightgreen";
+    case PlanType::NESTED_LOOP_JOIN:
+    case PlanType::HASH_JOIN:
+    case PlanType::MERGE_SORT_JOIN:
+        return "orange";
+    case PlanType::SORT:
+        return "purple";
+    case PlanType::LIMIT:
+        return "pink";
+    case PlanType::AGGREGATE:
+        return "red";
+    default:
+        return "white";
     }
 }
 
-std::string PlanVisualizer::escapeForDot(const std::string& str) {
+std::string PlanVisualizer::escapeForDot(const std::string& str)
+{
     std::string result = str;
 
     // Replace special characters for DOT format

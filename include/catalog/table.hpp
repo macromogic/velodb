@@ -1,12 +1,12 @@
 #pragma once
 
+#include "common/copy_traits.hpp"
 #include "schema.hpp"
 #include "types/value.hpp"
-#include "common/copy_traits.hpp"
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
-#include <functional>
 
 namespace velodb {
 

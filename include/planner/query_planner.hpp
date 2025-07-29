@@ -1,8 +1,8 @@
 #pragma once
 
 #include "catalog/catalog.hpp"
-#include "planner/abstract_plan_node.hpp"
 #include "expression/expression.hpp"
+#include "planner/abstract_plan_node.hpp"
 #include <memory>
 
 // Forward declarations for SQL parser

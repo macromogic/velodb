@@ -1,8 +1,8 @@
-#include <gtest/gtest.h>
-#include "catalog/mock_catalog_builder.hpp"
-#include "planner/query_planner.hpp"
-#include "planner/plan_visualizer.hpp"
 #include "SQLParser.h"
+#include "catalog/mock_catalog_builder.hpp"
+#include "planner/plan_visualizer.hpp"
+#include "planner/query_planner.hpp"
+#include <gtest/gtest.h>
 #include <iostream>
 #include <vector>
 
@@ -10,16 +10,19 @@ using namespace velodb;
 
 class AdaptiveCatalogTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         // Create adaptive catalog that can handle any query
         catalog_ = MockCatalogBuilder::createAdaptiveCatalog();
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         // Cleanup
     }
 
-    void testQueryVisualization(const std::string& query) {
+    void testQueryVisualization(const std::string& query)
+    {
         std::cout << "\n=== Testing Query: " << query << " ===\n";
 
         // Ensure tables exist for this query
@@ -63,7 +66,8 @@ protected:
     std::unique_ptr<Catalog> catalog_;
 };
 
-TEST_F(AdaptiveCatalogTest, BasicSelectQueries) {
+TEST_F(AdaptiveCatalogTest, BasicSelectQueries)
+{
     // Test various SELECT queries on different tables
     std::vector<std::string> queries = {
         "SELECT * FROM users",
@@ -82,7 +86,8 @@ TEST_F(AdaptiveCatalogTest, BasicSelectQueries) {
     }
 }
 
-TEST_F(AdaptiveCatalogTest, SelectWithColumns) {
+TEST_F(AdaptiveCatalogTest, SelectWithColumns)
+{
     std::vector<std::string> queries = {
         "SELECT id, name FROM users",
         "SELECT order_id, total FROM orders",
@@ -98,7 +103,8 @@ TEST_F(AdaptiveCatalogTest, SelectWithColumns) {
     }
 }
 
-TEST_F(AdaptiveCatalogTest, SelectWithWhere) {
+TEST_F(AdaptiveCatalogTest, SelectWithWhere)
+{
     std::vector<std::string> queries = {
         "SELECT * FROM users WHERE id = 1",
         "SELECT * FROM orders WHERE total > 100",
@@ -113,7 +119,8 @@ TEST_F(AdaptiveCatalogTest, SelectWithWhere) {
     }
 }
 
-TEST_F(AdaptiveCatalogTest, ComplexQueries) {
+TEST_F(AdaptiveCatalogTest, ComplexQueries)
+{
     std::vector<std::string> queries = {
         "SELECT name, email FROM users WHERE age > 25",
         "SELECT product_id, price FROM products WHERE category = 'electronics'",
@@ -126,7 +133,8 @@ TEST_F(AdaptiveCatalogTest, ComplexQueries) {
     }
 }
 
-TEST_F(AdaptiveCatalogTest, MultipleTablesInSameQuery) {
+TEST_F(AdaptiveCatalogTest, MultipleTablesInSameQuery)
+{
     // Test that the system can handle table references even if JOINs aren't fully implemented
     std::vector<std::string> queries = {
         // These will fail at planning stage but should create tables successfully
@@ -146,7 +154,8 @@ TEST_F(AdaptiveCatalogTest, MultipleTablesInSameQuery) {
     }
 }
 
-TEST_F(AdaptiveCatalogTest, TypeInference) {
+TEST_F(AdaptiveCatalogTest, TypeInference)
+{
     // Test that the system can infer reasonable types from column names
     std::vector<std::string> queries = {
         "SELECT id, name, email, age FROM users",
@@ -160,7 +169,8 @@ TEST_F(AdaptiveCatalogTest, TypeInference) {
     }
 }
 
-TEST_F(AdaptiveCatalogTest, GraphvizOutput) {
+TEST_F(AdaptiveCatalogTest, GraphvizOutput)
+{
     std::string query = "SELECT name, email FROM users WHERE age > 25";
 
     // Ensure tables exist
@@ -189,7 +199,8 @@ TEST_F(AdaptiveCatalogTest, GraphvizOutput) {
     EXPECT_NE(graphviz_output.find("digraph AdaptiveCatalogTest"), std::string::npos);
 }
 
-TEST_F(AdaptiveCatalogTest, CatalogPersistence) {
+TEST_F(AdaptiveCatalogTest, CatalogPersistence)
+{
     // Test that created tables persist across multiple queries
     std::vector<std::string> queries = {
         "SELECT * FROM persistent_table",

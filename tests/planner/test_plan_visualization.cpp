@@ -1,22 +1,24 @@
-#include <gtest/gtest.h>
-#include "planner/plan_visualizer.hpp"
-#include "catalog/mock_catalog_builder.hpp"
-#include "planner/query_planner.hpp"
 #include "SQLParser.h"
-#include <iostream>
+#include "catalog/mock_catalog_builder.hpp"
+#include "planner/plan_visualizer.hpp"
+#include "planner/query_planner.hpp"
 #include <fstream>
+#include <gtest/gtest.h>
+#include <iostream>
 
 using namespace velodb;
 
 class PlanVisualizationTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         // Create mock catalog with sample data
         catalog_ = MockCatalogBuilder::createSampleCatalog();
         planner_ = std::make_unique<QueryPlanner>(*catalog_);
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         // Cleanup
     }
 
@@ -24,7 +26,8 @@ protected:
     std::unique_ptr<QueryPlanner> planner_;
 };
 
-TEST_F(PlanVisualizationTest, TextVisualizationSimpleSelect) {
+TEST_F(PlanVisualizationTest, TextVisualizationSimpleSelect)
+{
     std::string sql = "SELECT * FROM users";
 
     hsql::SQLParserResult result;
@@ -49,7 +52,8 @@ TEST_F(PlanVisualizationTest, TextVisualizationSimpleSelect) {
     EXPECT_NE(text_output.find("users"), std::string::npos);
 }
 
-TEST_F(PlanVisualizationTest, TextVisualizationSelectWithWhere) {
+TEST_F(PlanVisualizationTest, TextVisualizationSelectWithWhere)
+{
     std::string sql = "SELECT * FROM users WHERE id = 1";
 
     hsql::SQLParserResult result;
@@ -73,7 +77,8 @@ TEST_F(PlanVisualizationTest, TextVisualizationSelectWithWhere) {
     EXPECT_NE(text_output.find("ScanFilter"), std::string::npos);
 }
 
-TEST_F(PlanVisualizationTest, TextVisualizationSelectWithProjection) {
+TEST_F(PlanVisualizationTest, TextVisualizationSelectWithProjection)
+{
     std::string sql = "SELECT name, email FROM users";
 
     hsql::SQLParserResult result;
@@ -96,7 +101,8 @@ TEST_F(PlanVisualizationTest, TextVisualizationSelectWithProjection) {
     EXPECT_FALSE(text_output.empty());
 }
 
-TEST_F(PlanVisualizationTest, GraphvizVisualizationSimpleSelect) {
+TEST_F(PlanVisualizationTest, GraphvizVisualizationSimpleSelect)
+{
     std::string sql = "SELECT * FROM users";
 
     hsql::SQLParserResult result;
@@ -122,7 +128,8 @@ TEST_F(PlanVisualizationTest, GraphvizVisualizationSimpleSelect) {
     EXPECT_NE(graphviz_output.find("diamond"), std::string::npos); // ScanFilter
 }
 
-TEST_F(PlanVisualizationTest, GraphvizVisualizationComplexQuery) {
+TEST_F(PlanVisualizationTest, GraphvizVisualizationComplexQuery)
+{
     std::string sql = "SELECT name, email FROM users WHERE age > 25";
 
     hsql::SQLParserResult result;
@@ -154,7 +161,8 @@ TEST_F(PlanVisualizationTest, GraphvizVisualizationComplexQuery) {
     }
 }
 
-TEST_F(PlanVisualizationTest, DetailedVisualizationSimpleSelect) {
+TEST_F(PlanVisualizationTest, DetailedVisualizationSimpleSelect)
+{
     std::string sql = "SELECT * FROM users";
 
     hsql::SQLParserResult result;
@@ -180,7 +188,8 @@ TEST_F(PlanVisualizationTest, DetailedVisualizationSimpleSelect) {
     EXPECT_NE(detailed_output.find("Output Schema"), std::string::npos);
 }
 
-TEST_F(PlanVisualizationTest, CompareAllVisualizationFormats) {
+TEST_F(PlanVisualizationTest, CompareAllVisualizationFormats)
+{
     std::string sql = "SELECT name, age FROM users WHERE age > 21";
 
     hsql::SQLParserResult result;
@@ -210,7 +219,8 @@ TEST_F(PlanVisualizationTest, CompareAllVisualizationFormats) {
     PlanVisualizer::printPlan(plan, std::cout, PlanVisualizer::OutputFormat::DETAILED);
 }
 
-TEST_F(PlanVisualizationTest, VisualizeDifferentTables) {
+TEST_F(PlanVisualizationTest, VisualizeDifferentTables)
+{
     std::cout << "\n=== VISUALIZING DIFFERENT TABLES ===\n";
 
     // Users table

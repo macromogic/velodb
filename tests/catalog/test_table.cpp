@@ -1,27 +1,30 @@
-#include <gtest/gtest.h>
-#include "catalog/table.hpp"
 #include "catalog/schema.hpp"
+#include "catalog/table.hpp"
 #include "types/data_type.hpp"
+#include <gtest/gtest.h>
 
 using namespace velodb;
 
 class TableTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         // Create a simple schema for testing
         test_schema_ = std::make_unique<Schema>();
         test_schema_->addColumnInfo({ "id", std::make_unique<IntegerType>() });
         test_schema_->addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         // Cleanup code if needed
     }
 
     std::unique_ptr<Schema> test_schema_;
 };
 
-TEST_F(TableTest, CreateTable) {
+TEST_F(TableTest, CreateTable)
+{
     auto table_info = std::make_unique<TableInfo>("test_table", std::move(test_schema_));
     Table table(std::move(table_info));
 
@@ -33,7 +36,8 @@ TEST_F(TableTest, CreateTable) {
     EXPECT_EQ(table.getRowCount(), 0);
 }
 
-TEST_F(TableTest, TableInfo) {
+TEST_F(TableTest, TableInfo)
+{
     auto table_info = std::make_unique<TableInfo>("users", std::move(test_schema_));
 
     EXPECT_EQ(table_info->getName(), "users");
@@ -42,7 +46,8 @@ TEST_F(TableTest, TableInfo) {
     EXPECT_EQ(table_info->getSchema().getColumnInfo(1).getName(), "name");
 }
 
-TEST_F(TableTest, InsertAndRetrieveTuple) {
+TEST_F(TableTest, InsertAndRetrieveTuple)
+{
     // Create a fresh schema for this test
     auto schema = std::make_unique<Schema>();
     schema->addColumnInfo({ "id", std::make_unique<IntegerType>() });

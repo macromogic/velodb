@@ -1,21 +1,24 @@
-#include <gtest/gtest.h>
-#include "types/value.hpp"
 #include "types/data_type.hpp"
+#include "types/value.hpp"
+#include <gtest/gtest.h>
 
 using namespace velodb;
 
 class ValueTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         // Setup code if needed
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         // Cleanup code if needed
     }
 };
 
-TEST_F(ValueTest, CreateIntegerValue) {
+TEST_F(ValueTest, CreateIntegerValue)
+{
     Value int_val = Value::createInteger(42);
 
     EXPECT_EQ(int_val.getTypeId(), DataTypeId::INTEGER);
@@ -24,7 +27,8 @@ TEST_F(ValueTest, CreateIntegerValue) {
     EXPECT_EQ(int_val.toString(), "42");
 }
 
-TEST_F(ValueTest, CreateDoubleValue) {
+TEST_F(ValueTest, CreateDoubleValue)
+{
     Value double_val = Value::createDouble(3.14);
 
     EXPECT_EQ(double_val.getTypeId(), DataTypeId::DOUBLE);
@@ -33,7 +37,8 @@ TEST_F(ValueTest, CreateDoubleValue) {
     EXPECT_EQ(double_val.toString(), "3.14");
 }
 
-TEST_F(ValueTest, CreateStringValue) {
+TEST_F(ValueTest, CreateStringValue)
+{
     Value string_val = Value::createString("hello");
 
     EXPECT_EQ(string_val.getTypeId(), DataTypeId::VARCHAR);
@@ -42,7 +47,8 @@ TEST_F(ValueTest, CreateStringValue) {
     EXPECT_EQ(string_val.toString(), "'hello'");
 }
 
-TEST_F(ValueTest, CreateBooleanValue) {
+TEST_F(ValueTest, CreateBooleanValue)
+{
     Value bool_val = Value::createBoolean(true);
 
     EXPECT_EQ(bool_val.getTypeId(), DataTypeId::BOOLEAN);
@@ -55,7 +61,8 @@ TEST_F(ValueTest, CreateBooleanValue) {
     EXPECT_EQ(false_val.toString(), "false");
 }
 
-TEST_F(ValueTest, CreateNullValue) {
+TEST_F(ValueTest, CreateNullValue)
+{
     Value null_val = Value::createNull(DataTypeId::INTEGER);
 
     EXPECT_EQ(null_val.getTypeId(), DataTypeId::INTEGER);
@@ -63,7 +70,8 @@ TEST_F(ValueTest, CreateNullValue) {
     EXPECT_EQ(null_val.toString(), "NULL");
 }
 
-TEST_F(ValueTest, ValueCopyAndMove) {
+TEST_F(ValueTest, ValueCopyAndMove)
+{
     Value original = Value::createInteger(100);
 
     // Test copy constructor
@@ -77,7 +85,8 @@ TEST_F(ValueTest, ValueCopyAndMove) {
     EXPECT_FALSE(moved.isNull());
 }
 
-TEST_F(ValueTest, ValueAssignment) {
+TEST_F(ValueTest, ValueAssignment)
+{
     Value val1 = Value::createInteger(10);
     Value val2 = Value::createInteger(20);
 
@@ -89,7 +98,8 @@ TEST_F(ValueTest, ValueAssignment) {
     EXPECT_EQ(val1.getTypeId(), DataTypeId::VARCHAR);
 }
 
-TEST_F(ValueTest, ValueComparison) {
+TEST_F(ValueTest, ValueComparison)
+{
     Value val1 = Value::createInteger(42);
     Value val2 = Value::createInteger(42);
     Value val3 = Value::createInteger(24);
@@ -104,7 +114,8 @@ TEST_F(ValueTest, ValueComparison) {
     EXPECT_TRUE(val1 != null_val);
 }
 
-TEST_F(ValueTest, ValueTypeConversion) {
+TEST_F(ValueTest, ValueTypeConversion)
+{
     // Test that we can create values of different types
     Value int_val = Value::createInteger(123);
     Value double_val = Value::createDouble(123.0);
@@ -120,7 +131,8 @@ TEST_F(ValueTest, ValueTypeConversion) {
     EXPECT_TRUE(int_val != double_val);
 }
 
-TEST_F(ValueTest, ValueOrdering) {
+TEST_F(ValueTest, ValueOrdering)
+{
     Value val1 = Value::createInteger(10);
     Value val2 = Value::createInteger(20);
     Value val3 = Value::createInteger(10);

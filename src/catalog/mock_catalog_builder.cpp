@@ -64,11 +64,11 @@ std::unique_ptr<Schema> MockCatalogBuilder::createUsersSchema()
     auto schema = std::make_unique<Schema>();
 
     // Add columns for users table
-    schema->addColumnInfo({ "id", std::make_unique<IntegerType>(), false} ); // NOT NULL
-    schema->addColumnInfo({ "name", std::make_unique<VarcharType>(100), false} );
-    schema->addColumnInfo({ "email", std::make_unique<VarcharType>(255), false} );
-    schema->addColumnInfo({ "age", std::make_unique<IntegerType>(), true} ); // Nullable
-    schema->addColumnInfo({ "salary", std::make_unique<DoubleType>(), true} );
+    schema->addColumnInfo({ "id", std::make_unique<IntegerType>(), false }); // NOT NULL
+    schema->addColumnInfo({ "name", std::make_unique<VarcharType>(100), false });
+    schema->addColumnInfo({ "email", std::make_unique<VarcharType>(255), false });
+    schema->addColumnInfo({ "age", std::make_unique<IntegerType>(), true }); // Nullable
+    schema->addColumnInfo({ "salary", std::make_unique<DoubleType>(), true });
 
     return schema;
 }

@@ -1,7 +1,7 @@
-#include "velodb.hpp"
-#include "planner/plan_visualizer.hpp"
 #include "catalog/mock_catalog_builder.hpp"
 #include "common/exception.hpp"
+#include "planner/plan_visualizer.hpp"
+#include "velodb.hpp"
 #include <argparse/argparse.hpp>
 #include <iostream>
 #include <memory>

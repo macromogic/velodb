@@ -1,16 +1,17 @@
-#include <gtest/gtest.h>
-#include "operator/scan_filter_operator.hpp"
-#include "operator/compaction_operator.hpp"
-#include "expression/expression.hpp"
-#include "catalog/table.hpp"
 #include "catalog/schema.hpp"
+#include "catalog/table.hpp"
+#include "expression/expression.hpp"
+#include "operator/compaction_operator.hpp"
+#include "operator/scan_filter_operator.hpp"
 #include "types/data_type.hpp"
+#include <gtest/gtest.h>
 
 using namespace velodb;
 
 class OperatorTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         // Create a test table with sample data
         auto schema = std::make_unique<Schema>();
         schema->addColumnInfo({ "id", std::make_unique<IntegerType>() });
@@ -32,14 +33,16 @@ protected:
         test_table.insertRow(values2);
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         // Cleanup code if needed
     }
 
     std::unique_ptr<Catalog> catalog_; // Mock catalog for operator creation
 };
 
-TEST_F(OperatorTest, ScanFilterOperatorCreation) {
+TEST_F(OperatorTest, ScanFilterOperatorCreation)
+{
     auto& test_table = catalog_->getTable("test_table").value().get();
     ScanFilterOperator scan_op(*catalog_, test_table, nullptr);
 
@@ -48,7 +51,8 @@ TEST_F(OperatorTest, ScanFilterOperatorCreation) {
     EXPECT_EQ(scan_op.getOutputSchema().getColumnInfo(1).getName(), "name");
 }
 
-TEST_F(OperatorTest, ScanFilterOperatorWithPredicate) {
+TEST_F(OperatorTest, ScanFilterOperatorWithPredicate)
+{
     // Create a predicate: id = 1
     Value target_val = Value::createInteger(1);
     auto const_expr = std::make_unique<ConstantExpression>(target_val);

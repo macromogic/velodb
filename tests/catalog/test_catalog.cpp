@@ -1,33 +1,37 @@
-#include <gtest/gtest.h>
 #include "catalog/catalog.hpp"
-#include "catalog/table.hpp"
 #include "catalog/schema.hpp"
+#include "catalog/table.hpp"
 #include "types/data_type.hpp"
+#include <gtest/gtest.h>
 
 using namespace velodb;
 
 class CatalogTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         catalog_ = std::make_unique<Catalog>();
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         // Cleanup code if needed
     }
 
     std::unique_ptr<Catalog> catalog_;
 };
 
-TEST_F(CatalogTest, CreateEmptyCatalog) {
+TEST_F(CatalogTest, CreateEmptyCatalog)
+{
     EXPECT_EQ(catalog_->getTableCount(), 0);
     EXPECT_FALSE(catalog_->hasTable("nonexistent"));
 }
 
-TEST_F(CatalogTest, CreateAndRetrieveTable) {
+TEST_F(CatalogTest, CreateAndRetrieveTable)
+{
     // Create a schema
     auto schema = std::make_unique<Schema>();
-    schema->addColumnInfo({ "id", std::make_unique<IntegerType>()});
+    schema->addColumnInfo({ "id", std::make_unique<IntegerType>() });
     schema->addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
 
     // Create table
@@ -44,7 +48,8 @@ TEST_F(CatalogTest, CreateAndRetrieveTable) {
     EXPECT_EQ(table.getSchema().getColumnCount(), 2);
 }
 
-TEST_F(CatalogTest, MultipleTablesOperations) {
+TEST_F(CatalogTest, MultipleTablesOperations)
+{
     // Create first table
     auto schema1 = std::make_unique<Schema>();
     schema1->addColumnInfo({ "id", std::make_unique<IntegerType>() });
@@ -79,7 +84,8 @@ TEST_F(CatalogTest, MultipleTablesOperations) {
     EXPECT_EQ(t2.getSchema().getColumnInfo(0).getName(), "name");
 }
 
-TEST_F(CatalogTest, DropTable) {
+TEST_F(CatalogTest, DropTable)
+{
     // Create a table
     auto schema = std::make_unique<Schema>();
     schema->addColumnInfo({ "id", std::make_unique<IntegerType>() });
@@ -94,7 +100,8 @@ TEST_F(CatalogTest, DropTable) {
     EXPECT_EQ(catalog_->getTableCount(), 0);
 }
 
-TEST_F(CatalogTest, GetNonexistentTable) {
+TEST_F(CatalogTest, GetNonexistentTable)
+{
     // Attempt to get a table that does not exist
     auto result = catalog_->getTable("nonexistent_table");
     EXPECT_FALSE(result.has_value());

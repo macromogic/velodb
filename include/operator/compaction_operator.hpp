@@ -22,8 +22,8 @@ public:
      * @param child The child operator to get input from
      */
     CompactionOperator(Catalog& catalog,
-                      std::unique_ptr<Schema> output_schema,
-                      std::unique_ptr<AbstractOperator> child);
+        std::unique_ptr<Schema> output_schema,
+        std::unique_ptr<AbstractOperator> child);
 
     /**
      * Virtual destructor for proper cleanup.

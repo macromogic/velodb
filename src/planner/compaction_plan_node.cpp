@@ -1,6 +1,6 @@
-#include "planner/execution_context.hpp"
 #include "planner/compaction_plan_node.hpp"
 #include "operator/compaction_operator.hpp"
+#include "planner/execution_context.hpp"
 #include <sstream>
 
 namespace velodb {

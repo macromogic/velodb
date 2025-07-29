@@ -1,5 +1,5 @@
-#include "catalog/catalog.hpp"
 #include "operator/abstract_operator.hpp"
+#include "catalog/catalog.hpp"
 
 namespace velodb {
 

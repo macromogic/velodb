@@ -1,8 +1,8 @@
 #include "operator/scan_filter_operator.hpp"
 #include "execution/execution_engine.hpp"
 #include "expression/expression.hpp"
-#include <stdexcept>
 #include <sstream>
+#include <stdexcept>
 
 namespace velodb {
 

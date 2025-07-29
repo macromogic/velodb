@@ -1,5 +1,5 @@
-#include "common/exception.hpp"
 #include "planner/merge_sort_join_plan_node.hpp"
+#include "common/exception.hpp"
 #include <stdexcept>
 
 namespace velodb {

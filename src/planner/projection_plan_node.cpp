@@ -1,7 +1,7 @@
-#include "common/exception.hpp"
-#include "planner/execution_context.hpp"
 #include "planner/projection_plan_node.hpp"
+#include "common/exception.hpp"
 #include "operator/projection_operator.hpp"
+#include "planner/execution_context.hpp"
 #include <stdexcept>
 
 namespace velodb {

@@ -2,10 +2,10 @@
 
 #include "catalog/schema.hpp"
 #include "types/value.hpp"
-#include <memory>
-#include <vector>
-#include <optional>
 #include <functional>
+#include <memory>
+#include <optional>
+#include <vector>
 
 namespace velodb {
 
