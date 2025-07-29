@@ -62,10 +62,10 @@ bool TypeChecker::validateExpression(const AbstractExpression* expr) const {
 }
 
 std::unique_ptr<DataType> TypeChecker::deduceArithmeticType(
-    const DataType& left_type, 
-    const DataType& right_type, 
+    const DataType& left_type,
+    const DataType& right_type,
     ArithmeticType op_type) const {
-    
+
     // Validate that both operands are numeric
     if (!validateArithmeticOperands(left_type, right_type, op_type)) {
         return nullptr;
@@ -89,10 +89,10 @@ std::unique_ptr<DataType> TypeChecker::deduceArithmeticType(
 }
 
 bool TypeChecker::validateComparison(
-    const DataType& left_type, 
-    const DataType& right_type, 
+    const DataType& left_type,
+    const DataType& right_type,
     ComparisonType comp_type) const {
-    
+
     return validateComparisonOperands(left_type, right_type, comp_type);
 }
 
@@ -107,16 +107,16 @@ ConversionResult TypeChecker::canConvert(const DataType& from_type, const DataTy
 
     // Check implicit conversions (safe)
     auto implicit_it = implicit_conversions_.find(from_id);
-    if (implicit_it != implicit_conversions_.end() && 
+    if (implicit_it != implicit_conversions_.end() &&
         implicit_it->second.count(to_id) > 0) {
         return ConversionResult::VALID;
     }
 
     // Check explicit conversions
     auto explicit_it = explicit_conversions_.find(from_id);
-    if (explicit_it != explicit_conversions_.end() && 
+    if (explicit_it != explicit_conversions_.end() &&
         explicit_it->second.count(to_id) > 0) {
-        
+
         // Determine if conversion may lose precision
         if (isNumericType(from_type) && isNumericType(to_type)) {
             int from_rank = getTypeRank(from_type);
@@ -125,12 +125,12 @@ ConversionResult TypeChecker::canConvert(const DataType& from_type, const DataTy
                 return ConversionResult::VALID_WITH_LOSS;
             }
         }
-        
+
         // String to numeric conversions need runtime validation
         if (isStringType(from_type) && isNumericType(to_type)) {
             return ConversionResult::RUNTIME_CHECK;
         }
-        
+
         return ConversionResult::VALID;
     }
 
@@ -211,12 +211,12 @@ bool TypeChecker::validateArithmeticOperands(const DataType& left_type, const Da
         // Both operands should be integer types for modulo
         DataTypeId left_id = left_type.getTypeId();
         DataTypeId right_id = right_type.getTypeId();
-        
-        bool left_is_int = (left_id == DataTypeId::TINYINT || left_id == DataTypeId::SMALLINT || 
+
+        bool left_is_int = (left_id == DataTypeId::TINYINT || left_id == DataTypeId::SMALLINT ||
                            left_id == DataTypeId::INTEGER || left_id == DataTypeId::BIGINT);
-        bool right_is_int = (right_id == DataTypeId::TINYINT || right_id == DataTypeId::SMALLINT || 
+        bool right_is_int = (right_id == DataTypeId::TINYINT || right_id == DataTypeId::SMALLINT ||
                             right_id == DataTypeId::INTEGER || right_id == DataTypeId::BIGINT);
-        
+
         if (!left_is_int || !right_is_int) {
             setError("Modulo operation requires integer operands");
             return false;

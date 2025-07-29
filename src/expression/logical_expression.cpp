@@ -36,20 +36,20 @@ std::vector<size_t> BinaryLogicalExpression::getRequiredColumns(const Schema& sc
     std::vector<size_t> required_columns;
     auto left_columns = left_->getRequiredColumns(schema);
     required_columns.insert(required_columns.end(), left_columns.begin(), left_columns.end());
-    
+
     auto right_columns = right_->getRequiredColumns(schema);
     required_columns.insert(required_columns.end(), right_columns.begin(), right_columns.end());
-    
+
     // Remove duplicates
     std::sort(required_columns.begin(), required_columns.end());
     required_columns.erase(std::unique(required_columns.begin(), required_columns.end()), required_columns.end());
-    
+
     return required_columns;
 }
 
 std::string BinaryLogicalExpression::toString() const
 {
-    return "(" + left_->toString() + 
+    return "(" + left_->toString() +
            (connective_type_ == ConnectiveType::AND ? " AND " : " OR ") +
            right_->toString() + ")";
 }

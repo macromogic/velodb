@@ -9,7 +9,7 @@ namespace velodb {
 ArithmeticExpression::ArithmeticExpression(ArithmeticType arith_type,
     std::unique_ptr<AbstractExpression> left,
     std::unique_ptr<AbstractExpression> right)
-    : AbstractExpression(ExpressionType::ARITHMETIC, 
+    : AbstractExpression(ExpressionType::ARITHMETIC,
         g_type_checker.deduceArithmeticType(left->getReturnType(), right->getReturnType(), arith_type))
     , arith_type_(arith_type)
     , left_(std::move(left))
@@ -32,19 +32,19 @@ Value ArithmeticExpression::evaluate(const Tuple& tuple, const Schema& schema) c
 std::vector<size_t> ArithmeticExpression::getRequiredColumns(const Schema& schema) const
 {
     std::vector<size_t> required_columns;
-    
+
     // Get required columns from left operand
     auto left_columns = left_->getRequiredColumns(schema);
     required_columns.insert(required_columns.end(), left_columns.begin(), left_columns.end());
-    
+
     // Get required columns from right operand
     auto right_columns = right_->getRequiredColumns(schema);
     required_columns.insert(required_columns.end(), right_columns.begin(), right_columns.end());
-    
+
     // Remove duplicates
     std::sort(required_columns.begin(), required_columns.end());
     required_columns.erase(std::unique(required_columns.begin(), required_columns.end()), required_columns.end());
-    
+
     return required_columns;
 }
 
@@ -68,7 +68,7 @@ std::string ArithmeticExpression::toString() const
             op_str = "%";
             break;
     }
-    
+
     return "(" + left_->toString() + " " + op_str + " " + right_->toString() + ")";
 }
 
@@ -78,25 +78,25 @@ Value ArithmeticExpression::computeArithmetic(const Value& left_val, const Value
     if (left_val.isNull() || right_val.isNull()) {
         return Value::createNull(DataTypeId::INVALID);
     }
-    
+
     // Get the operand types
     DataTypeId left_type = left_val.getTypeId();
     DataTypeId right_type = right_val.getTypeId();
-    
+
     // Determine result type using type checker
     auto result_type = g_type_checker.deduceArithmeticType(
-        *DataType::createType(left_type), 
-        *DataType::createType(right_type), 
+        *DataType::createType(left_type),
+        *DataType::createType(right_type),
         op_type
     );
 
     if (!result_type) {
         VELODB_THROW(TypeError, "Invalid arithmetic operation");
     }
-    
+
     // Perform the computation based on result type
     DataTypeId result_type_id = result_type->getTypeId();
-    
+
     try {
         switch (result_type_id) {
             case DataTypeId::INTEGER: {

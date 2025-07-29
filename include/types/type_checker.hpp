@@ -41,26 +41,26 @@ public:
 
     // Arithmetic type checking
     std::unique_ptr<DataType> deduceArithmeticType(
-        const DataType& left_type, 
-        const DataType& right_type, 
+        const DataType& left_type,
+        const DataType& right_type,
         ArithmeticType op_type) const;
 
     // Comparison type checking
     bool validateComparison(
-        const DataType& left_type, 
-        const DataType& right_type, 
+        const DataType& left_type,
+        const DataType& right_type,
         ComparisonType comp_type) const;
 
     // Type conversion checking
     ConversionResult canConvert(const DataType& from_type, const DataType& to_type) const;
     bool canImplicitlyConvert(const DataType& from_type, const DataType& to_type) const;
-    
+
     // Type promotion
     std::unique_ptr<DataType> promoteTypes(const DataType& left_type, const DataType& right_type) const;
-    
+
     // Cast validation
     bool validateCast(const DataType& from_type, const DataType& to_type) const;
-    
+
     // Utility methods
     bool isNumericType(const DataType& type) const;
     bool isStringType(const DataType& type) const;
@@ -69,15 +69,15 @@ public:
 
 private:
     mutable std::string last_error_;
-    
+
     // Type conversion matrices
     std::unordered_map<DataTypeId, std::unordered_set<DataTypeId>> implicit_conversions_;
     std::unordered_map<DataTypeId, std::unordered_set<DataTypeId>> explicit_conversions_;
     std::unordered_map<DataTypeId, int> type_ranks_;
-    
+
     void initializeConversionRules();
     void setError(const std::string& error) const;
-    
+
     // Helper methods for specific type checks
     bool validateArithmeticOperands(const DataType& left_type, const DataType& right_type, ArithmeticType op_type) const;
     bool validateComparisonOperands(const DataType& left_type, const DataType& right_type, ComparisonType comp_type) const;

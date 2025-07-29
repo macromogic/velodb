@@ -38,14 +38,14 @@ void QueryResult::insertRowInternal(const std::vector<Value>& values)
     if (values.size() != columns_.size()) {
         VELODB_THROW(ExecutionError, "Row value count does not match schema column count");
     }
-    
+
     ensureColumnCapacity(row_count_ + 1);
-    
+
     // Insert each value into its corresponding column
     for (size_t col_idx = 0; col_idx < values.size(); ++col_idx) {
         columns_[col_idx].push_back(values[col_idx]);
     }
-    
+
     ++row_count_;
 }
 
@@ -60,23 +60,23 @@ void QueryResult::addRow(std::vector<Value>&& values)
     if (values.size() != columns_.size()) {
         VELODB_THROW(ExecutionError, "Row value count does not match schema column count");
     }
-    
+
     ensureColumnCapacity(row_count_ + 1);
-    
+
     // Move each value into its corresponding column
     for (size_t col_idx = 0; col_idx < values.size(); ++col_idx) {
         columns_[col_idx].push_back(std::move(values[col_idx]));
     }
-    
+
     ++row_count_;
 }
 
 void QueryResult::addBatchRows(const std::vector<std::vector<Value>>& rows)
 {
     if (rows.empty()) return;
-    
+
     ensureColumnCapacity(row_count_ + rows.size());
-    
+
     for (const auto& row : rows) {
         insertRowInternal(row);
     }
@@ -91,7 +91,7 @@ Value QueryResult::getValue(RowId row_id, size_t column_index) const
     if (column_index >= columns_.size()) {
         VELODB_THROW(ExecutionError, "Column index out of range");
     }
-    
+
     return columns_[column_index][row_id];
 }
 
@@ -100,10 +100,10 @@ std::vector<Value> QueryResult::getValues(RowId row_id, const std::vector<size_t
     if (row_id >= row_count_) {
         VELODB_THROW(ExecutionError, "Row ID out of range");
     }
-    
+
     std::vector<Value> values;
     values.reserve(column_indices.size());
-    
+
     for (size_t const col_idx : column_indices) {
         if (col_idx >= columns_.size()) {
             VELODB_THROW(ExecutionError, "Column index out of range");
@@ -126,17 +126,17 @@ std::vector<Value> QueryResult::getColumnValues(size_t column_index, const std::
     if (column_index >= columns_.size()) {
         VELODB_THROW(ExecutionError, "Column index out of range");
     }
-    
+
     std::vector<Value> values;
     values.reserve(row_ids.size());
-    
+
     for (RowId const row_id : row_ids) {
         if (row_id >= row_count_) {
             VELODB_THROW(ExecutionError, "Row ID out of range");
         }
         values.push_back(columns_[column_index][row_id]);
     }
-    
+
     return values;
 }
 
@@ -144,14 +144,14 @@ std::vector<ValueVector> QueryResult::getColumns(const std::vector<size_t>& colu
 {
     std::vector<ValueVector> result;
     result.reserve(column_indices.size());
-    
+
     for (size_t const col_idx : column_indices) {
         if (col_idx >= columns_.size()) {
             VELODB_THROW(ExecutionError, "Column index out of range");
         }
         result.push_back(columns_[col_idx]);
     }
-    
+
     return result;
 }
 
@@ -159,11 +159,11 @@ std::vector<RowId> QueryResult::getAllRowIds() const
 {
     std::vector<RowId> row_ids;
     row_ids.reserve(row_count_);
-    
+
     for (RowId row_id = 0; row_id < row_count_; ++row_id) {
         row_ids.push_back(row_id);
     }
-    
+
     return row_ids;
 }
 

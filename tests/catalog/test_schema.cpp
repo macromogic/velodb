@@ -17,7 +17,7 @@ protected:
 
 TEST_F(SchemaTest, CreateEmptySchema) {
     Schema schema;
-    
+
     EXPECT_EQ(schema.getColumnCount(), 0);
 }
 
@@ -67,7 +67,7 @@ TEST_F(SchemaTest, GetColumnByName) {
     const auto& user_col_ref = schema.getColumnInfo("user_id");
     EXPECT_EQ(user_col_ref.getName(), "user_id");
     EXPECT_EQ(user_col_ref.getType().getTypeId(), DataTypeId::INTEGER);
-    
+
     const auto& score_col_ref = schema.getColumnInfo("score");
     EXPECT_EQ(score_col_ref.getName(), "score");
     EXPECT_EQ(score_col_ref.getType().getTypeId(), DataTypeId::DOUBLE);
@@ -87,7 +87,7 @@ TEST_F(SchemaTest, GetColumnIndex) {
 
 TEST_F(SchemaTest, HasColumn) {
     Schema schema;
-    
+
     schema.addColumnInfo({ "test_col", std::make_unique<IntegerType>() });
 
     EXPECT_TRUE(schema.hasColumn("test_col"));
@@ -97,7 +97,7 @@ TEST_F(SchemaTest, HasColumn) {
 
 TEST_F(SchemaTest, SchemaClone) {
     Schema original;
-    
+
     original.addColumnInfo({ "id", std::make_unique<IntegerType>() });
     original.addColumnInfo({ "description", std::make_unique<VarcharType>(200) });
 
@@ -112,7 +112,7 @@ TEST_F(SchemaTest, SchemaClone) {
 
 TEST_F(SchemaTest, SchemaToString) {
     Schema schema;
-    
+
     schema.addColumnInfo({ "id", std::make_unique<IntegerType>() });
     schema.addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
 
@@ -124,7 +124,7 @@ TEST_F(SchemaTest, SchemaToString) {
 
 TEST_F(SchemaTest, EmptySchemaOperations) {
     Schema schema;
-    
+
     // Test operations on empty schema
     EXPECT_EQ(schema.getColumnCount(), 0);
     EXPECT_FALSE(schema.hasColumn("any_column"));

@@ -14,24 +14,24 @@ public:
     // Success constructor
     explicit Result(T&& value) : value_(std::forward<T>(value)) {}
     explicit Result(const T& value) : value_(value) {}
-    
+
     // Error constructor
     explicit Result(E&& error) : value_(std::forward<E>(error)) {}
     explicit Result(const E& error) : value_(error) {}
-    
+
     // Query methods
     bool ok() const noexcept {
         return std::holds_alternative<T>(value_);
     }
-    
+
     bool err() const noexcept {
         return std::holds_alternative<E>(value_);
     }
-    
+
     explicit operator bool() const noexcept {
         return ok();
     }
-    
+
     // Access methods
     T& value() & {
         if (!ok()) {
@@ -39,57 +39,57 @@ public:
         }
         return std::get<T>(value_);
     }
-    
+
     const T& value() const& {
         if (!ok()) {
             VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::get<T>(value_);
     }
-    
+
     T&& value() && {
         if (!ok()) {
             VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::move(std::get<T>(value_));
     }
-    
+
     const E& error() const& {
         if (!err()) {
             VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
         return std::get<E>(value_);
     }
-    
+
     E&& error() && {
         if (!err()) {
             VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
         return std::move(std::get<E>(value_));
     }
-    
+
     // Convenience methods
     T value_or(const T& default_value) const& {
         return ok() ? value() : default_value;
     }
-    
+
     T value_or(T&& default_value) && {
         return ok() ? std::move(value()) : std::move(default_value);
     }
-    
+
     // Factory methods
     static Result success(T&& value) {
         return Result(std::forward<T>(value));
     }
-    
+
     static Result success(const T& value) {
         return Result(value);
     }
-    
+
     static Result failure(E&& error) {
         return Result(std::forward<E>(error));
     }
-    
+
     static Result failure(const E& error) {
         return Result(error);
     }

@@ -25,7 +25,7 @@ public:
     void addRow(const std::vector<Value>& values);
     void addRow(std::vector<Value>&& values);
     void addBatchRows(const std::vector<std::vector<Value>>& rows);
-    
+
     // Schema and basic info
     const Schema& getSchema() const { return *schema_; }
     size_t getRowCount() const { return row_count_; }
@@ -37,7 +37,7 @@ public:
     const ValueVector& getColumn(size_t column_index) const;
     std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
     std::vector<ValueVector> getColumns(const std::vector<size_t>& column_indices) const;
-    
+
     // Row ID management
     std::vector<RowId> getAllRowIds() const;
 
@@ -48,11 +48,11 @@ public:
 
 private:
     std::unique_ptr<Schema> schema_;
-    
+
     // Column-based storage: each column is stored as a separate vector
     std::vector<ValueVector> columns_;
     size_t row_count_; // Current number of rows
-    
+
     // Helper methods
     void initializeColumns();
     void ensureColumnCapacity(size_t new_row_count);
@@ -83,7 +83,7 @@ public:
 private:
     // Helper methods
     std::unique_ptr<AbstractOperator> createOperatorTree(const AbstractPlanNode& plan_node);
-    
+
     Catalog& catalog_;
     std::unique_ptr<QueryPlanner> planner_;
     std::unique_ptr<ExecutionContext> context_;

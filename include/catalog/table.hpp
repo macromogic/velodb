@@ -124,7 +124,7 @@ private:
     // Column-based storage: each column is stored as a separate vector
     std::vector<ValueColumn> columns_;
     size_t row_count_; // Current number of rows (including deleted)
-    
+
     // Helper methods
     void ensureColumnCapacity(size_t new_row_count);
     void initializeColumns();

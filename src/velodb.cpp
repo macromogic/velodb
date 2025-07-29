@@ -61,7 +61,7 @@ bool Database::insertTuple(const std::string& table_name, const Tuple& tuple)
     auto table = catalog_->getTable(table_name);
     if (!table)
         return false;
-    
+
     // Convert tuple to values vector
     std::vector<Value> values;
     values.reserve(tuple.getColumnCount());
@@ -79,7 +79,7 @@ bool Database::insertTuple(const std::string& table_name, Tuple&& tuple)
     auto table = catalog_->getTable(table_name);
     if (!table)
         return false;
-    
+
     // Convert tuple to values vector
     std::vector<Value> values;
     values.reserve(tuple.getColumnCount());

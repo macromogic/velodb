@@ -10,7 +10,7 @@ namespace velodb {
 
 /**
  * @brief Utility class for visualizing query execution plans
- * 
+ *
  * Provides multiple output formats for plan visualization:
  * - Text-based tree format (default)
  * - Graphviz DOT format for graph visualization
@@ -38,7 +38,7 @@ public:
      * @param graph_name Name of the graph (default: "QueryPlan")
      * @return DOT format string for Graphviz
      */
-    static std::string visualizeAsGraphviz(const std::unique_ptr<AbstractPlanNode>& plan_node, 
+    static std::string visualizeAsGraphviz(const std::unique_ptr<AbstractPlanNode>& plan_node,
                                          const std::string& graph_name = "QueryPlan");
 
     /**
@@ -54,21 +54,21 @@ public:
      * @param out Output stream
      * @param format Output format
      */
-    static void printPlan(const std::unique_ptr<AbstractPlanNode>& plan_node, 
-                         std::ostream& out, 
+    static void printPlan(const std::unique_ptr<AbstractPlanNode>& plan_node,
+                         std::ostream& out,
                          OutputFormat format = OutputFormat::TEXT_TREE);
 
 private:
     // Helper methods for different visualization formats
-    static void visualizeTextRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node, 
+    static void visualizeTextRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
                                       std::string& result, int indent);
-    
-    static void visualizeGraphvizRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node, 
+
+    static void visualizeGraphvizRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
                                          std::string& result, int& node_counter);
-    
-    static void visualizeDetailedRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node, 
+
+    static void visualizeDetailedRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
                                          std::string& result, int level);
-    
+
     static std::string planTypeToString(PlanType type);
     static std::string getNodeLabel(const AbstractPlanNode& node);
     static std::string getNodeShape(PlanType type);

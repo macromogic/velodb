@@ -3,13 +3,13 @@
 
 namespace velodb {
 
-TracedException::TracedException(const std::string& message) 
+TracedException::TracedException(const std::string& message)
     : message_(message) {
     capture_stack_trace(32);
     format_full_message();
 }
 
-TracedException::TracedException(const std::string& message, size_t trace_depth) 
+TracedException::TracedException(const std::string& message, size_t trace_depth)
     : message_(message) {
     capture_stack_trace(trace_depth);
     format_full_message();
@@ -31,26 +31,26 @@ void TracedException::capture_stack_trace(size_t trace_depth) {
     // Capture the stack trace
     stack_trace_obj_.load_here(trace_depth);
     stack_trace_obj_.skip_n_firsts(5);
-    
+
     // Format the stack trace
     backward::Printer printer;
     printer.snippet = false;
     std::ostringstream oss;
-    
+
     // Print the full stack trace (backward-cpp will handle formatting)
     printer.print(stack_trace_obj_, oss);
-    
+
     stack_trace_ = oss.str();
 }
 
 void TracedException::format_full_message() {
     std::ostringstream oss;
     oss << message_;
-    
+
     if (!stack_trace_.empty()) {
         oss << "\n\n" << stack_trace_;
     }
-    
+
     full_message_ = oss.str();
 }
 

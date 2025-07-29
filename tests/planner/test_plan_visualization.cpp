@@ -26,24 +26,24 @@ protected:
 
 TEST_F(PlanVisualizationTest, TextVisualizationSimpleSelect) {
     std::string sql = "SELECT * FROM users";
-    
+
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(sql, &result);
-    
+
     ASSERT_TRUE(result.isValid());
     ASSERT_EQ(result.size(), 1);
-    
+
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
-    
+
     auto plan = planner_->planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
-    
+
     // Test text visualization
     std::string text_output = PlanVisualizer::visualizeAsText(plan);
     std::cout << "\n=== TEXT VISUALIZATION: Simple SELECT ===\n";
     std::cout << text_output << std::endl;
-    
+
     EXPECT_FALSE(text_output.empty());
     EXPECT_NE(text_output.find("ScanFilter"), std::string::npos);
     EXPECT_NE(text_output.find("users"), std::string::npos);
@@ -51,71 +51,71 @@ TEST_F(PlanVisualizationTest, TextVisualizationSimpleSelect) {
 
 TEST_F(PlanVisualizationTest, TextVisualizationSelectWithWhere) {
     std::string sql = "SELECT * FROM users WHERE id = 1";
-    
+
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(sql, &result);
-    
+
     ASSERT_TRUE(result.isValid());
     ASSERT_EQ(result.size(), 1);
-    
+
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
-    
+
     auto plan = planner_->planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
-    
+
     // Test text visualization
     std::string text_output = PlanVisualizer::visualizeAsText(plan);
     std::cout << "\n=== TEXT VISUALIZATION: SELECT with WHERE ===\n";
     std::cout << text_output << std::endl;
-    
+
     EXPECT_FALSE(text_output.empty());
     EXPECT_NE(text_output.find("ScanFilter"), std::string::npos);
 }
 
 TEST_F(PlanVisualizationTest, TextVisualizationSelectWithProjection) {
     std::string sql = "SELECT name, email FROM users";
-    
+
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(sql, &result);
-    
+
     ASSERT_TRUE(result.isValid());
     ASSERT_EQ(result.size(), 1);
-    
+
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
-    
+
     auto plan = planner_->planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
-    
+
     // Test text visualization
     std::string text_output = PlanVisualizer::visualizeAsText(plan);
     std::cout << "\n=== TEXT VISUALIZATION: SELECT with Projection ===\n";
     std::cout << text_output << std::endl;
-    
+
     EXPECT_FALSE(text_output.empty());
 }
 
 TEST_F(PlanVisualizationTest, GraphvizVisualizationSimpleSelect) {
     std::string sql = "SELECT * FROM users";
-    
+
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(sql, &result);
-    
+
     ASSERT_TRUE(result.isValid());
     ASSERT_EQ(result.size(), 1);
-    
+
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
-    
+
     auto plan = planner_->planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
-    
+
     // Test Graphviz visualization
     std::string graphviz_output = PlanVisualizer::visualizeAsGraphviz(plan, "SimpleSelect");
     std::cout << "\n=== GRAPHVIZ VISUALIZATION: Simple SELECT ===\n";
     std::cout << graphviz_output << std::endl;
-    
+
     EXPECT_FALSE(graphviz_output.empty());
     EXPECT_NE(graphviz_output.find("digraph SimpleSelect"), std::string::npos);
     EXPECT_NE(graphviz_output.find("node"), std::string::npos);
@@ -124,27 +124,27 @@ TEST_F(PlanVisualizationTest, GraphvizVisualizationSimpleSelect) {
 
 TEST_F(PlanVisualizationTest, GraphvizVisualizationComplexQuery) {
     std::string sql = "SELECT name, email FROM users WHERE age > 25";
-    
+
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(sql, &result);
-    
+
     ASSERT_TRUE(result.isValid());
     ASSERT_EQ(result.size(), 1);
-    
+
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
-    
+
     auto plan = planner_->planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
-    
+
     // Test Graphviz visualization
     std::string graphviz_output = PlanVisualizer::visualizeAsGraphviz(plan, "ComplexQuery");
     std::cout << "\n=== GRAPHVIZ VISUALIZATION: Complex Query ===\n";
     std::cout << graphviz_output << std::endl;
-    
+
     EXPECT_FALSE(graphviz_output.empty());
     EXPECT_NE(graphviz_output.find("digraph ComplexQuery"), std::string::npos);
-    
+
     // Save to file for external visualization
     std::ofstream dot_file("complex_query.dot");
     if (dot_file.is_open()) {
@@ -156,24 +156,24 @@ TEST_F(PlanVisualizationTest, GraphvizVisualizationComplexQuery) {
 
 TEST_F(PlanVisualizationTest, DetailedVisualizationSimpleSelect) {
     std::string sql = "SELECT * FROM users";
-    
+
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(sql, &result);
-    
+
     ASSERT_TRUE(result.isValid());
     ASSERT_EQ(result.size(), 1);
-    
+
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
-    
+
     auto plan = planner_->planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
-    
+
     // Test detailed visualization
     std::string detailed_output = PlanVisualizer::visualizeDetailed(plan);
     std::cout << "\n=== DETAILED VISUALIZATION: Simple SELECT ===\n";
     std::cout << detailed_output << std::endl;
-    
+
     EXPECT_FALSE(detailed_output.empty());
     EXPECT_NE(detailed_output.find("Query Plan Analysis"), std::string::npos);
     EXPECT_NE(detailed_output.find("Level 0"), std::string::npos);
@@ -182,29 +182,29 @@ TEST_F(PlanVisualizationTest, DetailedVisualizationSimpleSelect) {
 
 TEST_F(PlanVisualizationTest, CompareAllVisualizationFormats) {
     std::string sql = "SELECT name, age FROM users WHERE age > 21";
-    
+
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(sql, &result);
-    
+
     ASSERT_TRUE(result.isValid());
     ASSERT_EQ(result.size(), 1);
-    
+
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
-    
+
     auto plan = planner_->planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
-    
+
     std::cout << "\n=== COMPARISON OF ALL FORMATS ===\n";
-    
+
     // Text format
     std::cout << "\n--- TEXT FORMAT ---\n";
     PlanVisualizer::printPlan(plan, std::cout, PlanVisualizer::OutputFormat::TEXT_TREE);
-    
+
     // Graphviz format
     std::cout << "\n--- GRAPHVIZ FORMAT ---\n";
     PlanVisualizer::printPlan(plan, std::cout, PlanVisualizer::OutputFormat::GRAPHVIZ_DOT);
-    
+
     // Detailed format
     std::cout << "\n--- DETAILED FORMAT ---\n";
     PlanVisualizer::printPlan(plan, std::cout, PlanVisualizer::OutputFormat::DETAILED);
@@ -212,7 +212,7 @@ TEST_F(PlanVisualizationTest, CompareAllVisualizationFormats) {
 
 TEST_F(PlanVisualizationTest, VisualizeDifferentTables) {
     std::cout << "\n=== VISUALIZING DIFFERENT TABLES ===\n";
-    
+
     // Users table
     std::string sql1 = "SELECT * FROM users";
     hsql::SQLParserResult result1;
@@ -223,7 +223,7 @@ TEST_F(PlanVisualizationTest, VisualizeDifferentTables) {
         std::cout << "\n--- USERS TABLE ---\n";
         std::cout << PlanVisualizer::visualizeAsText(plan);
     }
-    
+
     // Orders table
     std::string sql2 = "SELECT * FROM orders";
     hsql::SQLParserResult result2;
@@ -234,7 +234,7 @@ TEST_F(PlanVisualizationTest, VisualizeDifferentTables) {
         std::cout << "\n--- ORDERS TABLE ---\n";
         std::cout << PlanVisualizer::visualizeAsText(plan);
     }
-    
+
     // Products table
     std::string sql3 = "SELECT * FROM products";
     hsql::SQLParserResult result3;
@@ -258,4 +258,3 @@ TEST_F(PlanVisualizationTest, VisualizeDifferentTables) {
 //     std::string sql = "SELECT COUNT(*) FROM users WHERE age > 25";
 //     // Implementation pending aggregation support
 // }
-

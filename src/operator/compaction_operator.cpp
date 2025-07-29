@@ -1,22 +1,24 @@
 #include "operator/compaction_operator.hpp"
-#include "catalog/table.hpp"
 #include "catalog/column.hpp"
 #include "catalog/schema.hpp"
-#include "types/value.hpp"
-#include "types/data_type.hpp"
+#include "catalog/table.hpp"
 #include "common/result.hpp"
-#include <vector>
+#include "types/data_type.hpp"
+#include "types/value.hpp"
 #include <algorithm>
+#include <vector>
 
 namespace velodb {
 
 CompactionOperator::CompactionOperator(Catalog& catalog,
-                                     std::unique_ptr<Schema> output_schema,
-                                     std::unique_ptr<AbstractOperator> child)
-    : UnaryOperator(catalog, std::move(output_schema), std::move(child)) {
+    std::unique_ptr<Schema> output_schema,
+    std::unique_ptr<AbstractOperator> child)
+    : UnaryOperator(catalog, std::move(output_schema), std::move(child))
+{
 }
 
-Result<View> CompactionOperator::execute() const {
+Result<View> CompactionOperator::execute() const
+{
     auto* child = getChild();
     if (!child) {
         return Result<View>::failure("CompactionOperator requires a child operator");

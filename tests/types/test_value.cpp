@@ -17,7 +17,7 @@ protected:
 
 TEST_F(ValueTest, CreateIntegerValue) {
     Value int_val = Value::createInteger(42);
-    
+
     EXPECT_EQ(int_val.getTypeId(), DataTypeId::INTEGER);
     EXPECT_FALSE(int_val.isNull());
     EXPECT_EQ(int_val.getInteger(), 42);
@@ -80,7 +80,7 @@ TEST_F(ValueTest, ValueCopyAndMove) {
 TEST_F(ValueTest, ValueAssignment) {
     Value val1 = Value::createInteger(10);
     Value val2 = Value::createInteger(20);
-    
+
     val1 = val2;
     EXPECT_EQ(val1.getInteger(), 20);
 

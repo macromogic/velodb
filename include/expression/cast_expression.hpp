@@ -23,7 +23,7 @@ private:
 
     // Cast implementation methods
     static Value performCast(const Value& value, const DataType& target_type);
-    
+
     // Type-specific cast methods
     static Value castToBoolean(const Value& value);
     static Value castToInteger(const Value& value);

@@ -117,12 +117,12 @@ add_executable(velodb ${SOURCES})
 add_dependencies(velodb sql-parser)
 
 # Include directories for sql-parser
-target_include_directories(velodb PRIVATE 
+target_include_directories(velodb PRIVATE
     ${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/src
 )
 
 # Link libraries
-target_link_libraries(velodb 
+target_link_libraries(velodb
     sqlparser
     argparse::argparse
     backward

@@ -8,11 +8,11 @@ class NonCopyable {
 protected:
     NonCopyable() = default;
     virtual ~NonCopyable() = default;
-    
+
     // Allow move construction and assignment
     NonCopyable(NonCopyable&&) = default;
     NonCopyable& operator=(NonCopyable&&) = default;
-    
+
 private:
     // Prevent copying
     NonCopyable(const NonCopyable&) = delete;

@@ -50,7 +50,7 @@ TEST_F(TableTest, InsertAndRetrieveTuple) {
 
     auto table_info = std::make_unique<TableInfo>("test_table", std::move(schema));
     Table table(std::move(table_info));
-    
+
     // Create values for insertion
     std::vector<Value> values;
     values.push_back(Value::createInteger(1));
@@ -68,7 +68,7 @@ TEST_F(TableTest, InsertAndRetrieveTuple) {
 
 // TODO: Add more comprehensive table tests when table operations are implemented
 // - Insert tuple tests
-// - Delete tuple tests  
+// - Delete tuple tests
 // - Update tuple tests
 // - Scan tests
 // - Index tests

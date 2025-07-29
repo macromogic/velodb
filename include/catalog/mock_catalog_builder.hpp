@@ -52,7 +52,7 @@ public:
      * @param column_names Optional list of column names mentioned in query
      * @param inferred_types Optional type hints from query context
      */
-    static void createDynamicTable(Catalog& catalog, 
+    static void createDynamicTable(Catalog& catalog,
                                   const std::string& table_name,
                                   const std::vector<std::string>& column_names = {},
                                   const std::map<std::string, DataTypeId>& inferred_types = {});
@@ -63,7 +63,7 @@ public:
      * @param table_name Name of the table
      * @param column_count Number of columns (default: 5)
      */
-    static void createGenericTable(Catalog& catalog, 
+    static void createGenericTable(Catalog& catalog,
                                   const std::string& table_name,
                                   size_t column_count = 5);
 
@@ -83,7 +83,7 @@ private:
     static DataTypeId inferTypeFromExpression(const hsql::Expr* expr);
     static DataTypeId inferTypeFromLiteral(const hsql::Expr* literal);
     static void createTableFromCommonSchema(Catalog& catalog, const std::string& table_name);
-    
+
     // Helper methods for schema creation
     static std::unique_ptr<Schema> createUsersSchema();
     static std::unique_ptr<Schema> createOrdersSchema();
@@ -93,10 +93,10 @@ private:
     static std::unique_ptr<Schema> createDynamicSchema(const std::string& table_name,
                                                       const std::vector<std::string>& column_names,
                                                       const std::map<std::string, DataTypeId>& inferred_types);
-    
+
     // Default column types for common column names
     static std::map<std::string, DataTypeId> getDefaultColumnTypes();
-    
+
     // Common table schemas that can be automatically created
     static std::map<std::string, std::vector<std::pair<std::string, DataTypeId>>> getCommonTableSchemas();
 };
