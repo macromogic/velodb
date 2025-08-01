@@ -82,8 +82,10 @@ bool Value::operator!=(const Value& other) const
 
 bool Value::operator<(const Value& other) const
 {
-    if (is_null_ || other.is_null_)
-        return false;
+    if (is_null_)
+        return !other.is_null_; // NULL is less than any non-NULL value
+    else if (other.is_null_)
+        return false; // Non-NULL is not less than NULL
     if (type_id_ != other.type_id_)
         return false;
 

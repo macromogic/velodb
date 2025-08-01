@@ -65,14 +65,6 @@ void Sorter::sort()
     is_sorted_ = true;
 }
 
-std::unique_ptr<Sorter::Iterator> Sorter::getIterator() const
-{
-    if (!is_sorted_) {
-        VELODB_THROW(ExecutionError, "Sorter must be sorted before getting iterator");
-    }
-    return std::make_unique<Iterator>(sorted_tuples_, 0);
-}
-
 void Sorter::clear()
 {
     tuples_.clear();
@@ -102,25 +94,10 @@ SortComparator Sorter::createComparator() const
             const Value& right_val = right.key_values_[i];
             bool const ascending = ascending_flags_[i];
 
-            // Handle NULL values (NULLs are considered smaller)
-            if (left_val.isNull() && right_val.isNull()) {
-                continue; // Equal, check next key
+            if (left_val == right_val) {
+                continue; // Equal values, move to next key
             }
-            if (left_val.isNull()) {
-                return ascending; // NULL < non-NULL if ascending
-            }
-            if (right_val.isNull()) {
-                return !ascending; // non-NULL > NULL if ascending
-            }
-
-            // Compare non-NULL values
-            if (left_val < right_val) {
-                return ascending;
-            }
-            if (left_val > right_val) {
-                return !ascending;
-            }
-            // Values are equal, continue to next key
+            return ascending ? (left_val < right_val) : (right_val < left_val);
         }
 
         // All keys are equal

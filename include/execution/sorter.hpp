@@ -49,27 +49,6 @@ public:
     // Get sorted tuples
     const std::vector<Tuple>& getSortedTuples() const { return sorted_tuples_; }
 
-    // Iterator interface for sorted tuples
-    class Iterator {
-    public:
-        Iterator(const std::vector<Tuple>& tuples, size_t index)
-            : tuples_(tuples)
-            , index_(index)
-        {
-        }
-
-        bool hasNext() const { return index_ < tuples_.size(); }
-        const Tuple& next() { return tuples_[index_++]; }
-        void reset() { index_ = 0; }
-
-    private:
-        const std::vector<Tuple>& tuples_;
-        size_t index_;
-    };
-
-    // Get iterator for sorted tuples
-    std::unique_ptr<Iterator> getIterator() const;
-
     // Statistics
     size_t getSize() const { return tuples_.size(); }
     bool isEmpty() const { return tuples_.empty(); }
