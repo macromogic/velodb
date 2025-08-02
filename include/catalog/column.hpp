@@ -2,6 +2,8 @@
 
 #include "common/copy_traits.hpp"
 #include "types/value.hpp"
+#include <variant>
+#include <vector>
 
 namespace velodb {
 
@@ -82,6 +84,7 @@ public:
     void fill(const Value& value, size_t count);
 
     DataType& getType() const override { return *type_; }
+    const ValueVector& getValues() const { return values_; } // For view creation
 
     ViewColumn view() const override;
     ViewColumn viewAs(std::string alias) const override;
@@ -95,7 +98,43 @@ private:
 
 class ViewColumn : public Column {
 public:
+    // View mode structures
+    struct EntireView {
+        // No additional data needed - views entire column
+    };
+
+    struct SliceView {
+        size_t start_row;
+        size_t end_row;
+
+        SliceView(size_t start, size_t end)
+            : start_row(start)
+            , end_row(end)
+        {
+        }
+    };
+
+    struct IndicesView {
+        std::vector<size_t> indices;
+
+        explicit IndicesView(std::vector<size_t> idx)
+            : indices(std::move(idx))
+        {
+        }
+    };
+
+    using ViewMode = std::variant<EntireView, SliceView, IndicesView>;
+
+    // Constructor for entire column view
     ViewColumn(DataType& type, std::string name, const ValueVector& values);
+
+    // Constructor for slice view
+    ViewColumn(DataType& type, std::string name, const ValueVector& values,
+        size_t start_row, size_t end_row);
+
+    // Constructor for discrete indices view
+    ViewColumn(DataType& type, std::string name, const ValueVector& values,
+        std::vector<size_t> indices);
 
     size_t size() const override;
     const Value& get(size_t row) const override;
@@ -105,11 +144,19 @@ public:
     ViewColumn view() const override;
     ViewColumn viewAs(std::string alias) const override;
 
+    // Create new views from this view
+    ViewColumn slice(size_t start_row, size_t end_row) const;
+    ViewColumn indices(const std::vector<size_t>& indices) const;
+
     std::string toString() const override;
 
 private:
     DataType& type_;
-    const ValueVector& values_; // Reference to the column values in the view
+    const ValueVector& values_; // Reference to the original column values
+    ViewMode view_mode_;
+
+    // Helper method to map view row to actual row using std::visit
+    size_t mapToActualRow(size_t view_row) const;
 };
 
 } // namespace velodb

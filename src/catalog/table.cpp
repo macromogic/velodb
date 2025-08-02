@@ -140,6 +140,76 @@ void Table::insertRow(std::vector<Value>&& values)
     ++row_count_;
 }
 
+View Table::slice(size_t start_row, size_t end_row) const
+{
+    if (start_row > end_row || end_row > row_count_) {
+        VELODB_THROW(CatalogError, "Invalid slice range");
+    }
+
+    std::vector<ViewColumn> sliced_columns;
+    sliced_columns.reserve(columns_.size());
+
+    for (const auto& column : columns_) {
+        // Create a slice view of each column
+        sliced_columns.emplace_back(column.getType(), column.getName(), column.getValues(), start_row, end_row);
+    }
+
+    return View(
+        std::make_unique<TableInfo>(table_info_->getName() + "_slice", table_info_->getSchema().cloneUnique()),
+        std::move(sliced_columns));
+}
+
+View Table::indices(const std::vector<size_t>& indices) const
+{
+    for (size_t idx : indices) {
+        if (idx >= row_count_) {
+            VELODB_THROW(CatalogError, "Index out of range for table");
+        }
+    }
+
+    std::vector<ViewColumn> indexed_columns;
+    indexed_columns.reserve(columns_.size());
+
+    for (const auto& column : columns_) {
+        // Create an indices view of each column
+        indexed_columns.emplace_back(column.getType(), column.getName(), column.getValues(), indices);
+    }
+
+    return View(
+        std::make_unique<TableInfo>(table_info_->getName() + "_indexed", table_info_->getSchema().cloneUnique()),
+        std::move(indexed_columns));
+}
+
+View Table::filterRows(std::function<bool(const ViewTuple&)> predicate) const
+{
+    std::vector<size_t> matching_indices;
+
+    // Iterate through all rows and collect indices that match the predicate
+    for (size_t i = 0; i < row_count_; ++i) {
+        ViewTuple tuple(*this, i);
+        if (predicate(tuple)) {
+            matching_indices.push_back(i);
+        }
+    }
+
+    return indices(matching_indices);
+}
+
+ViewColumn Table::getColumn(const std::string& name) const
+{
+    size_t column_index = table_info_->getSchema().getColumnIndex(name);
+    return getColumn(column_index);
+}
+
+ViewColumn Table::getColumn(size_t column_index) const
+{
+    if (column_index >= columns_.size()) {
+        VELODB_THROW(CatalogError, "Column index out of range");
+    }
+    return columns_[column_index].view();
+}
+
+// Efficient column-based access for late materialization
 const Value& Table::getValue(uint64_t row_id, size_t column_index) const
 {
     if (row_id >= row_count_) {
@@ -200,6 +270,14 @@ ViewColumn View::getColumn(const std::string& name) const
     VELODB_THROW(CatalogError, "Column not found: " + name);
 }
 
+ViewColumn View::getColumn(size_t column_index) const
+{
+    if (column_index >= columns_.size()) {
+        VELODB_THROW(CatalogError, "Column index out of range");
+    }
+    return columns_[column_index].view();
+}
+
 TableIterator View::begin() const
 {
     return TableIterator(*this);
@@ -231,6 +309,59 @@ View View::viewAs(std::string alias) const
         columns.push_back(column.view());
     }
     return View(std::make_unique<TableInfo>(std::move(alias), table_info_->getSchema().cloneUnique()), std::move(columns));
+}
+
+View View::slice(size_t start_row, size_t end_row) const
+{
+    if (start_row > end_row || end_row > row_count_) {
+        VELODB_THROW(CatalogError, "Invalid slice range");
+    }
+
+    std::vector<ViewColumn> sliced_columns;
+    sliced_columns.reserve(columns_.size());
+
+    for (const auto& column : columns_) {
+        sliced_columns.emplace_back(column.slice(start_row, end_row));
+    }
+
+    return View(
+        std::make_unique<TableInfo>(table_info_->getName() + "_slice", table_info_->getSchema().cloneUnique()),
+        std::move(sliced_columns));
+}
+
+View View::indices(const std::vector<size_t>& indices) const
+{
+    for (size_t idx : indices) {
+        if (idx >= row_count_) {
+            VELODB_THROW(CatalogError, "Index out of range for view");
+        }
+    }
+
+    std::vector<ViewColumn> indexed_columns;
+    indexed_columns.reserve(columns_.size());
+
+    for (const auto& column : columns_) {
+        indexed_columns.emplace_back(column.indices(indices));
+    }
+
+    return View(
+        std::make_unique<TableInfo>(table_info_->getName() + "_indexed", table_info_->getSchema().cloneUnique()),
+        std::move(indexed_columns));
+}
+
+View View::filterRows(std::function<bool(const ViewTuple&)> predicate) const
+{
+    std::vector<size_t> matching_indices;
+
+    // Iterate through all rows and collect indices that match the predicate
+    for (size_t i = 0; i < row_count_; ++i) {
+        ViewTuple tuple(*this, i);
+        if (predicate(tuple)) {
+            matching_indices.push_back(i);
+        }
+    }
+
+    return indices(matching_indices);
 }
 
 // Column-based access methods

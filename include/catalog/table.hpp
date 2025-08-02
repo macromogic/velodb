@@ -85,6 +85,15 @@ public:
     void insertRow(const std::vector<Value>& values);
     void insertRow(std::vector<Value>&& values);
 
+    // Enhanced view creation methods
+    View slice(size_t start_row, size_t end_row) const;
+    View indices(const std::vector<size_t>& indices) const;
+    View filterRows(std::function<bool(const ViewTuple&)> predicate) const;
+
+    // Column access
+    ViewColumn getColumn(const std::string& name) const;
+    ViewColumn getColumn(size_t column_index) const;
+
     // Efficient column-based access for late materialization
     const Value& getValue(uint64_t row_id, size_t column_index) const override;
 
@@ -119,6 +128,13 @@ public:
 
     void addColumn(ViewColumn column);
     ViewColumn getColumn(const std::string& name) const;
+    ViewColumn getColumn(size_t column_index) const;
+
+    // Enhanced view creation methods
+    View slice(size_t start_row, size_t end_row) const;
+    View indices(const std::vector<size_t>& indices) const;
+    View filterRows(std::function<bool(const ViewTuple&)> predicate) const;
+
     // Column-based access methods (similar to Table)
     const Value& getValue(uint64_t row_id, size_t column_index) const override;
 
