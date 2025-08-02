@@ -28,8 +28,8 @@ private:
     JoinType join_type_;
 
     // TODO: Add state for join iteration with late materialization
-    std::vector<RowId> left_row_ids_;
-    std::vector<RowId> right_row_ids_;
+    std::vector<uint64_t> left_row_ids_;
+    std::vector<uint64_t> right_row_ids_;
     size_t current_left_index_ { 0 };
     size_t current_right_index_ { 0 };
     bool initialized_ { false };

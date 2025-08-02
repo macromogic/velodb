@@ -30,7 +30,7 @@ private:
     JoinType join_type_;
 
     // TODO: Add state for hash join with late materialization
-    std::vector<RowId> result_row_ids_;
+    std::vector<uint64_t> result_row_ids_;
     size_t current_result_index_ { 0 };
     bool hash_table_built_ { false };
 };

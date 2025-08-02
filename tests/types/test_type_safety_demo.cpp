@@ -121,7 +121,7 @@ TEST_F(TypeSafetyDemoTest, ArithmeticEvaluation)
 
     // Evaluate the expression
     Schema dummy_schema;
-    Tuple dummy_tuple(dummy_schema, {});
+    ValueTuple dummy_tuple(dummy_schema, {});
     Value result = expr->evaluate(dummy_tuple, dummy_schema);
     EXPECT_FALSE(result.isNull());
     EXPECT_EQ(result.getTypeId(), DataTypeId::INTEGER);
@@ -140,7 +140,7 @@ TEST_F(TypeSafetyDemoTest, CastEvaluation)
 
     // Evaluate the cast
     Schema dummy_schema;
-    Tuple dummy_tuple(dummy_schema, {});
+    ValueTuple dummy_tuple(dummy_schema, {});
     Value result = cast_expr->evaluate(dummy_tuple, dummy_schema);
     EXPECT_FALSE(result.isNull());
     EXPECT_EQ(result.getTypeId(), DataTypeId::VARCHAR);
@@ -174,7 +174,7 @@ TEST_F(TypeSafetyDemoTest, ComplexExpression)
     EXPECT_EQ(multiply_expr->getReturnType().getTypeId(), DataTypeId::INTEGER);
 
     Schema dummy_schema;
-    Tuple dummy_tuple(dummy_schema, {});
+    ValueTuple dummy_tuple(dummy_schema, {});
     Value result = multiply_expr->evaluate(dummy_tuple, dummy_schema);
     EXPECT_FALSE(result.isNull());
     EXPECT_EQ(result.getTypeId(), DataTypeId::INTEGER);

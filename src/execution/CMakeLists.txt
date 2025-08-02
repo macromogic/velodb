@@ -1,7 +1,5 @@
 add_library(velodb_execution OBJECT
     ${OPERATOR_SOURCES}
-    hash_table.cpp
-    sorter.cpp
     execution_engine.cpp
 )
 

@@ -158,6 +158,8 @@ std::string PlanVisualizer::planTypeToString(PlanType type)
     switch (type) {
     case PlanType::SCAN_FILTER:
         return "Scan Filter";
+    case PlanType::COMPACTION:
+        return "Compaction";
     case PlanType::PROJECTION:
         return "Projection";
     case PlanType::NESTED_LOOP_JOIN:

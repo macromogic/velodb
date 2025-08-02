@@ -20,7 +20,7 @@ Result<View> ScanFilterOperator::execute() const
     rowids.reserve(table_.getRowCount());
     masks.reserve(table_.getRowCount());
 
-    RowId row_id = 0;
+    uint64_t row_id = 0;
     for (const auto& tuple : table_) {
         Value result = predicate_ ? predicate_->evaluate(tuple, table_.getSchema()) : Value::createBoolean(true);
         rowids.append(Value::createBigInt(row_id));

@@ -80,7 +80,7 @@ size_t ValueColumn::size() const
     return values_.size();
 }
 
-Value ValueColumn::get(size_t row) const
+const Value& ValueColumn::get(size_t row) const
 {
     if (row >= values_.size()) {
         VELODB_THROW(CatalogError, "Row index out of range");
@@ -149,7 +149,7 @@ size_t ViewColumn::size() const
     return values_.size();
 }
 
-Value ViewColumn::get(size_t row) const
+const Value& ViewColumn::get(size_t row) const
 {
     if (row >= values_.size()) {
         VELODB_THROW(CatalogError, "Row index out of range");

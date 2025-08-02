@@ -30,7 +30,7 @@ Result<View> ProjectionOperator::execute() const
     auto& child_view = child_result.value();
 
     View view("projection_result");
-    Tuple dummy_tuple(*output_schema_);
+    ViewTuple dummy_tuple(child_view, 0);
     size_t output_columns = output_schema_->getColumnCount();
     if (expressions_.empty()) {
         // TODO: handle select * case.

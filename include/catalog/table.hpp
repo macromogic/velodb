@@ -1,5 +1,6 @@
 #pragma once
 
+#include "catalog/tuple.hpp"
 #include "common/copy_traits.hpp"
 #include "schema.hpp"
 #include "types/value.hpp"
@@ -15,38 +16,7 @@ class Tuple;
 class View;
 class TableIterator;
 
-// Row ID type for late materialization
-using RowId = uint64_t;
-constexpr RowId INVALID_ROW_ID = UINT64_MAX;
-
-class Tuple {
-public:
-    explicit Tuple(const Schema& schema);
-    Tuple(const Schema& schema, std::vector<Value> values);
-    ~Tuple() = default;
-
-    // Copy and move constructors
-    Tuple(const Tuple& other) = default;
-    Tuple(Tuple&& other) noexcept = default;
-    Tuple& operator=(const Tuple& other) = default;
-    Tuple& operator=(Tuple&& other) noexcept = default;
-
-    const Value& getValue(size_t column_index) const;
-    const Value& getValue(const std::string& column_name) const;
-    void setValue(size_t column_index, const Value& value);
-    void setValue(size_t column_index, Value&& value);
-    void setValue(const std::string& column_name, const Value& value);
-    void setValue(const std::string& column_name, Value&& value);
-
-    const Schema& getSchema() const { return schema_.get(); }
-    size_t getColumnCount() const { return values_.size(); }
-
-    std::string toString() const;
-
-private:
-    std::reference_wrapper<const Schema> schema_;
-    std::vector<Value> values_;
-};
+constexpr uint64_t INVALID_ROW_ID = UINT64_MAX;
 
 class TableInfo : private NonCopyable {
 public:
@@ -89,6 +59,7 @@ public:
     virtual bool isView() const = 0;
     virtual View view() const = 0;
     virtual View viewAs(std::string alias) const = 0;
+    virtual const Value& getValue(uint64_t row_id, size_t column_index) const = 0;
 
     std::string toString() const;
 
@@ -113,12 +84,9 @@ public:
     // Primary column-based insertion methods
     void insertRow(const std::vector<Value>& values);
     void insertRow(std::vector<Value>&& values);
-    void insertBatchRows(const std::vector<std::vector<Value>>& rows);
 
     // Efficient column-based access for late materialization
-    Value getValue(RowId row_id, size_t column_index) const;
-    std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
-    std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
+    const Value& getValue(uint64_t row_id, size_t column_index) const override;
 
 private:
     // Column-based storage: each column is stored as a separate vector
@@ -152,9 +120,7 @@ public:
     void addColumn(ViewColumn column);
     ViewColumn getColumn(const std::string& name) const;
     // Column-based access methods (similar to Table)
-    Value getValue(RowId row_id, size_t column_index) const;
-    std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
-    std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
+    const Value& getValue(uint64_t row_id, size_t column_index) const override;
 
 private:
     // Column-based storage: each column is stored as a separate vector
@@ -165,8 +131,8 @@ private:
 // Iterator for table scanning
 class TableIterator {
 public:
-    explicit TableIterator(const Table& table, RowId row_id = 0);
-    explicit TableIterator(const View& view, RowId row_id = 0);
+    explicit TableIterator(const Table& table, uint64_t row_id = 0);
+    explicit TableIterator(const View& view, uint64_t row_id = 0);
     ~TableIterator() = default;
 
     bool operator==(const TableIterator& other) const;
@@ -179,11 +145,7 @@ public:
 
 private:
     const TableBase& table_;
-    RowId current_row_id_;
-    bool is_view_;
-    std::shared_ptr<Tuple> current_tuple_; // Store tuple as shared_ptr
-
-    void fetchCurrentTuple(); // Helper to fetch current tuple based on row ID
+    ViewTuple current_tuple_;
 };
 
 } // namespace velodb

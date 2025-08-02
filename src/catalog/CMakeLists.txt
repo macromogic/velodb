@@ -3,6 +3,7 @@ add_library(velodb_catalog OBJECT
     column.cpp
     table.cpp
     catalog.cpp
+    tuple.cpp
     mock_catalog_builder.cpp
 )
 

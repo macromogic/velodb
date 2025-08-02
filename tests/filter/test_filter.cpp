@@ -2,6 +2,7 @@
 #include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
+#include "catalog/tuple.hpp"
 #include "execution/execution_engine.hpp"
 #include "planner/planner.hpp"
 #include "types/data_type.hpp"

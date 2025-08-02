@@ -15,50 +15,6 @@ struct SelectStatement;
 
 namespace velodb {
 
-// Query execution result - Column-based storage
-class QueryResult : public NonCopyable {
-public:
-    explicit QueryResult(std::unique_ptr<Schema> schema);
-    ~QueryResult() = default;
-
-    // Column-based insertion methods
-    void addRow(const std::vector<Value>& values);
-    void addRow(std::vector<Value>&& values);
-    void addBatchRows(const std::vector<std::vector<Value>>& rows);
-
-    // Schema and basic info
-    const Schema& getSchema() const { return *schema_; }
-    size_t getRowCount() const { return row_count_; }
-    bool isEmpty() const { return row_count_ == 0; }
-
-    // Column-based access methods
-    Value getValue(RowId row_id, size_t column_index) const;
-    std::vector<Value> getValues(RowId row_id, const std::vector<size_t>& column_indices) const;
-    const ValueVector& getColumn(size_t column_index) const;
-    std::vector<Value> getColumnValues(size_t column_index, const std::vector<RowId>& row_ids) const;
-    std::vector<ValueVector> getColumns(const std::vector<size_t>& column_indices) const;
-
-    // Row ID management
-    std::vector<RowId> getAllRowIds() const;
-
-    std::string toString() const;
-
-    // Conversion to View for catalog integration
-    // std::unique_ptr<View> toView(const std::string& view_name) const;
-
-private:
-    std::unique_ptr<Schema> schema_;
-
-    // Column-based storage: each column is stored as a separate vector
-    std::vector<ValueVector> columns_;
-    size_t row_count_; // Current number of rows
-
-    // Helper methods
-    void initializeColumns();
-    void ensureColumnCapacity(size_t new_row_count);
-    void insertRowInternal(const std::vector<Value>& values);
-};
-
 // Main execution engine
 class ExecutionEngine {
 public:
