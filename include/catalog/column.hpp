@@ -155,7 +155,6 @@ private:
     const ValueVector& values_; // Reference to the original column values
     ViewMode view_mode_;
 
-    // Helper method to map view row to actual row using std::visit
     size_t mapToActualRow(size_t view_row) const;
 };
 

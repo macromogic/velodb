@@ -1,7 +1,7 @@
 #include "catalog/table.hpp"
 #include "catalog/column.hpp"
 #include "common/exception.hpp"
-#include <sstream>
+#include <fmt/core.h>
 #include <stdexcept>
 #include <utility>
 
@@ -30,13 +30,12 @@ TableBase::TableBase(std::unique_ptr<TableInfo> table_info)
 
 std::string TableBase::toString() const
 {
-    std::stringstream ss;
-    ss << "Table: " << getName() << "\n";
-    ss << "Schema: " << getSchema().toString() << "\n";
+    std::string result = fmt::format("Table: {}\n", getName());
+    result += fmt::format("Schema: {}\n", getSchema().toString());
     for (const auto& tuple : *this) {
-        ss << tuple.toString() << "\n";
+        result += fmt::format("{}\n", tuple.toString());
     }
-    return ss.str();
+    return result;
 }
 
 // Table implementation with column-based storage

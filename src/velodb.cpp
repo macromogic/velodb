@@ -1,5 +1,5 @@
 #include "velodb.hpp"
-#include <sstream>
+#include "fmt/core.h"
 #include <stdexcept>
 
 namespace velodb {
@@ -117,13 +117,12 @@ std::string Database::getDatabaseInfo() const
     if (!initialized_)
         return "Database not initialized";
 
-    std::stringstream ss;
-    ss << "VeloDB Database Information:\n";
-    ss << "  Tables: " << getTableCount() << "\n";
-    ss << "\nCatalog Details:\n";
-    ss << catalog_->toString();
-
-    return ss.str();
+    return fmt::format("VeloDB Database Information:\n"
+                       "  Tables: {}\n"
+                       "\nCatalog Details:\n"
+                       "{}",
+        getTableCount(),
+        catalog_->toString());
 }
 
 } // namespace velodb

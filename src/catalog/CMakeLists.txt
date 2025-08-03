@@ -12,6 +12,10 @@ target_include_directories(velodb_catalog PRIVATE
     ${CMAKE_SOURCE_DIR}/thirdparty/backward-cpp
 )
 
+target_link_libraries(velodb_catalog
+    fmt::fmt
+)
+
 set(ALL_OBJS
     ${ALL_OBJS} $<TARGET_OBJECTS:velodb_catalog>
     PARENT_SCOPE

@@ -1,7 +1,7 @@
 #include "planner/plan_visualizer.hpp"
 #include <iomanip>
 #include <map>
-#include <sstream>
+#include <ostream>
 
 namespace velodb {
 

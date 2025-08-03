@@ -1,6 +1,6 @@
 #include "types/value.hpp"
 #include "common/exception.hpp"
-#include <sstream>
+#include <fmt/core.h>
 #include <stdexcept>
 #include <utility>
 
@@ -8,7 +8,7 @@ namespace velodb {
 
 Value::Value(DataTypeId type_id, ValueData data)
     : type_id_(type_id)
-    , data_(std::move(std::move(data)))
+    , data_(std::move(data))
     , is_null_(false)
 {
 }
@@ -28,6 +28,24 @@ bool Value::getBoolean() const
     return std::get<bool>(data_);
 }
 
+int8_t Value::getTinyInt() const
+{
+    if (is_null_)
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
+    if (type_id_ != DataTypeId::TINYINT)
+        VELODB_THROW(TypeError, "Type mismatch");
+    return std::get<int8_t>(data_);
+}
+
+int16_t Value::getSmallInt() const
+{
+    if (is_null_)
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
+    if (type_id_ != DataTypeId::SMALLINT)
+        VELODB_THROW(TypeError, "Type mismatch");
+    return std::get<int16_t>(data_);
+}
+
 int32_t Value::getInteger() const
 {
     if (is_null_)
@@ -44,6 +62,15 @@ int64_t Value::getBigInt() const
     if (type_id_ != DataTypeId::BIGINT)
         VELODB_THROW(TypeError, "Type mismatch");
     return std::get<int64_t>(data_);
+}
+
+float Value::getFloat() const
+{
+    if (is_null_)
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
+    if (type_id_ != DataTypeId::FLOAT)
+        VELODB_THROW(TypeError, "Type mismatch");
+    return std::get<float>(data_);
 }
 
 double Value::getDouble() const
@@ -125,32 +152,35 @@ std::string Value::toString() const
     if (is_null_)
         return "NULL";
 
-    std::stringstream ss;
     switch (type_id_) {
     case DataTypeId::BOOLEAN:
-        ss << (getBoolean() ? "true" : "false");
-        break;
+        return getBoolean() ? "true" : "false";
     case DataTypeId::INTEGER:
-        ss << getInteger();
-        break;
+        return fmt::format("{}", getInteger());
     case DataTypeId::BIGINT:
-        ss << getBigInt();
-        break;
+        return fmt::format("{}", getBigInt());
     case DataTypeId::DOUBLE:
-        ss << getDouble();
-        break;
+        return fmt::format("{}", getDouble());
     case DataTypeId::VARCHAR:
-        ss << "'" << getString() << "'";
-        break;
+        return fmt::format("'{}'", getString());
     default:
-        ss << "UNKNOWN";
+        return "UNKNOWN";
     }
-    return ss.str();
 }
 
 Value Value::createBoolean(bool value)
 {
     return { DataTypeId::BOOLEAN, value };
+}
+
+Value Value::createTinyInt(int8_t value)
+{
+    return { DataTypeId::TINYINT, value };
+}
+
+Value Value::createSmallInt(int16_t value)
+{
+    return { DataTypeId::SMALLINT, value };
 }
 
 Value Value::createInteger(int32_t value)
@@ -161,6 +191,11 @@ Value Value::createInteger(int32_t value)
 Value Value::createBigInt(int64_t value)
 {
     return { DataTypeId::BIGINT, value };
+}
+
+Value Value::createFloat(float value)
+{
+    return { DataTypeId::FLOAT, value };
 }
 
 Value Value::createDouble(double value)

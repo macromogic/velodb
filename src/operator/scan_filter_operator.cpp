@@ -1,7 +1,6 @@
 #include "operator/scan_filter_operator.hpp"
 #include "execution/execution_engine.hpp"
 #include "expression/expression.hpp"
-#include <sstream>
 #include <stdexcept>
 
 namespace velodb {
@@ -36,12 +35,11 @@ Result<View> ScanFilterOperator::execute() const
 
 std::string ScanFilterOperator::toString() const
 {
-    std::stringstream ss;
-    ss << "ScanFilterOperator(" << table_.getName() << ")";
+    std::string result = fmt::format("ScanFilterOperator({})", table_.getName());
     if (predicate_) {
-        ss << " WHERE " << predicate_->toString();
+        result += fmt::format(" WHERE {}", predicate_->toString());
     }
-    return ss.str();
+    return result;
 }
 
 } // namespace velodb

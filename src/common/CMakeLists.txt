@@ -9,6 +9,7 @@ target_include_directories(velodb_common PUBLIC
 
 target_link_libraries(velodb_common
     backward
+    fmt::fmt
 )
 
 set(ALL_OBJS

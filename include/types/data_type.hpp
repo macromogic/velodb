@@ -20,7 +20,8 @@ enum class DataTypeId {
     CHAR,
     DATE,
     TIMESTAMP,
-    DECIMAL
+    DECIMAL,
+    ANY
 };
 
 class DataType : public UniqueCloneable<DataType> {
@@ -58,6 +59,28 @@ public:
     bool isNumeric() const override { return false; }
 };
 
+class TinyIntType : public DataType {
+public:
+    TinyIntType()
+        : DataType(DataTypeId::TINYINT, sizeof(int8_t))
+    {
+    }
+    std::string toString() const override { return "TINYINT"; }
+    bool isFixedSize() const override { return true; }
+    bool isNumeric() const override { return true; }
+};
+
+class SmallIntType : public DataType {
+public:
+    SmallIntType()
+        : DataType(DataTypeId::SMALLINT, sizeof(int16_t))
+    {
+    }
+    std::string toString() const override { return "SMALLINT"; }
+    bool isFixedSize() const override { return true; }
+    bool isNumeric() const override { return true; }
+};
+
 class IntegerType : public DataType {
 public:
     IntegerType()
@@ -76,6 +99,17 @@ public:
     {
     }
     std::string toString() const override { return "BIGINT"; }
+    bool isFixedSize() const override { return true; }
+    bool isNumeric() const override { return true; }
+};
+
+class FloatType : public DataType {
+public:
+    FloatType()
+        : DataType(DataTypeId::FLOAT, sizeof(float))
+    {
+    }
+    std::string toString() const override { return "FLOAT"; }
     bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
 };

@@ -2,10 +2,10 @@
 
 #include <exception>
 #include <memory>
-#include <sstream>
 #include <string>
 
 #include "backward.hpp"
+#include "fmt/core.h"
 
 namespace velodb {
 

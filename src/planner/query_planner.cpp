@@ -89,6 +89,8 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::Tab
         return std::make_unique<ConstantExpression>(Value::createDouble(expr->fval));
     case hsql::kExprLiteralString:
         return std::make_unique<ConstantExpression>(Value::createString(expr->name));
+    case hsql::kExprLiteralNull:
+        return std::make_unique<ConstantExpression>(Value::createNull(DataTypeId::ANY));
     case hsql::kExprColumnRef:
         return planColumnRef(table_ref, expr);
     case hsql::kExprOperator:

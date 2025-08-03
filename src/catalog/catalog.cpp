@@ -1,5 +1,5 @@
 #include "catalog/catalog.hpp"
-#include <sstream>
+#include <fmt/core.h>
 #include <stdexcept>
 
 namespace velodb {
@@ -83,14 +83,13 @@ void Catalog::clear()
 
 std::string Catalog::toString() const
 {
-    std::stringstream ss;
-    ss << "Catalog: " << tables_.size() << " tables\n";
+    std::string result = fmt::format("Catalog: {} tables\n", tables_.size());
 
     for (const auto& pair : tables_) {
-        ss << "  Table: " << pair.first << " " << pair.second->getSchema().toString() << "\n";
+        result += fmt::format("  Table: {} {}\n", pair.first, pair.second->getSchema().toString());
     }
 
-    return ss.str();
+    return result;
 }
 
 // TODO: Implement catalog builder functionality

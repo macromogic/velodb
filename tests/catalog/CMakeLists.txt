@@ -10,6 +10,7 @@ target_link_libraries(test_catalog
     ${ALL_OBJS}
     sqlparser
     backward
+    fmt::fmt
     GTest::GTest
     GTest::Main
     pthread

@@ -3,10 +3,9 @@
 #include "catalog/column.hpp"
 #include "types/data_type.hpp"
 #include <algorithm>
-#include <iostream>
+#include <fmt/core.h>
 #include <memory>
 #include <regex>
-#include <sstream>
 
 namespace velodb {
 
@@ -134,7 +133,7 @@ bool MockCatalogBuilder::ensureTablesForQuery(Catalog& catalog, const std::strin
         hsql::SQLParser::parse(sql, &result);
 
         if (!result.isValid() || result.size() == 0) {
-            std::cerr << "Invalid SQL query: " << sql << std::endl;
+            fmt::print(stderr, "Invalid SQL query: {}\n", sql);
             return false;
         }
 
@@ -176,7 +175,7 @@ bool MockCatalogBuilder::ensureTablesForQuery(Catalog& catalog, const std::strin
 
         return true;
     } catch (const std::exception& e) {
-        std::cerr << "Error analyzing query: " << e.what() << std::endl;
+        fmt::print(stderr, "Error analyzing query: {}\n", e.what());
         return false;
     }
 }

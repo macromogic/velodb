@@ -2,7 +2,6 @@
 #include "operator/compaction_operator.hpp"
 #include "operator/scan_filter_operator.hpp"
 #include "planner/execution_context.hpp"
-#include <sstream>
 
 namespace velodb {
 
@@ -21,12 +20,11 @@ std::unique_ptr<AbstractOperator> ScanFilterPlanNode::createOperator(ExecutionCo
 
 std::string ScanFilterPlanNode::toString() const
 {
-    std::stringstream ss;
-    ss << "ScanFilter(" << table_.getName() << ")";
+    std::string result = fmt::format("ScanFilter({})", table_.getName());
     if (predicate_) {
-        ss << " WHERE " << predicate_->toString();
+        result += fmt::format(" WHERE {}", predicate_->toString());
     }
-    return ss.str();
+    return result;
 }
 
 } // namespace velodb

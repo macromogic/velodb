@@ -1,5 +1,4 @@
 #include "expression/expression.hpp"
-#include <sstream>
 #include <stdexcept>
 
 namespace velodb {

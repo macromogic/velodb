@@ -1,6 +1,6 @@
 #include "types/type_checker.hpp"
 #include "expression/expression.hpp"
-#include <sstream>
+#include <fmt/core.h>
 
 namespace velodb {
 
@@ -206,16 +206,12 @@ bool TypeChecker::validateArithmeticOperands(const DataType& left_type, const Da
 {
     // All arithmetic operations require numeric operands
     if (!isNumericType(left_type)) {
-        std::ostringstream oss;
-        oss << "Left operand of arithmetic operation must be numeric, got " << left_type.toString();
-        setError(oss.str());
+        setError(fmt::format("Left operand of arithmetic operation must be numeric, got {}", left_type.toString()));
         return false;
     }
 
     if (!isNumericType(right_type)) {
-        std::ostringstream oss;
-        oss << "Right operand of arithmetic operation must be numeric, got " << right_type.toString();
-        setError(oss.str());
+        setError(fmt::format("Right operand of arithmetic operation must be numeric, got {}", right_type.toString()));
         return false;
     }
 
@@ -279,9 +275,7 @@ bool TypeChecker::validateComparisonOperands(const DataType& left_type, const Da
         return true;
     }
 
-    std::ostringstream oss;
-    oss << "Cannot compare " << left_type.toString() << " with " << right_type.toString();
-    setError(oss.str());
+    setError(fmt::format("Cannot compare {} with {}", left_type.toString(), right_type.toString()));
     return false;
 }
 

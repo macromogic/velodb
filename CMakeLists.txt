@@ -77,18 +77,15 @@ add_custom_target(clean-all
     COMMENT "Cleaning project and all thirdparty libraries"
 )
 
-# Create imported library target
+# Dependencies
 add_library(sqlparser STATIC IMPORTED)
 set_target_properties(sqlparser PROPERTIES
     IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/libsqlparser.a
 )
 add_dependencies(sqlparser sql-parser)
-
-# Add argparse as subdirectory (header-only library)
 add_subdirectory(thirdparty/argparse)
-
-# Add backward-cpp
 add_subdirectory(thirdparty/backward-cpp)
+add_subdirectory(thirdparty/fmt)
 
 # Project source files
 add_subdirectory(src/common)
@@ -115,6 +112,7 @@ set(SOURCES
 # Create main executable
 add_executable(velodb ${SOURCES})
 add_dependencies(velodb sql-parser)
+add_dependencies(velodb fmt::fmt)
 
 # Include directories for sql-parser
 target_include_directories(velodb PRIVATE
@@ -126,6 +124,7 @@ target_link_libraries(velodb
     sqlparser
     argparse::argparse
     backward
+    fmt::fmt
 )
 
 # Set executable properties

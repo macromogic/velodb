@@ -1,6 +1,6 @@
 #include "catalog/column.hpp"
 #include "common/exception.hpp"
-#include <sstream>
+#include <fmt/core.h>
 
 namespace velodb {
 
@@ -24,18 +24,17 @@ ColumnInfo ColumnInfo::cloneImpl() const
 
 std::string ColumnInfo::toString() const
 {
-    std::stringstream ss;
-    ss << name_ << " " << type_->toString();
+    std::string result = fmt::format("{} {}", name_, type_->toString());
     if (!is_nullable_) {
-        ss << " NOT NULL";
+        result += " NOT NULL";
     }
     if (is_unique_) {
-        ss << " UNIQUE";
+        result += " UNIQUE";
     }
     if (is_primary_key_) {
-        ss << " PRIMARY KEY";
+        result += " PRIMARY KEY";
     }
-    return ss.str();
+    return result;
 }
 
 Column::Column(std::string name,
@@ -122,19 +121,18 @@ ViewColumn ValueColumn::viewAs(std::string alias) const
 
 std::string ValueColumn::toString() const
 {
-    std::stringstream ss;
-    ss << "ValueColumn(name=" << getName() << ", type=" << type_->toString() << ", size=" << size();
+    std::string result = fmt::format("ValueColumn(name={}, type={}, size={}", getName(), type_->toString(), size());
     if (!isNullable()) {
-        ss << ", not null";
+        result += ", not null";
     }
     if (isUnique()) {
-        ss << ", unique";
+        result += ", unique";
     }
     if (isPrimaryKey()) {
-        ss << ", primary key";
+        result += ", primary key";
     }
-    ss << ")";
-    return ss.str();
+    result += ")";
+    return result;
 }
 
 ViewColumn::ViewColumn(DataType& type, std::string name, const ValueVector& values)
@@ -302,18 +300,17 @@ ViewColumn ViewColumn::viewAs(std::string alias) const
 
 std::string ViewColumn::toString() const
 {
-    std::stringstream ss;
-    ss << "ViewColumn(name=" << getName() << ", type=" << type_.toString() << ", size=" << size();
+    std::string result = fmt::format("ViewColumn(name={}, type={}, size={}", getName(), type_.toString(), size());
 
-    std::visit([&ss](const auto& mode) {
+    std::visit([&result](const auto& mode) {
         using T = std::decay_t<decltype(mode)>;
 
         if constexpr (std::is_same_v<T, EntireView>) {
-            ss << ", view=ENTIRE";
+            result += ", view=ENTIRE";
         } else if constexpr (std::is_same_v<T, SliceView>) {
-            ss << ", view=SLICE[" << mode.start_row << ":" << mode.end_row << ")";
+            result += fmt::format(", view=SLICE[{}:{})", mode.start_row, mode.end_row);
         } else if constexpr (std::is_same_v<T, IndicesView>) {
-            ss << ", view=INDICES[" << mode.indices.size() << " indices]";
+            result += fmt::format(", view=INDICES[{} indices]", mode.indices.size());
         } else {
             static_assert(std::is_same_v<T, void>, "Unhandled view mode type");
         }
@@ -321,16 +318,16 @@ std::string ViewColumn::toString() const
         view_mode_);
 
     if (!isNullable()) {
-        ss << ", not null";
+        result += ", not null";
     }
     if (isUnique()) {
-        ss << ", unique";
+        result += ", unique";
     }
     if (isPrimaryKey()) {
-        ss << ", primary key";
+        result += ", primary key";
     }
-    ss << ")";
-    return ss.str();
+    result += ")";
+    return result;
 }
 
 } // namespace velodb

@@ -1,7 +1,7 @@
 #include "catalog/tuple.hpp"
 #include "catalog/table.hpp"
 #include "common/exception.hpp"
-#include <sstream>
+#include <fmt/core.h>
 
 namespace velodb {
 
@@ -39,15 +39,14 @@ const Value& ValueTuple::getValue(const std::string& column_name) const
 
 std::string ValueTuple::toString() const
 {
-    std::stringstream ss;
-    ss << "(";
+    std::string result = "(";
     for (size_t i = 0; i < values_.size(); ++i) {
         if (i > 0)
-            ss << ", ";
-        ss << values_[i].toString();
+            result += ", ";
+        result += values_[i].toString();
     }
-    ss << ")";
-    return ss.str();
+    result += ")";
+    return result;
 }
 
 ViewTuple::ViewTuple(const TableBase& table, uint64_t row_id)
@@ -82,15 +81,14 @@ size_t ViewTuple::getColumnCount() const
 
 std::string ViewTuple::toString() const
 {
-    std::stringstream ss;
-    ss << "(";
+    std::string result = "(";
     for (size_t i = 0; i < table_.getSchema().getColumnCount(); ++i) {
         if (i > 0)
-            ss << ", ";
-        ss << getValue(i).toString();
+            result += ", ";
+        result += getValue(i).toString();
     }
-    ss << ")";
-    return ss.str();
+    result += ")";
+    return result;
 }
 
 } // namespace velodb

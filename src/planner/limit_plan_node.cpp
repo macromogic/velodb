@@ -1,6 +1,5 @@
 #include "planner/limit_plan_node.hpp"
 #include "common/exception.hpp"
-#include <sstream>
 #include <stdexcept>
 
 namespace velodb {
@@ -21,13 +20,11 @@ std::unique_ptr<AbstractOperator> LimitPlanNode::createOperator([[maybe_unused]]
 
 std::string LimitPlanNode::toString() const
 {
-    std::stringstream ss;
-    ss << "Limit(" << limit_;
     if (offset_ > 0) {
-        ss << ", offset=" << offset_;
+        return fmt::format("Limit({}, offset={})", limit_, offset_);
+    } else {
+        return fmt::format("Limit({})", limit_);
     }
-    ss << ")";
-    return ss.str();
 }
 
 } // namespace velodb

@@ -8,6 +8,7 @@ target_link_libraries(test_planner
     ${ALL_OBJS}
     sqlparser
     backward
+    fmt::fmt
     GTest::GTest
     GTest::Main
     pthread

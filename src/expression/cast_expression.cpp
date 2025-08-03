@@ -5,7 +5,6 @@
 #include <cctype>
 #include <climits>
 #include <regex>
-#include <sstream>
 #include <stdexcept>
 
 namespace velodb {

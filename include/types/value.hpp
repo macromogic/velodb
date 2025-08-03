@@ -44,8 +44,11 @@ public:
     bool isNull() const { return is_null_; }
 
     bool getBoolean() const;
+    int8_t getTinyInt() const;
+    int16_t getSmallInt() const;
     int32_t getInteger() const;
     int64_t getBigInt() const;
+    float getFloat() const;
     double getDouble() const;
     std::string getString() const;
 
@@ -62,8 +65,11 @@ public:
 
     // Static factory methods
     static Value createBoolean(bool value);
+    static Value createTinyInt(int8_t value);
+    static Value createSmallInt(int16_t value);
     static Value createInteger(int32_t value);
     static Value createBigInt(int64_t value);
+    static Value createFloat(float value);
     static Value createDouble(double value);
     static Value createString(const std::string& value);
     static Value createNull(DataTypeId type_id);

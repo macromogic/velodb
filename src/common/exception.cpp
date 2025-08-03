@@ -51,15 +51,11 @@ void TracedException::capture_stack_trace(size_t trace_depth)
 
 void TracedException::format_full_message()
 {
-    std::ostringstream oss;
-    oss << message_;
-
     if (!stack_trace_.empty()) {
-        oss << "\n\n"
-            << stack_trace_;
+        full_message_ = fmt::format("{}\n\n{}", message_, stack_trace_);
+    } else {
+        full_message_ = message_;
     }
-
-    full_message_ = oss.str();
 }
 
 } // namespace velodb

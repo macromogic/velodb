@@ -1,6 +1,5 @@
 #include "catalog/schema.hpp"
 #include "common/exception.hpp"
-#include <sstream>
 #include <stdexcept>
 #include <utility>
 
@@ -60,15 +59,14 @@ std::unique_ptr<Schema> Schema::cloneUniqueImpl() const
 
 std::string Schema::toString() const
 {
-    std::stringstream ss;
-    ss << "(";
+    std::string result = "(";
     for (size_t i = 0; i < columns_.size(); ++i) {
         if (i > 0)
-            ss << ", ";
-        ss << columns_[i].toString();
+            result += ", ";
+        result += columns_[i].toString();
     }
-    ss << ")";
-    return ss.str();
+    result += ")";
+    return result;
 }
 
 } // namespace velodb
