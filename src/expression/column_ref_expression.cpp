@@ -1,6 +1,6 @@
-#include <utility>
-
 #include "expression/column_ref_expression.hpp"
+
+#include <utility>
 
 namespace velodb {
 

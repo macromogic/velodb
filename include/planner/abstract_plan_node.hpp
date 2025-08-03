@@ -4,6 +4,7 @@
 #include "catalog/schema.hpp"
 #include "common/copy_traits.hpp"
 #include "operator/operator.hpp"
+
 #include <memory>
 #include <string>
 #include <vector>

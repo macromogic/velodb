@@ -1,6 +1,7 @@
 #include "expression/expression.hpp"
 #include "types/data_type.hpp"
 #include "types/value.hpp"
+
 #include <gtest/gtest.h>
 
 using namespace velodb;
@@ -104,11 +105,9 @@ TEST_F(ExpressionTest, NestedExpressions)
     auto expr3 = std::make_unique<ConstantExpression>(val3);
     auto expr7 = std::make_unique<ConstantExpression>(val7);
 
-    auto add_expr = std::make_unique<ArithmeticExpression>(
-        ArithmeticType::PLUS, std::move(expr5), std::move(expr3));
+    auto add_expr = std::make_unique<ArithmeticExpression>(ArithmeticType::PLUS, std::move(expr5), std::move(expr3));
 
-    ComparisonExpression comp_expr(
-        ComparisonType::GREATER_THAN, std::move(add_expr), std::move(expr7));
+    ComparisonExpression comp_expr(ComparisonType::GREATER_THAN, std::move(add_expr), std::move(expr7));
 
     EXPECT_EQ(comp_expr.getReturnType().getTypeId(), DataTypeId::BOOLEAN);
 

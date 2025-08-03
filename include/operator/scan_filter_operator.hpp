@@ -3,6 +3,7 @@
 #include "catalog/table.hpp"
 #include "expression/expression.hpp"
 #include "operator/abstract_operator.hpp"
+
 #include <memory>
 
 namespace velodb {
@@ -13,7 +14,9 @@ class TableIterator;
 // Scan with filter operator
 class ScanFilterOperator : public UnaryOperator {
 public:
-    explicit ScanFilterOperator(Catalog& catalog, const TableBase& table, const std::unique_ptr<AbstractExpression>& predicate);
+    explicit ScanFilterOperator(Catalog& catalog,
+                                const TableBase& table,
+                                const std::unique_ptr<AbstractExpression>& predicate);
     ~ScanFilterOperator() override = default;
 
     Result<View> execute() const override;

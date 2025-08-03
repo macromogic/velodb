@@ -1,8 +1,11 @@
 #include "execution/execution_engine.hpp"
-#include "SQLParser.h"
+
 #include "common/exception.hpp"
 #include "operator/projection_operator.hpp"
+
+#include <SQLParser.h>
 #include <fmt/core.h>
+
 #include <stdexcept>
 
 namespace velodb {
@@ -71,7 +74,8 @@ std::unique_ptr<AbstractOperator> ExecutionEngine::createOperatorTree(const Abst
 std::string ExecutionStats::toString() const
 {
     return fmt::format("Execution Stats:\n  Rows processed: {}\n  Execution time: {} ms\n",
-        rows_processed_, execution_time_ms_);
+                       rows_processed_,
+                       execution_time_ms_);
 }
 
 } // namespace velodb

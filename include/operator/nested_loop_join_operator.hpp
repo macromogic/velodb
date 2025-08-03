@@ -2,6 +2,7 @@
 
 #include "operator/abstract_operator.hpp"
 #include "operator/join_type.hpp"
+
 #include <memory>
 #include <vector>
 
@@ -14,11 +15,11 @@ class AbstractExpression;
 class NestedLoopJoinOperator : public BinaryOperator {
 public:
     NestedLoopJoinOperator(Catalog& catalog,
-        std::unique_ptr<Schema> output_schema,
-        std::unique_ptr<AbstractOperator> left_child,
-        std::unique_ptr<AbstractOperator> right_child,
-        std::unique_ptr<AbstractExpression> join_predicate,
-        JoinType join_type = JoinType::INNER);
+                           std::unique_ptr<Schema> output_schema,
+                           std::unique_ptr<AbstractOperator> left_child,
+                           std::unique_ptr<AbstractOperator> right_child,
+                           std::unique_ptr<AbstractExpression> join_predicate,
+                           JoinType join_type = JoinType::INNER);
     ~NestedLoopJoinOperator() override = default;
 
     Result<View> execute() const override;

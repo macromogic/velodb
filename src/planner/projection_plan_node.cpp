@@ -1,14 +1,16 @@
 #include "planner/projection_plan_node.hpp"
+
 #include "common/exception.hpp"
 #include "operator/projection_operator.hpp"
 #include "planner/execution_context.hpp"
+
 #include <stdexcept>
 
 namespace velodb {
 
 // ProjectionPlanNode implementation
 ProjectionPlanNode::ProjectionPlanNode(std::unique_ptr<Schema> output_schema,
-    std::vector<std::unique_ptr<AbstractExpression>> expressions)
+                                       std::vector<std::unique_ptr<AbstractExpression>> expressions)
     : AbstractPlanNode(PlanType::PROJECTION, std::move(output_schema))
     , expressions_(std::move(expressions))
 {
@@ -23,7 +25,10 @@ std::unique_ptr<AbstractOperator> ProjectionPlanNode::createOperator(ExecutionCo
 
     auto child_operator = children_[0]->createOperator(context);
 
-    return std::make_unique<ProjectionOperator>(context.getCatalog(), output_schema_->cloneUnique(), std::move(child_operator), std::move(expressions_));
+    return std::make_unique<ProjectionOperator>(context.getCatalog(),
+                                                output_schema_->cloneUnique(),
+                                                std::move(child_operator),
+                                                std::move(expressions_));
 }
 
 std::string ProjectionPlanNode::toString() const

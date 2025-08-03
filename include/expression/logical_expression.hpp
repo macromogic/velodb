@@ -1,6 +1,7 @@
 #pragma once
 
 #include "expression.hpp"
+
 #include <vector>
 
 namespace velodb {
@@ -9,8 +10,8 @@ namespace velodb {
 class BinaryLogicalExpression : public AbstractExpression {
 public:
     BinaryLogicalExpression(ConnectiveType connective_type,
-        std::unique_ptr<AbstractExpression> left,
-        std::unique_ptr<AbstractExpression> right);
+                            std::unique_ptr<AbstractExpression> left,
+                            std::unique_ptr<AbstractExpression> right);
     ~BinaryLogicalExpression() override = default;
 
     Value evaluate(const Tuple& tuple, const Schema& schema) const override;

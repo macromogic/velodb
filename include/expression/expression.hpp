@@ -4,6 +4,7 @@
 #include "catalog/table.hpp"
 #include "common/copy_traits.hpp"
 #include "types/value.hpp"
+
 #include <memory>
 #include <string>
 #include <vector>

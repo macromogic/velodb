@@ -1,6 +1,7 @@
 #pragma once
 
 #include "operator/abstract_operator.hpp"
+
 #include <memory>
 
 namespace velodb {
@@ -9,10 +10,10 @@ namespace velodb {
 class LimitOperator : public UnaryOperator {
 public:
     LimitOperator(Catalog& catalog,
-        std::unique_ptr<Schema> output_schema,
-        std::unique_ptr<AbstractOperator> child,
-        size_t limit,
-        size_t offset = 0);
+                  std::unique_ptr<Schema> output_schema,
+                  std::unique_ptr<AbstractOperator> child,
+                  size_t limit,
+                  size_t offset = 0);
     ~LimitOperator() override = default;
 
     Result<View> execute() const override;

@@ -1,13 +1,15 @@
 #include "expression/function_call_expression.hpp"
+
 #include "common/exception.hpp"
+
 #include <stdexcept>
 #include <utility>
 
 namespace velodb {
 
 FunctionCallExpression::FunctionCallExpression(std::string function_name,
-    std::vector<std::unique_ptr<AbstractExpression>> arguments,
-    std::unique_ptr<DataType> return_type)
+                                               std::vector<std::unique_ptr<AbstractExpression>> arguments,
+                                               std::unique_ptr<DataType> return_type)
     : AbstractExpression(ExpressionType::FUNCTION_CALL, std::move(return_type))
     , function_name_(std::move(function_name))
     , arguments_(std::move(arguments))

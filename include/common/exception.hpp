@@ -1,11 +1,11 @@
 #pragma once
 
+#include <backward.hpp>
+#include <fmt/core.h>
+
 #include <exception>
 #include <memory>
 #include <string>
-
-#include "backward.hpp"
-#include "fmt/core.h"
 
 namespace velodb {
 
@@ -96,7 +96,5 @@ public:
 
 } // namespace velodb
 
-#define VELODB_THROW(ExceptionType, message) \
-    throw ExceptionType(message)
-#define VELODB_THROW_DEPTH(ExceptionType, message, depth) \
-    throw ExceptionType(message, depth)
+#define VELODB_THROW(ExceptionType, message) throw ExceptionType(message)
+#define VELODB_THROW_DEPTH(ExceptionType, message, depth) throw ExceptionType(message, depth)

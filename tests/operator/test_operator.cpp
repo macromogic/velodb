@@ -4,6 +4,7 @@
 #include "operator/compaction_operator.hpp"
 #include "operator/scan_filter_operator.hpp"
 #include "types/data_type.hpp"
+
 #include <gtest/gtest.h>
 
 using namespace velodb;
@@ -60,12 +61,15 @@ TEST_F(OperatorTest, ScanFilterOperatorWithPredicate)
     auto int_type = std::make_unique<IntegerType>();
     auto col_expr = std::make_unique<ColumnRefExpression>("id", std::move(int_type));
 
-    std::unique_ptr<AbstractExpression> predicate = std::make_unique<ComparisonExpression>(
-        ComparisonType::EQUAL, std::move(col_expr), std::move(const_expr));
+    std::unique_ptr<AbstractExpression> predicate = std::make_unique<ComparisonExpression>(ComparisonType::EQUAL,
+                                                                                           std::move(col_expr),
+                                                                                           std::move(const_expr));
 
     auto& test_table = catalog_->getTable("test_table").value().get();
     auto scan_op = std::make_unique<ScanFilterOperator>(*catalog_, test_table, std::move(predicate));
-    auto compaction_op = std::make_unique<CompactionOperator>(*catalog_, scan_op->getOutputSchema().cloneUnique(), std::move(scan_op));
+    auto compaction_op = std::make_unique<CompactionOperator>(*catalog_,
+                                                              scan_op->getOutputSchema().cloneUnique(),
+                                                              std::move(scan_op));
 
     auto view_result = compaction_op->execute();
     EXPECT_TRUE(view_result.ok());
@@ -79,7 +83,8 @@ TEST_F(OperatorTest, ScanFilterOperatorWithPredicate)
     }
 }
 
-// TODO: Add more comprehensive operator tests when additional operators are implemented
+// TODO: Add more comprehensive operator tests when additional operators are
+// implemented
 // - ProjectionOperator tests
 // - FilterOperator tests
 // - JoinOperator tests

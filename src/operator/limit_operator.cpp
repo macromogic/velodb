@@ -4,10 +4,10 @@ namespace velodb {
 
 // LimitOperator implementation
 LimitOperator::LimitOperator(Catalog& catalog,
-    std::unique_ptr<Schema> output_schema,
-    std::unique_ptr<AbstractOperator> child,
-    size_t limit,
-    size_t offset)
+                             std::unique_ptr<Schema> output_schema,
+                             std::unique_ptr<AbstractOperator> child,
+                             size_t limit,
+                             size_t offset)
     : UnaryOperator(catalog, std::move(output_schema), std::move(child))
     , limit_(limit)
     , offset_(offset)

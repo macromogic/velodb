@@ -1,9 +1,12 @@
 #include "catalog/mock_catalog_builder.hpp"
-#include "SQLParser.h"
+
 #include "catalog/column.hpp"
 #include "types/data_type.hpp"
-#include <algorithm>
+
+#include <SQLParser.h>
 #include <fmt/core.h>
+
+#include <algorithm>
 #include <memory>
 #include <regex>
 
@@ -181,17 +184,15 @@ bool MockCatalogBuilder::ensureTablesForQuery(Catalog& catalog, const std::strin
 }
 
 void MockCatalogBuilder::createDynamicTable(Catalog& catalog,
-    const std::string& table_name,
-    const std::vector<std::string>& column_names,
-    const std::map<std::string, DataTypeId>& inferred_types)
+                                            const std::string& table_name,
+                                            const std::vector<std::string>& column_names,
+                                            const std::map<std::string, DataTypeId>& inferred_types)
 {
     auto schema = createDynamicSchema(table_name, column_names, inferred_types);
     catalog.createTable(table_name, std::move(schema));
 }
 
-void MockCatalogBuilder::createGenericTable(Catalog& catalog,
-    const std::string& table_name,
-    size_t column_count)
+void MockCatalogBuilder::createGenericTable(Catalog& catalog, const std::string& table_name, size_t column_count)
 {
     auto schema = createGenericSchema(table_name, column_count);
     catalog.createTable(table_name, std::move(schema));
@@ -225,7 +226,8 @@ std::set<std::string> MockCatalogBuilder::extractTableNames(const std::string& s
     return table_names;
 }
 
-void MockCatalogBuilder::extractTableNamesFromTableRef(const hsql::TableRef* table_ref, std::set<std::string>& table_names)
+void MockCatalogBuilder::extractTableNamesFromTableRef(const hsql::TableRef* table_ref,
+                                                       std::set<std::string>& table_names)
 {
     if (!table_ref)
         return;
@@ -401,8 +403,8 @@ std::unique_ptr<Schema> MockCatalogBuilder::createGenericSchema(const std::strin
 }
 
 std::unique_ptr<Schema> MockCatalogBuilder::createDynamicSchema(const std::string& table_name,
-    const std::vector<std::string>& column_names,
-    const std::map<std::string, DataTypeId>& inferred_types)
+                                                                const std::vector<std::string>& column_names,
+                                                                const std::map<std::string, DataTypeId>& inferred_types)
 {
     auto schema = std::make_unique<Schema>();
 
@@ -434,42 +436,27 @@ std::unique_ptr<Schema> MockCatalogBuilder::createDynamicSchema(const std::strin
 std::map<std::string, DataTypeId> MockCatalogBuilder::getDefaultColumnTypes()
 {
     return {
-        { "id", DataTypeId::INTEGER },
-        { "_id", DataTypeId::INTEGER },
-        { "count", DataTypeId::INTEGER },
-        { "num", DataTypeId::INTEGER },
-        { "quantity", DataTypeId::INTEGER },
-        { "age", DataTypeId::INTEGER },
-        { "year", DataTypeId::INTEGER },
-        { "month", DataTypeId::INTEGER },
+        { "id", DataTypeId::INTEGER },          { "_id", DataTypeId::INTEGER },
+        { "count", DataTypeId::INTEGER },       { "num", DataTypeId::INTEGER },
+        { "quantity", DataTypeId::INTEGER },    { "age", DataTypeId::INTEGER },
+        { "year", DataTypeId::INTEGER },        { "month", DataTypeId::INTEGER },
         { "day", DataTypeId::INTEGER },
 
-        { "price", DataTypeId::DOUBLE },
-        { "cost", DataTypeId::DOUBLE },
-        { "total", DataTypeId::DOUBLE },
-        { "amount", DataTypeId::DOUBLE },
-        { "salary", DataTypeId::DOUBLE },
-        { "weight", DataTypeId::DOUBLE },
-        { "height", DataTypeId::DOUBLE },
-        { "rate", DataTypeId::DOUBLE },
+        { "price", DataTypeId::DOUBLE },        { "cost", DataTypeId::DOUBLE },
+        { "total", DataTypeId::DOUBLE },        { "amount", DataTypeId::DOUBLE },
+        { "salary", DataTypeId::DOUBLE },       { "weight", DataTypeId::DOUBLE },
+        { "height", DataTypeId::DOUBLE },       { "rate", DataTypeId::DOUBLE },
         { "percentage", DataTypeId::DOUBLE },
 
-        { "active", DataTypeId::BOOLEAN },
-        { "enabled", DataTypeId::BOOLEAN },
-        { "deleted", DataTypeId::BOOLEAN },
-        { "visible", DataTypeId::BOOLEAN },
+        { "active", DataTypeId::BOOLEAN },      { "enabled", DataTypeId::BOOLEAN },
+        { "deleted", DataTypeId::BOOLEAN },     { "visible", DataTypeId::BOOLEAN },
         { "public", DataTypeId::BOOLEAN },
 
-        { "name", DataTypeId::VARCHAR },
-        { "email", DataTypeId::VARCHAR },
-        { "address", DataTypeId::VARCHAR },
-        { "phone", DataTypeId::VARCHAR },
-        { "description", DataTypeId::VARCHAR },
-        { "title", DataTypeId::VARCHAR },
-        { "category", DataTypeId::VARCHAR },
-        { "status", DataTypeId::VARCHAR },
-        { "type", DataTypeId::VARCHAR },
-        { "code", DataTypeId::VARCHAR },
+        { "name", DataTypeId::VARCHAR },        { "email", DataTypeId::VARCHAR },
+        { "address", DataTypeId::VARCHAR },     { "phone", DataTypeId::VARCHAR },
+        { "description", DataTypeId::VARCHAR }, { "title", DataTypeId::VARCHAR },
+        { "category", DataTypeId::VARCHAR },    { "status", DataTypeId::VARCHAR },
+        { "type", DataTypeId::VARCHAR },        { "code", DataTypeId::VARCHAR },
         { "date", DataTypeId::VARCHAR }, // Simplified as string
         { "time", DataTypeId::VARCHAR }, // Simplified as string
         { "timestamp", DataTypeId::VARCHAR } // Simplified as string
@@ -478,13 +465,39 @@ std::map<std::string, DataTypeId> MockCatalogBuilder::getDefaultColumnTypes()
 
 std::map<std::string, std::vector<std::pair<std::string, DataTypeId>>> MockCatalogBuilder::getCommonTableSchemas()
 {
-    return {
-        { "users", { { "id", DataTypeId::INTEGER }, { "name", DataTypeId::VARCHAR }, { "email", DataTypeId::VARCHAR }, { "age", DataTypeId::INTEGER }, { "created_at", DataTypeId::VARCHAR } } },
-        { "orders", { { "order_id", DataTypeId::INTEGER }, { "user_id", DataTypeId::INTEGER }, { "product_id", DataTypeId::INTEGER }, { "quantity", DataTypeId::INTEGER }, { "price", DataTypeId::DOUBLE }, { "total", DataTypeId::DOUBLE }, { "order_date", DataTypeId::VARCHAR } } },
-        { "products", { { "product_id", DataTypeId::INTEGER }, { "name", DataTypeId::VARCHAR }, { "description", DataTypeId::VARCHAR }, { "price", DataTypeId::DOUBLE }, { "stock_quantity", DataTypeId::INTEGER }, { "category", DataTypeId::VARCHAR } } },
-        { "customers", { { "customer_id", DataTypeId::INTEGER }, { "name", DataTypeId::VARCHAR }, { "email", DataTypeId::VARCHAR }, { "phone", DataTypeId::VARCHAR }, { "address", DataTypeId::VARCHAR } } },
-        { "employees", { { "employee_id", DataTypeId::INTEGER }, { "name", DataTypeId::VARCHAR }, { "department", DataTypeId::VARCHAR }, { "salary", DataTypeId::DOUBLE }, { "hire_date", DataTypeId::VARCHAR } } }
-    };
+    return { { "users",
+               { { "id", DataTypeId::INTEGER },
+                 { "name", DataTypeId::VARCHAR },
+                 { "email", DataTypeId::VARCHAR },
+                 { "age", DataTypeId::INTEGER },
+                 { "created_at", DataTypeId::VARCHAR } } },
+             { "orders",
+               { { "order_id", DataTypeId::INTEGER },
+                 { "user_id", DataTypeId::INTEGER },
+                 { "product_id", DataTypeId::INTEGER },
+                 { "quantity", DataTypeId::INTEGER },
+                 { "price", DataTypeId::DOUBLE },
+                 { "total", DataTypeId::DOUBLE },
+                 { "order_date", DataTypeId::VARCHAR } } },
+             { "products",
+               { { "product_id", DataTypeId::INTEGER },
+                 { "name", DataTypeId::VARCHAR },
+                 { "description", DataTypeId::VARCHAR },
+                 { "price", DataTypeId::DOUBLE },
+                 { "stock_quantity", DataTypeId::INTEGER },
+                 { "category", DataTypeId::VARCHAR } } },
+             { "customers",
+               { { "customer_id", DataTypeId::INTEGER },
+                 { "name", DataTypeId::VARCHAR },
+                 { "email", DataTypeId::VARCHAR },
+                 { "phone", DataTypeId::VARCHAR },
+                 { "address", DataTypeId::VARCHAR } } },
+             { "employees",
+               { { "employee_id", DataTypeId::INTEGER },
+                 { "name", DataTypeId::VARCHAR },
+                 { "department", DataTypeId::VARCHAR },
+                 { "salary", DataTypeId::DOUBLE },
+                 { "hire_date", DataTypeId::VARCHAR } } } };
 }
 
 void MockCatalogBuilder::createTableFromCommonSchema(Catalog& catalog, const std::string& table_name)

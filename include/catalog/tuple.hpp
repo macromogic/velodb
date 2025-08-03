@@ -1,6 +1,7 @@
 #pragma once
 
 #include "schema.hpp"
+
 #include "types/value.hpp"
 
 namespace velodb {

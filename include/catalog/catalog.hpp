@@ -2,6 +2,7 @@
 
 #include "schema.hpp"
 #include "table.hpp"
+
 #include <memory>
 #include <optional>
 #include <string>
@@ -43,7 +44,7 @@ public:
 
 private:
     std::unordered_map<std::string, std::unique_ptr<Table>> tables_;
-    std::vector<std::unique_ptr<ValueColumn>> temporary_columns_; // For temporary storage during operations
+    std::vector<std::unique_ptr<ValueColumn>> temporary_columns_;
 };
 
 // Catalog builder for easy setup

@@ -8,8 +8,8 @@ namespace velodb {
 class ComparisonExpression : public AbstractExpression {
 public:
     ComparisonExpression(ComparisonType comp_type,
-        std::unique_ptr<AbstractExpression> left,
-        std::unique_ptr<AbstractExpression> right);
+                         std::unique_ptr<AbstractExpression> left,
+                         std::unique_ptr<AbstractExpression> right);
     ~ComparisonExpression() override = default;
 
     Value evaluate(const Tuple& tuple, const Schema& schema) const override;

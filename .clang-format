@@ -1,2 +1,49 @@
 BasedOnStyle: WebKit
 IndentWidth: 4
+
+# Include formatting
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"[^/]*\.hpp"$'
+    Priority: 1
+  - Regex: '^".*\.hpp"$'
+    Priority: 2
+  - Regex: '^<(argparse/.*|fmt/.*|backward.*|SQLParser\.h|util/sqlhelper\.h)>$'
+    Priority: 3
+  - Regex: '^<gtest/.*>$'
+    Priority: 4
+  - Regex: '^<[a-z_]+>$'
+    Priority: 5
+  - Regex: '^<.*>$'
+    Priority: 6
+
+# Code formatting
+ColumnLimit: 120
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+PointerAlignment: Left
+ReferenceAlignment: Left
+BinPackArguments: false
+BinPackParameters: false
+AlignAfterOpenBracket: Align
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllArgumentsOnNextLine: false
+PackConstructorInitializers: Never
+
+# Template formatting
+AlwaysBreakTemplateDeclarations: Yes
+
+# Enum and brace formatting
+AllowShortEnumsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+
+# Function parameter breaking preferences
+PenaltyReturnTypeOnItsOwnLine: 1000
+PenaltyBreakBeforeFirstCallParameter: 10
+PenaltyBreakAssignment: 100
+PenaltyBreakComment: 300
+PenaltyBreakString: 1000
+AlwaysBreakAfterReturnType: None
+AlwaysBreakAfterDefinitionReturnType: None

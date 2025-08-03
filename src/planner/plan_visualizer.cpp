@@ -1,4 +1,5 @@
 #include "planner/plan_visualizer.hpp"
+
 #include <iomanip>
 #include <map>
 #include <ostream>
@@ -14,12 +15,13 @@ std::string PlanVisualizer::visualizeAsText(const std::unique_ptr<AbstractPlanNo
 }
 
 std::string PlanVisualizer::visualizeAsGraphviz(const std::unique_ptr<AbstractPlanNode>& plan_node,
-    const std::string& graph_name)
+                                                const std::string& graph_name)
 {
     std::string result;
     result += "digraph " + graph_name + " {\n";
     result += "  rankdir=TB;\n";
-    result += "  node [shape=box, style=filled, fontname=\"Arial\", fontsize=10];\n";
+    result += "  node [shape=box, style=filled, fontname=\"Arial\", "
+              "fontsize=10];\n";
     result += "  edge [fontname=\"Arial\", fontsize=8];\n\n";
 
     int node_counter = 0;
@@ -38,8 +40,8 @@ std::string PlanVisualizer::visualizeDetailed(const std::unique_ptr<AbstractPlan
 }
 
 void PlanVisualizer::printPlan(const std::unique_ptr<AbstractPlanNode>& plan_node,
-    std::ostream& out,
-    OutputFormat format)
+                               std::ostream& out,
+                               OutputFormat format)
 {
     switch (format) {
     case OutputFormat::TEXT_TREE:
@@ -56,7 +58,8 @@ void PlanVisualizer::printPlan(const std::unique_ptr<AbstractPlanNode>& plan_nod
 
 // Private helper methods
 void PlanVisualizer::visualizeTextRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-    std::string& result, int indent)
+                                            std::string& result,
+                                            int indent)
 {
     if (!plan_node) {
         return;
@@ -87,7 +90,8 @@ void PlanVisualizer::visualizeTextRecursive(const std::unique_ptr<AbstractPlanNo
 }
 
 void PlanVisualizer::visualizeGraphvizRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-    std::string& result, int& node_counter)
+                                                std::string& result,
+                                                int& node_counter)
 {
     if (!plan_node) {
         return;
@@ -114,7 +118,8 @@ void PlanVisualizer::visualizeGraphvizRecursive(const std::unique_ptr<AbstractPl
 }
 
 void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-    std::string& result, int level)
+                                                std::string& result,
+                                                int level)
 {
     if (!plan_node) {
         return;
@@ -135,7 +140,8 @@ void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPl
 
     for (size_t i = 0; i < schema.getColumnCount(); ++i) {
         const auto& column = schema.getColumnInfo(i);
-        result += prefix + "    [" + std::to_string(i) + "] " + column.getName() + " (" + column.getType().toString() + ")\n";
+        result += prefix + "    [" + std::to_string(i) + "] " + column.getName() + " (" + column.getType().toString()
+            + ")\n";
     }
 
     // Children info

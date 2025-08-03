@@ -1,9 +1,12 @@
-#include "SQLParser.h"
 #include "catalog/mock_catalog_builder.hpp"
 #include "planner/plan_visualizer.hpp"
 #include "planner/query_planner.hpp"
-#include <fstream>
+
+#include <SQLParser.h>
+
 #include <gtest/gtest.h>
+
+#include <fstream>
 #include <iostream>
 
 using namespace velodb;
@@ -157,7 +160,9 @@ TEST_F(PlanVisualizationTest, GraphvizVisualizationComplexQuery)
     if (dot_file.is_open()) {
         dot_file << graphviz_output;
         dot_file.close();
-        std::cout << "DOT file saved as 'complex_query.dot' - use 'dot -Tpng complex_query.dot -o complex_query.png' to generate image\n";
+        std::cout << "DOT file saved as 'complex_query.dot' - use 'dot -Tpng "
+                     "complex_query.dot -o complex_query.png' "
+                     "to generate image\n";
     }
 }
 
@@ -259,7 +264,8 @@ TEST_F(PlanVisualizationTest, VisualizeDifferentTables)
 
 // TODO: Add tests for more complex queries when JOIN support is implemented
 // TEST_F(PlanVisualizationTest, VisualizeJoinQuery) {
-//     std::string sql = "SELECT u.name, o.order_date FROM users u JOIN orders o ON u.id = o.user_id";
+//     std::string sql = "SELECT u.name, o.order_date FROM users u JOIN orders o
+//     ON u.id = o.user_id";
 //     // Implementation pending JOIN support
 // }
 

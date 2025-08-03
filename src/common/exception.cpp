@@ -1,4 +1,5 @@
 #include "common/exception.hpp"
+
 #include <sstream>
 
 namespace velodb {

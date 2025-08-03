@@ -1,4 +1,5 @@
 #include "types/data_type.hpp"
+
 #include <gtest/gtest.h>
 
 using namespace velodb;

@@ -8,8 +8,8 @@ namespace velodb {
 class ArithmeticExpression : public AbstractExpression {
 public:
     ArithmeticExpression(ArithmeticType arith_type,
-        std::unique_ptr<AbstractExpression> left,
-        std::unique_ptr<AbstractExpression> right);
+                         std::unique_ptr<AbstractExpression> left,
+                         std::unique_ptr<AbstractExpression> right);
     ~ArithmeticExpression() override = default;
 
     Value evaluate(const Tuple& tuple, const Schema& schema) const override;

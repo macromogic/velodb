@@ -1,5 +1,7 @@
 #include "catalog/schema.hpp"
+
 #include "common/exception.hpp"
+
 #include <stdexcept>
 #include <utility>
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "expression.hpp"
+
 #include <string>
 #include <vector>
 
@@ -10,8 +11,8 @@ namespace velodb {
 class FunctionCallExpression : public AbstractExpression {
 public:
     FunctionCallExpression(std::string function_name,
-        std::vector<std::unique_ptr<AbstractExpression>> arguments,
-        std::unique_ptr<DataType> return_type);
+                           std::vector<std::unique_ptr<AbstractExpression>> arguments,
+                           std::unique_ptr<DataType> return_type);
     ~FunctionCallExpression() override = default;
 
     Value evaluate(const Tuple& tuple, const Schema& schema) const override;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "planner/abstract_plan_node.hpp"
+
 #include <memory>
 #include <string>
 

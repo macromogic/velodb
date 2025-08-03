@@ -1,7 +1,10 @@
 #include "catalog/table.hpp"
+
 #include "catalog/column.hpp"
 #include "common/exception.hpp"
+
 #include <fmt/core.h>
+
 #include <stdexcept>
 #include <utility>
 
@@ -109,7 +112,8 @@ View Table::view() const
     for (const auto& column : columns_) {
         columns.emplace_back(column.view());
     }
-    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()), std::move(columns));
+    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
+                std::move(columns));
 }
 
 View Table::viewAs(std::string alias) const
@@ -119,7 +123,8 @@ View Table::viewAs(std::string alias) const
     for (const auto& column : columns_) {
         columns.emplace_back(column.view());
     }
-    return View(std::make_unique<TableInfo>(std::move(alias), table_info_->getSchema().cloneUnique()), std::move(columns));
+    return View(std::make_unique<TableInfo>(std::move(alias), table_info_->getSchema().cloneUnique()),
+                std::move(columns));
 }
 
 void Table::insertRow(std::vector<Value>&& values)
@@ -153,9 +158,8 @@ View Table::slice(size_t start_row, size_t end_row) const
         sliced_columns.emplace_back(column.getType(), column.getName(), column.getValues(), start_row, end_row);
     }
 
-    return View(
-        std::make_unique<TableInfo>(table_info_->getName() + "_slice", table_info_->getSchema().cloneUnique()),
-        std::move(sliced_columns));
+    return View(std::make_unique<TableInfo>(table_info_->getName() + "_slice", table_info_->getSchema().cloneUnique()),
+                std::move(sliced_columns));
 }
 
 View Table::indices(const std::vector<size_t>& indices) const
@@ -227,7 +231,8 @@ View::View(std::unique_ptr<TableInfo> table_info, std::vector<ViewColumn> column
     , columns_(std::move(columns))
     , row_count_(0)
 {
-    // Determine row count from the first column (all columns should have same size)
+    // Determine row count from the first column (all columns should have same
+    // size)
     if (!columns_.empty()) {
         row_count_ = columns_[0].size();
 
@@ -294,10 +299,8 @@ View View::view() const
     for (const auto& column : columns_) {
         columns.push_back(column.view());
     }
-    return {
-        std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
-        std::move(columns)
-    };
+    return { std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
+             std::move(columns) };
 }
 
 View View::viewAs(std::string alias) const
@@ -307,7 +310,8 @@ View View::viewAs(std::string alias) const
     for (const auto& column : columns_) {
         columns.push_back(column.view());
     }
-    return View(std::make_unique<TableInfo>(std::move(alias), table_info_->getSchema().cloneUnique()), std::move(columns));
+    return View(std::make_unique<TableInfo>(std::move(alias), table_info_->getSchema().cloneUnique()),
+                std::move(columns));
 }
 
 View View::slice(size_t start_row, size_t end_row) const
@@ -323,9 +327,8 @@ View View::slice(size_t start_row, size_t end_row) const
         sliced_columns.emplace_back(column.slice(start_row, end_row));
     }
 
-    return View(
-        std::make_unique<TableInfo>(table_info_->getName() + "_slice", table_info_->getSchema().cloneUnique()),
-        std::move(sliced_columns));
+    return View(std::make_unique<TableInfo>(table_info_->getName() + "_slice", table_info_->getSchema().cloneUnique()),
+                std::move(sliced_columns));
 }
 
 View View::indices(const std::vector<size_t>& indices) const

@@ -1,8 +1,11 @@
+#include "velodb.hpp"
+
 #include "catalog/mock_catalog_builder.hpp"
 #include "common/exception.hpp"
 #include "planner/plan_visualizer.hpp"
-#include "velodb.hpp"
+
 #include <argparse/argparse.hpp>
+
 #include <iostream>
 #include <memory>
 
@@ -13,12 +16,9 @@ int main(int argc, char* argv[])
     // Simple test version with mock catalog support
     argparse::ArgumentParser program("velodb", VERSION_STRING);
 
-    program.add_argument("query")
-        .help("SQL query to execute");
+    program.add_argument("query").help("SQL query to execute");
 
-    program.add_argument("--mock-catalog")
-        .help("Use mock catalog with adaptive table creation")
-        .flag();
+    program.add_argument("--mock-catalog").help("Use mock catalog with adaptive table creation").flag();
 
     program.add_argument("--plan-format")
         .help("Format for query plan visualization {text,graphviz,detailed}")
@@ -26,9 +26,7 @@ int main(int argc, char* argv[])
         .nargs(1)
         .choices("text", "graphviz", "detailed");
 
-    program.add_argument("--verbose")
-        .help("Enable verbose output")
-        .flag();
+    program.add_argument("--verbose").help("Enable verbose output").flag();
 
     try {
         program.parse_args(argc, argv);
@@ -92,7 +90,6 @@ int main(int argc, char* argv[])
                 } else if (format == "detailed") {
                     std::cout << PlanVisualizer::visualizeDetailed(plan) << std::endl;
                 }
-
             } catch (const TracedException& e) {
                 std::cerr << "VeloDB Error: " << e.message() << std::endl;
                 if (program["--verbose"] == true) {

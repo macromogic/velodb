@@ -6,6 +6,7 @@
 #include "common/copy_traits.hpp"
 #include "common/exception.hpp"
 #include "common/result.hpp"
+
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -34,7 +35,9 @@ protected:
 
 class UnaryOperator : public AbstractOperator {
 public:
-    explicit UnaryOperator(Catalog& catalog, std::unique_ptr<Schema> output_schema, std::unique_ptr<AbstractOperator> child);
+    explicit UnaryOperator(Catalog& catalog,
+                           std::unique_ptr<Schema> output_schema,
+                           std::unique_ptr<AbstractOperator> child);
 
     bool isUnary() const override { return true; }
 
@@ -47,9 +50,9 @@ private:
 class BinaryOperator : public AbstractOperator {
 public:
     BinaryOperator(Catalog& catalog,
-        std::unique_ptr<Schema> output_schema,
-        std::unique_ptr<AbstractOperator> left_child,
-        std::unique_ptr<AbstractOperator> right_child);
+                   std::unique_ptr<Schema> output_schema,
+                   std::unique_ptr<AbstractOperator> left_child,
+                   std::unique_ptr<AbstractOperator> right_child);
 
     bool isUnary() const override { return false; }
 

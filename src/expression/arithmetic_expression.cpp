@@ -1,16 +1,18 @@
 #include "expression/arithmetic_expression.hpp"
+
 #include "common/exception.hpp"
 #include "types/type_checker.hpp"
+
 #include <algorithm>
 #include <stdexcept>
 
 namespace velodb {
 
 ArithmeticExpression::ArithmeticExpression(ArithmeticType arith_type,
-    std::unique_ptr<AbstractExpression> left,
-    std::unique_ptr<AbstractExpression> right)
+                                           std::unique_ptr<AbstractExpression> left,
+                                           std::unique_ptr<AbstractExpression> right)
     : AbstractExpression(ExpressionType::ARITHMETIC,
-          g_type_checker.deduceArithmeticType(left->getReturnType(), right->getReturnType(), arith_type))
+                         g_type_checker.deduceArithmeticType(left->getReturnType(), right->getReturnType(), arith_type))
     , arith_type_(arith_type)
     , left_(std::move(left))
     , right_(std::move(right))
@@ -84,10 +86,9 @@ Value ArithmeticExpression::computeArithmetic(const Value& left_val, const Value
     DataTypeId right_type = right_val.getTypeId();
 
     // Determine result type using type checker
-    auto result_type = g_type_checker.deduceArithmeticType(
-        *DataType::createType(left_type),
-        *DataType::createType(right_type),
-        op_type);
+    auto result_type = g_type_checker.deduceArithmeticType(*DataType::createType(left_type),
+                                                           *DataType::createType(right_type),
+                                                           op_type);
 
     if (!result_type) {
         VELODB_THROW(TypeError, "Invalid arithmetic operation");

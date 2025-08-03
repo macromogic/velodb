@@ -1,8 +1,11 @@
-#include "SQLParser.h"
 #include "catalog/mock_catalog_builder.hpp"
 #include "planner/plan_visualizer.hpp"
 #include "planner/query_planner.hpp"
+
+#include <SQLParser.h>
+
 #include <gtest/gtest.h>
+
 #include <iostream>
 #include <vector>
 
@@ -53,7 +56,6 @@ protected:
 
                     // Test that the plan is valid
                     EXPECT_NE(plan->getPlanType(), PlanType::INVALID);
-
                 } catch (const std::exception& e) {
                     FAIL() << "Exception during planning: " << e.what();
                 }
@@ -69,17 +71,11 @@ protected:
 TEST_F(AdaptiveCatalogTest, BasicSelectQueries)
 {
     // Test various SELECT queries on different tables
-    std::vector<std::string> queries = {
-        "SELECT * FROM users",
-        "SELECT * FROM orders",
-        "SELECT * FROM products",
-        "SELECT * FROM customers",
-        "SELECT * FROM employees",
-        "SELECT * FROM any_table_name",
-        "SELECT * FROM foo",
-        "SELECT * FROM bar",
-        "SELECT * FROM test_table"
-    };
+    std::vector<std::string> queries = { "SELECT * FROM users",     "SELECT * FROM orders",
+                                         "SELECT * FROM products",  "SELECT * FROM customers",
+                                         "SELECT * FROM employees", "SELECT * FROM any_table_name",
+                                         "SELECT * FROM foo",       "SELECT * FROM bar",
+                                         "SELECT * FROM test_table" };
 
     for (const auto& query : queries) {
         testQueryVisualization(query);
@@ -88,15 +84,13 @@ TEST_F(AdaptiveCatalogTest, BasicSelectQueries)
 
 TEST_F(AdaptiveCatalogTest, SelectWithColumns)
 {
-    std::vector<std::string> queries = {
-        "SELECT id, name FROM users",
-        "SELECT order_id, total FROM orders",
-        "SELECT product_id, price FROM products",
-        "SELECT customer_id, email FROM customers",
-        "SELECT employee_id, salary FROM employees",
-        "SELECT foo, bar, baz FROM any_table",
-        "SELECT x, y, z FROM test_data"
-    };
+    std::vector<std::string> queries = { "SELECT id, name FROM users",
+                                         "SELECT order_id, total FROM orders",
+                                         "SELECT product_id, price FROM products",
+                                         "SELECT customer_id, email FROM customers",
+                                         "SELECT employee_id, salary FROM employees",
+                                         "SELECT foo, bar, baz FROM any_table",
+                                         "SELECT x, y, z FROM test_data" };
 
     for (const auto& query : queries) {
         testQueryVisualization(query);
@@ -105,14 +99,12 @@ TEST_F(AdaptiveCatalogTest, SelectWithColumns)
 
 TEST_F(AdaptiveCatalogTest, SelectWithWhere)
 {
-    std::vector<std::string> queries = {
-        "SELECT * FROM users WHERE id = 1",
-        "SELECT * FROM orders WHERE total > 100",
-        "SELECT * FROM products WHERE price < 50",
-        "SELECT name FROM customers WHERE email = 'test@example.com'",
-        "SELECT * FROM employees WHERE salary > 50000",
-        "SELECT * FROM any_table WHERE col_1 = 'value'"
-    };
+    std::vector<std::string> queries = { "SELECT * FROM users WHERE id = 1",
+                                         "SELECT * FROM orders WHERE total > 100",
+                                         "SELECT * FROM products WHERE price < 50",
+                                         "SELECT name FROM customers WHERE email = 'test@example.com'",
+                                         "SELECT * FROM employees WHERE salary > 50000",
+                                         "SELECT * FROM any_table WHERE col_1 = 'value'" };
 
     for (const auto& query : queries) {
         testQueryVisualization(query);
@@ -121,12 +113,11 @@ TEST_F(AdaptiveCatalogTest, SelectWithWhere)
 
 TEST_F(AdaptiveCatalogTest, ComplexQueries)
 {
-    std::vector<std::string> queries = {
-        "SELECT name, email FROM users WHERE age > 25",
-        "SELECT product_id, price FROM products WHERE category = 'electronics'",
-        "SELECT order_id, quantity FROM orders WHERE order_date > '2023-01-01'",
-        "SELECT employee_id, department FROM employees WHERE salary BETWEEN 40000 AND 80000"
-    };
+    std::vector<std::string> queries = { "SELECT name, email FROM users WHERE age > 25",
+                                         "SELECT product_id, price FROM products WHERE category = 'electronics'",
+                                         "SELECT order_id, quantity FROM orders WHERE order_date > '2023-01-01'",
+                                         "SELECT employee_id, department FROM employees WHERE salary BETWEEN "
+                                         "40000 AND 80000" };
 
     for (const auto& query : queries) {
         testQueryVisualization(query);
@@ -135,11 +126,12 @@ TEST_F(AdaptiveCatalogTest, ComplexQueries)
 
 TEST_F(AdaptiveCatalogTest, MultipleTablesInSameQuery)
 {
-    // Test that the system can handle table references even if JOINs aren't fully implemented
-    std::vector<std::string> queries = {
-        // These will fail at planning stage but should create tables successfully
-        "SELECT * FROM table1, table2",
-        "SELECT * FROM alpha, beta, gamma"
+    // Test that the system can handle table references even if JOINs aren't
+    // fully implemented
+    std::vector<std::string> queries = { // These will fail at planning stage but should create tables
+                                         // successfully
+                                         "SELECT * FROM table1, table2",
+                                         "SELECT * FROM alpha, beta, gamma"
     };
 
     for (const auto& query : queries) {
@@ -157,12 +149,10 @@ TEST_F(AdaptiveCatalogTest, MultipleTablesInSameQuery)
 TEST_F(AdaptiveCatalogTest, TypeInference)
 {
     // Test that the system can infer reasonable types from column names
-    std::vector<std::string> queries = {
-        "SELECT id, name, email, age FROM users",
-        "SELECT order_id, user_id, total, price, quantity FROM orders",
-        "SELECT product_id, price, description FROM products",
-        "SELECT record_count, percentage, enabled, created_at FROM stats_table"
-    };
+    std::vector<std::string> queries = { "SELECT id, name, email, age FROM users",
+                                         "SELECT order_id, user_id, total, price, quantity FROM orders",
+                                         "SELECT product_id, price, description FROM products",
+                                         "SELECT record_count, percentage, enabled, created_at FROM stats_table" };
 
     for (const auto& query : queries) {
         testQueryVisualization(query);
@@ -202,11 +192,9 @@ TEST_F(AdaptiveCatalogTest, GraphvizOutput)
 TEST_F(AdaptiveCatalogTest, CatalogPersistence)
 {
     // Test that created tables persist across multiple queries
-    std::vector<std::string> queries = {
-        "SELECT * FROM persistent_table",
-        "SELECT id, name FROM persistent_table",
-        "SELECT * FROM persistent_table WHERE id = 1"
-    };
+    std::vector<std::string> queries = { "SELECT * FROM persistent_table",
+                                         "SELECT id, name FROM persistent_table",
+                                         "SELECT * FROM persistent_table WHERE id = 1" };
 
     size_t initial_table_count = catalog_->getTableCount();
 
@@ -237,8 +225,9 @@ TEST_F(AdaptiveCatalogTest, CatalogPersistence)
 // TODO: Add tests for JOIN queries when JOIN support is implemented
 // TEST_F(AdaptiveCatalogTest, JoinQueries) {
 //     std::vector<std::string> queries = {
-//         "SELECT u.name, o.total FROM users u JOIN orders o ON u.id = o.user_id",
-//         "SELECT p.name, o.quantity FROM products p JOIN orders o ON p.id = o.product_id"
+//         "SELECT u.name, o.total FROM users u JOIN orders o ON u.id =
+//         o.user_id", "SELECT p.name, o.quantity FROM products p JOIN orders o
+//         ON p.id = o.product_id"
 //     };
 //
 //     for (const auto& query : queries) {

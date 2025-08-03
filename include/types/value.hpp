@@ -1,6 +1,7 @@
 #pragma once
 
 #include "data_type.hpp"
+
 #include <memory>
 #include <string>
 #include <variant>
@@ -11,6 +12,7 @@ namespace velodb {
 class Value;
 
 // Value variant type for storing actual data
+// clang-format off
 using ValueData = std::variant<
     bool,
     int8_t,
@@ -20,6 +22,7 @@ using ValueData = std::variant<
     float,
     double,
     std::string>;
+// clang-format on
 
 class Value {
 public:

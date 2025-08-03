@@ -3,6 +3,7 @@
 #include "expression/expression.hpp"
 #include "operator/operator.hpp"
 #include "planner/abstract_plan_node.hpp"
+
 #include <memory>
 #include <string>
 
@@ -12,8 +13,8 @@ namespace velodb {
 class NestedLoopJoinPlanNode : public AbstractPlanNode {
 public:
     NestedLoopJoinPlanNode(std::unique_ptr<Schema> output_schema,
-        std::unique_ptr<AbstractExpression> join_predicate,
-        JoinType join_type = JoinType::INNER);
+                           std::unique_ptr<AbstractExpression> join_predicate,
+                           JoinType join_type = JoinType::INNER);
     ~NestedLoopJoinPlanNode() override = default;
 
     std::unique_ptr<AbstractOperator> createOperator(ExecutionContext& context) const override;

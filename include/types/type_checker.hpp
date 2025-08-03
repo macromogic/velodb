@@ -2,6 +2,7 @@
 
 #include "types/data_type.hpp"
 #include "types/value.hpp"
+
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -40,16 +41,12 @@ public:
     std::string getLastError() const { return last_error_; }
 
     // Arithmetic type checking
-    std::unique_ptr<DataType> deduceArithmeticType(
-        const DataType& left_type,
-        const DataType& right_type,
-        ArithmeticType op_type) const;
+    std::unique_ptr<DataType> deduceArithmeticType(const DataType& left_type,
+                                                   const DataType& right_type,
+                                                   ArithmeticType op_type) const;
 
     // Comparison type checking
-    bool validateComparison(
-        const DataType& left_type,
-        const DataType& right_type,
-        ComparisonType comp_type) const;
+    bool validateComparison(const DataType& left_type, const DataType& right_type, ComparisonType comp_type) const;
 
     // Type conversion checking
     ConversionResult canConvert(const DataType& from_type, const DataType& to_type) const;
@@ -79,8 +76,12 @@ private:
     void setError(const std::string& error) const;
 
     // Helper methods for specific type checks
-    bool validateArithmeticOperands(const DataType& left_type, const DataType& right_type, ArithmeticType op_type) const;
-    bool validateComparisonOperands(const DataType& left_type, const DataType& right_type, ComparisonType comp_type) const;
+    bool validateArithmeticOperands(const DataType& left_type,
+                                    const DataType& right_type,
+                                    ArithmeticType op_type) const;
+    bool validateComparisonOperands(const DataType& left_type,
+                                    const DataType& right_type,
+                                    ComparisonType comp_type) const;
 };
 
 // Global type checker instance

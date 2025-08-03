@@ -1,6 +1,7 @@
 #pragma once
 
 #include "operator/abstract_operator.hpp"
+
 #include <memory>
 #include <vector>
 
@@ -15,9 +16,9 @@ class TableBase;
 class ProjectionOperator : public UnaryOperator {
 public:
     ProjectionOperator(Catalog& catalog,
-        std::unique_ptr<Schema> output_schema,
-        std::unique_ptr<AbstractOperator> child,
-        std::vector<std::unique_ptr<AbstractExpression>> expressions);
+                       std::unique_ptr<Schema> output_schema,
+                       std::unique_ptr<AbstractOperator> child,
+                       std::vector<std::unique_ptr<AbstractExpression>> expressions);
     ~ProjectionOperator() override = default;
 
     Result<View> execute() const override;

@@ -1,5 +1,7 @@
 #include "types/type_checker.hpp"
+
 #include "expression/expression.hpp"
+
 #include <fmt/core.h>
 
 namespace velodb {
@@ -29,25 +31,49 @@ void TypeChecker::initializeConversionRules()
     type_ranks_[DataTypeId::TIMESTAMP] = 21;
 
     // Initialize implicit conversion rules (safe widening conversions)
-    implicit_conversions_[DataTypeId::TINYINT] = { DataTypeId::SMALLINT, DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL };
-    implicit_conversions_[DataTypeId::SMALLINT] = { DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL };
-    implicit_conversions_[DataTypeId::INTEGER] = { DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL };
+    implicit_conversions_[DataTypeId::TINYINT] = { DataTypeId::SMALLINT, DataTypeId::INTEGER, DataTypeId::BIGINT,
+                                                   DataTypeId::FLOAT,    DataTypeId::DOUBLE,  DataTypeId::DECIMAL };
+    implicit_conversions_[DataTypeId::SMALLINT]
+        = { DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL };
+    implicit_conversions_[DataTypeId::INTEGER]
+        = { DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL };
     implicit_conversions_[DataTypeId::BIGINT] = { DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL };
     implicit_conversions_[DataTypeId::FLOAT] = { DataTypeId::DOUBLE };
     implicit_conversions_[DataTypeId::CHAR] = { DataTypeId::VARCHAR };
     implicit_conversions_[DataTypeId::DATE] = { DataTypeId::TIMESTAMP };
 
     // Initialize explicit conversion rules (all valid casts)
-    explicit_conversions_[DataTypeId::BOOLEAN] = { DataTypeId::TINYINT, DataTypeId::SMALLINT, DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::VARCHAR };
-    explicit_conversions_[DataTypeId::TINYINT] = { DataTypeId::BOOLEAN, DataTypeId::SMALLINT, DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL, DataTypeId::VARCHAR };
-    explicit_conversions_[DataTypeId::SMALLINT] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL, DataTypeId::VARCHAR };
-    explicit_conversions_[DataTypeId::INTEGER] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT, DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL, DataTypeId::VARCHAR };
-    explicit_conversions_[DataTypeId::BIGINT] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT, DataTypeId::INTEGER, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL, DataTypeId::VARCHAR };
-    explicit_conversions_[DataTypeId::FLOAT] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT, DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::DOUBLE, DataTypeId::DECIMAL, DataTypeId::VARCHAR };
-    explicit_conversions_[DataTypeId::DOUBLE] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT, DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DECIMAL, DataTypeId::VARCHAR };
-    explicit_conversions_[DataTypeId::DECIMAL] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT, DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::VARCHAR };
-    explicit_conversions_[DataTypeId::CHAR] = { DataTypeId::VARCHAR, DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT, DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL, DataTypeId::DATE, DataTypeId::TIMESTAMP };
-    explicit_conversions_[DataTypeId::VARCHAR] = { DataTypeId::CHAR, DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT, DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::FLOAT, DataTypeId::DOUBLE, DataTypeId::DECIMAL, DataTypeId::DATE, DataTypeId::TIMESTAMP };
+    explicit_conversions_[DataTypeId::BOOLEAN]
+        = { DataTypeId::TINYINT, DataTypeId::SMALLINT, DataTypeId::INTEGER, DataTypeId::BIGINT, DataTypeId::VARCHAR };
+    explicit_conversions_[DataTypeId::TINYINT] = { DataTypeId::BOOLEAN, DataTypeId::SMALLINT, DataTypeId::INTEGER,
+                                                   DataTypeId::BIGINT,  DataTypeId::FLOAT,    DataTypeId::DOUBLE,
+                                                   DataTypeId::DECIMAL, DataTypeId::VARCHAR };
+    explicit_conversions_[DataTypeId::SMALLINT] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::INTEGER,
+                                                    DataTypeId::BIGINT,  DataTypeId::FLOAT,   DataTypeId::DOUBLE,
+                                                    DataTypeId::DECIMAL, DataTypeId::VARCHAR };
+    explicit_conversions_[DataTypeId::INTEGER] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT,
+                                                   DataTypeId::BIGINT,  DataTypeId::FLOAT,   DataTypeId::DOUBLE,
+                                                   DataTypeId::DECIMAL, DataTypeId::VARCHAR };
+    explicit_conversions_[DataTypeId::BIGINT] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT,
+                                                  DataTypeId::INTEGER, DataTypeId::FLOAT,   DataTypeId::DOUBLE,
+                                                  DataTypeId::DECIMAL, DataTypeId::VARCHAR };
+    explicit_conversions_[DataTypeId::FLOAT] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT,
+                                                 DataTypeId::INTEGER, DataTypeId::BIGINT,  DataTypeId::DOUBLE,
+                                                 DataTypeId::DECIMAL, DataTypeId::VARCHAR };
+    explicit_conversions_[DataTypeId::DOUBLE] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT,
+                                                  DataTypeId::INTEGER, DataTypeId::BIGINT,  DataTypeId::FLOAT,
+                                                  DataTypeId::DECIMAL, DataTypeId::VARCHAR };
+    explicit_conversions_[DataTypeId::DECIMAL] = { DataTypeId::BOOLEAN, DataTypeId::TINYINT, DataTypeId::SMALLINT,
+                                                   DataTypeId::INTEGER, DataTypeId::BIGINT,  DataTypeId::FLOAT,
+                                                   DataTypeId::DOUBLE,  DataTypeId::VARCHAR };
+    explicit_conversions_[DataTypeId::CHAR] = { DataTypeId::VARCHAR,  DataTypeId::BOOLEAN,  DataTypeId::TINYINT,
+                                                DataTypeId::SMALLINT, DataTypeId::INTEGER,  DataTypeId::BIGINT,
+                                                DataTypeId::FLOAT,    DataTypeId::DOUBLE,   DataTypeId::DECIMAL,
+                                                DataTypeId::DATE,     DataTypeId::TIMESTAMP };
+    explicit_conversions_[DataTypeId::VARCHAR] = { DataTypeId::CHAR,     DataTypeId::BOOLEAN,  DataTypeId::TINYINT,
+                                                   DataTypeId::SMALLINT, DataTypeId::INTEGER,  DataTypeId::BIGINT,
+                                                   DataTypeId::FLOAT,    DataTypeId::DOUBLE,   DataTypeId::DECIMAL,
+                                                   DataTypeId::DATE,     DataTypeId::TIMESTAMP };
     explicit_conversions_[DataTypeId::DATE] = { DataTypeId::VARCHAR, DataTypeId::TIMESTAMP };
     explicit_conversions_[DataTypeId::TIMESTAMP] = { DataTypeId::VARCHAR, DataTypeId::DATE };
 }
@@ -60,14 +86,14 @@ bool TypeChecker::validateExpression(const AbstractExpression* expr) const
     }
 
     // TODO: Implement comprehensive expression validation
-    // This would involve traversing the expression tree and validating each node
+    // This would involve traversing the expression tree and validating each
+    // node
     return true;
 }
 
-std::unique_ptr<DataType> TypeChecker::deduceArithmeticType(
-    const DataType& left_type,
-    const DataType& right_type,
-    ArithmeticType op_type) const
+std::unique_ptr<DataType> TypeChecker::deduceArithmeticType(const DataType& left_type,
+                                                            const DataType& right_type,
+                                                            ArithmeticType op_type) const
 {
 
     // Validate that both operands are numeric
@@ -92,10 +118,9 @@ std::unique_ptr<DataType> TypeChecker::deduceArithmeticType(
     return promoteTypes(left_type, right_type);
 }
 
-bool TypeChecker::validateComparison(
-    const DataType& left_type,
-    const DataType& right_type,
-    ComparisonType comp_type) const
+bool TypeChecker::validateComparison(const DataType& left_type,
+                                     const DataType& right_type,
+                                     ComparisonType comp_type) const
 {
 
     return validateComparisonOperands(left_type, right_type, comp_type);
@@ -202,7 +227,9 @@ void TypeChecker::setError(const std::string& error) const
     last_error_ = error;
 }
 
-bool TypeChecker::validateArithmeticOperands(const DataType& left_type, const DataType& right_type, ArithmeticType op_type) const
+bool TypeChecker::validateArithmeticOperands(const DataType& left_type,
+                                             const DataType& right_type,
+                                             ArithmeticType op_type) const
 {
     // All arithmetic operations require numeric operands
     if (!isNumericType(left_type)) {
@@ -221,8 +248,10 @@ bool TypeChecker::validateArithmeticOperands(const DataType& left_type, const Da
         DataTypeId left_id = left_type.getTypeId();
         DataTypeId right_id = right_type.getTypeId();
 
-        bool left_is_int = (left_id == DataTypeId::TINYINT || left_id == DataTypeId::SMALLINT || left_id == DataTypeId::INTEGER || left_id == DataTypeId::BIGINT);
-        bool right_is_int = (right_id == DataTypeId::TINYINT || right_id == DataTypeId::SMALLINT || right_id == DataTypeId::INTEGER || right_id == DataTypeId::BIGINT);
+        bool left_is_int = (left_id == DataTypeId::TINYINT || left_id == DataTypeId::SMALLINT
+                            || left_id == DataTypeId::INTEGER || left_id == DataTypeId::BIGINT);
+        bool right_is_int = (right_id == DataTypeId::TINYINT || right_id == DataTypeId::SMALLINT
+                             || right_id == DataTypeId::INTEGER || right_id == DataTypeId::BIGINT);
 
         if (!left_is_int || !right_is_int) {
             setError("Modulo operation requires integer operands");
@@ -233,7 +262,9 @@ bool TypeChecker::validateArithmeticOperands(const DataType& left_type, const Da
     return true;
 }
 
-bool TypeChecker::validateComparisonOperands(const DataType& left_type, const DataType& right_type, ComparisonType comp_type) const
+bool TypeChecker::validateComparisonOperands(const DataType& left_type,
+                                             const DataType& right_type,
+                                             ComparisonType comp_type) const
 {
     DataTypeId left_id = left_type.getTypeId();
     DataTypeId right_id = right_type.getTypeId();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/copy_traits.hpp"
+
 #include <memory>
 #include <string>
 #include <vector>

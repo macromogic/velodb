@@ -1,12 +1,14 @@
 #include "expression/comparison_expression.hpp"
+
 #include "common/exception.hpp"
+
 #include <stdexcept>
 
 namespace velodb {
 
 ComparisonExpression::ComparisonExpression(ComparisonType comp_type,
-    std::unique_ptr<AbstractExpression> left,
-    std::unique_ptr<AbstractExpression> right)
+                                           std::unique_ptr<AbstractExpression> left,
+                                           std::unique_ptr<AbstractExpression> right)
     : AbstractExpression(ExpressionType::COMPARISON, std::make_unique<BooleanType>())
     , comp_type_(comp_type)
     , left_(std::move(left))
@@ -86,7 +88,8 @@ Value ComparisonExpression::compareValues(const Value& left_val, const Value& ri
         result = (left_val >= right_val);
         break;
     default:
-        VELODB_THROW(ExecutionError, "Comparison operator not implemented: " + std::to_string(static_cast<int>(comp_type_)));
+        VELODB_THROW(ExecutionError,
+                     "Comparison operator not implemented: " + std::to_string(static_cast<int>(comp_type_)));
     }
 
     return Value::createBoolean(result);

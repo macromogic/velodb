@@ -2,6 +2,7 @@
 
 #include "operator/abstract_operator.hpp"
 #include "operator/join_type.hpp"
+
 #include <memory>
 #include <vector>
 
@@ -14,12 +15,12 @@ class AbstractExpression;
 class MergeSortJoinOperator : public BinaryOperator {
 public:
     MergeSortJoinOperator(Catalog& catalog,
-        std::unique_ptr<Schema> output_schema,
-        std::unique_ptr<AbstractOperator> left_child,
-        std::unique_ptr<AbstractOperator> right_child,
-        std::unique_ptr<AbstractExpression> left_key_expr,
-        std::unique_ptr<AbstractExpression> right_key_expr,
-        JoinType join_type = JoinType::INNER);
+                          std::unique_ptr<Schema> output_schema,
+                          std::unique_ptr<AbstractOperator> left_child,
+                          std::unique_ptr<AbstractOperator> right_child,
+                          std::unique_ptr<AbstractExpression> left_key_expr,
+                          std::unique_ptr<AbstractExpression> right_key_expr,
+                          JoinType join_type = JoinType::INNER);
     ~MergeSortJoinOperator() override = default;
 
     Result<View> execute() const override;

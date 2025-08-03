@@ -4,6 +4,7 @@
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "types/data_type.hpp"
+
 #include <map>
 #include <memory>
 #include <set>
@@ -27,12 +28,10 @@ public:
 
     static bool ensureTablesForQuery(Catalog& catalog, const std::string& sql);
     static void createDynamicTable(Catalog& catalog,
-        const std::string& table_name,
-        const std::vector<std::string>& column_names = {},
-        const std::map<std::string, DataTypeId>& inferred_types = {});
-    static void createGenericTable(Catalog& catalog,
-        const std::string& table_name,
-        size_t column_count = 5);
+                                   const std::string& table_name,
+                                   const std::vector<std::string>& column_names = {},
+                                   const std::map<std::string, DataTypeId>& inferred_types = {});
+    static void createGenericTable(Catalog& catalog, const std::string& table_name, size_t column_count = 5);
 
     static void createUsersTable(Catalog& catalog);
     static void createOrdersTable(Catalog& catalog);
@@ -57,8 +56,8 @@ private:
     static std::unique_ptr<Schema> createComplexSchema();
     static std::unique_ptr<Schema> createGenericSchema(const std::string& table_name, size_t column_count);
     static std::unique_ptr<Schema> createDynamicSchema(const std::string& table_name,
-        const std::vector<std::string>& column_names,
-        const std::map<std::string, DataTypeId>& inferred_types);
+                                                       const std::vector<std::string>& column_names,
+                                                       const std::map<std::string, DataTypeId>& inferred_types);
 
     // Default column types for common column names
     static std::map<std::string, DataTypeId> getDefaultColumnTypes();

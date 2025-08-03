@@ -2,6 +2,7 @@
 
 #include "common/copy_traits.hpp"
 #include "types/value.hpp"
+
 #include <variant>
 #include <vector>
 
@@ -10,10 +11,10 @@ namespace velodb {
 class ColumnInfo : private NonCopyable, public Cloneable<ColumnInfo> {
 public:
     ColumnInfo(std::string name,
-        std::unique_ptr<DataType> type,
-        bool is_nullable = true,
-        bool is_unique = false,
-        bool is_primary_key = false);
+               std::unique_ptr<DataType> type,
+               bool is_nullable = true,
+               bool is_unique = false,
+               bool is_primary_key = false);
 
     const std::string& getName() const { return name_; }
     const DataType& getType() const { return *type_; }
@@ -53,10 +54,7 @@ public:
     virtual std::string toString() const = 0;
 
 protected:
-    Column(std::string name,
-        bool is_nullable = true,
-        bool is_unique = false,
-        bool is_primary_key = false);
+    Column(std::string name, bool is_nullable = true, bool is_unique = false, bool is_primary_key = false);
 
 private:
     std::string name_;
@@ -68,10 +66,10 @@ private:
 class ValueColumn : public Column {
 public:
     ValueColumn(std::string name,
-        std::unique_ptr<DataType> type,
-        bool is_nullable = true,
-        bool is_unique = false,
-        bool is_primary_key = false);
+                std::unique_ptr<DataType> type,
+                bool is_nullable = true,
+                bool is_unique = false,
+                bool is_primary_key = false);
 
     explicit ValueColumn(const ColumnInfo& info);
 
@@ -129,12 +127,10 @@ public:
     ViewColumn(DataType& type, std::string name, const ValueVector& values);
 
     // Constructor for slice view
-    ViewColumn(DataType& type, std::string name, const ValueVector& values,
-        size_t start_row, size_t end_row);
+    ViewColumn(DataType& type, std::string name, const ValueVector& values, size_t start_row, size_t end_row);
 
     // Constructor for discrete indices view
-    ViewColumn(DataType& type, std::string name, const ValueVector& values,
-        std::vector<size_t> indices);
+    ViewColumn(DataType& type, std::string name, const ValueVector& values, std::vector<size_t> indices);
 
     size_t size() const override;
     const Value& get(size_t row) const override;

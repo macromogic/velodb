@@ -21,8 +21,8 @@
 #include "velodb_version.hpp"
 
 // SQL Parser integration
-#include "SQLParser.h"
-#include "util/sqlhelper.h"
+#include <SQLParser.h>
+#include <util/sqlhelper.h>
 
 namespace velodb {
 

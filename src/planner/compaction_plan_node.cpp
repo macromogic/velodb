@@ -1,4 +1,5 @@
 #include "planner/compaction_plan_node.hpp"
+
 #include "operator/compaction_operator.hpp"
 #include "planner/execution_context.hpp"
 
@@ -15,7 +16,9 @@ std::unique_ptr<AbstractOperator> CompactionPlanNode::createOperator(ExecutionCo
         VELODB_THROW(ExecutionError, "CompactionPlanNode must have exactly one child");
     }
     auto child_operator = children_[0]->createOperator(context);
-    return std::make_unique<CompactionOperator>(context.getCatalog(), output_schema_->cloneUnique(), std::move(child_operator));
+    return std::make_unique<CompactionOperator>(context.getCatalog(),
+                                                output_schema_->cloneUnique(),
+                                                std::move(child_operator));
 }
 
 std::string CompactionPlanNode::toString() const

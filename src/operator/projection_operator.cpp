@@ -1,4 +1,5 @@
 #include "operator/projection_operator.hpp"
+
 #include "catalog/table.hpp"
 #include "common/result.hpp"
 #include "execution/execution_engine.hpp"
@@ -9,9 +10,9 @@ namespace velodb {
 
 // ProjectionOperator implementation
 ProjectionOperator::ProjectionOperator(Catalog& catalog,
-    std::unique_ptr<Schema> output_schema,
-    std::unique_ptr<AbstractOperator> child,
-    std::vector<std::unique_ptr<AbstractExpression>> expressions)
+                                       std::unique_ptr<Schema> output_schema,
+                                       std::unique_ptr<AbstractOperator> child,
+                                       std::vector<std::unique_ptr<AbstractExpression>> expressions)
     : UnaryOperator(catalog, std::move(output_schema), std::move(child))
     , expressions_(std::move(expressions))
 {
@@ -52,7 +53,8 @@ Result<View> ProjectionOperator::execute() const
                 break;
             }
             case ExpressionType::CONSTANT: {
-                ValueColumn& constant_col = catalog_.createTemporaryColumn(column_info.getName(), expr->getReturnType().cloneUnique());
+                ValueColumn& constant_col = catalog_.createTemporaryColumn(column_info.getName(),
+                                                                           expr->getReturnType().cloneUnique());
                 constant_col.fill(expr->evaluate(dummy_tuple, child_view.getSchema()), child_view.getRowCount());
                 view.addColumn(constant_col.view());
                 break;

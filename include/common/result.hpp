@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/exception.hpp"
+
 #include <memory>
 #include <optional>
 #include <string>
@@ -32,20 +33,11 @@ public:
     }
 
     // Query methods
-    bool ok() const noexcept
-    {
-        return std::holds_alternative<T>(value_);
-    }
+    bool ok() const noexcept { return std::holds_alternative<T>(value_); }
 
-    bool err() const noexcept
-    {
-        return std::holds_alternative<E>(value_);
-    }
+    bool err() const noexcept { return std::holds_alternative<E>(value_); }
 
-    explicit operator bool() const noexcept
-    {
-        return ok();
-    }
+    explicit operator bool() const noexcept { return ok(); }
 
     // Access methods
     T& value() &
@@ -89,36 +81,18 @@ public:
     }
 
     // Convenience methods
-    T value_or(const T& default_value) const&
-    {
-        return ok() ? value() : default_value;
-    }
+    T value_or(const T& default_value) const& { return ok() ? value() : default_value; }
 
-    T value_or(T&& default_value) &&
-    {
-        return ok() ? std::move(value()) : std::move(default_value);
-    }
+    T value_or(T&& default_value) && { return ok() ? std::move(value()) : std::move(default_value); }
 
     // Factory methods
-    static Result success(T&& value)
-    {
-        return Result(std::forward<T>(value));
-    }
+    static Result success(T&& value) { return Result(std::forward<T>(value)); }
 
-    static Result success(const T& value)
-    {
-        return Result(value);
-    }
+    static Result success(const T& value) { return Result(value); }
 
-    static Result failure(E&& error)
-    {
-        return Result(std::forward<E>(error));
-    }
+    static Result failure(E&& error) { return Result(std::forward<E>(error)); }
 
-    static Result failure(const E& error)
-    {
-        return Result(error);
-    }
+    static Result failure(const E& error) { return Result(error); }
 
 private:
     std::variant<T, E> value_;

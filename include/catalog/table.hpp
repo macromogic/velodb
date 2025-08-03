@@ -1,9 +1,11 @@
 #pragma once
 
+#include "schema.hpp"
+
 #include "catalog/tuple.hpp"
 #include "common/copy_traits.hpp"
-#include "schema.hpp"
 #include "types/value.hpp"
+
 #include <functional>
 #include <memory>
 #include <string>

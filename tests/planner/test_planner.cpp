@@ -1,10 +1,12 @@
-#include "SQLParser.h"
 #include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "common/exception.hpp"
 #include "planner/planner.hpp"
 #include "types/data_type.hpp"
+
+#include <SQLParser.h>
+
 #include <gtest/gtest.h>
 
 using namespace velodb;
@@ -144,7 +146,8 @@ TEST_F(PlannerTest, PlanComplexWhere)
     EXPECT_NE(plan->getPlanType(), PlanType::INVALID);
 }
 
-// TODO: Add more comprehensive planner tests when additional features are implemented
+// TODO: Add more comprehensive planner tests when additional features are
+// implemented
 // - JOIN planning tests
 // - Subquery planning tests
 // - Aggregation planning tests

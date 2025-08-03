@@ -1,12 +1,18 @@
 #include "operator/scan_filter_operator.hpp"
+
 #include "execution/execution_engine.hpp"
 #include "expression/expression.hpp"
+
 #include <stdexcept>
 
 namespace velodb {
 
-ScanFilterOperator::ScanFilterOperator(Catalog& catalog, const TableBase& table, const std::unique_ptr<AbstractExpression>& predicate)
-    : UnaryOperator(catalog, table.getSchema().cloneUnique(), nullptr) // NOTE: May support child operators in future
+ScanFilterOperator::ScanFilterOperator(Catalog& catalog,
+                                       const TableBase& table,
+                                       const std::unique_ptr<AbstractExpression>& predicate)
+    : UnaryOperator(catalog,
+                    table.getSchema().cloneUnique(),
+                    nullptr) // NOTE: May support child operators in future
     , table_(table)
     , predicate_(predicate)
 {

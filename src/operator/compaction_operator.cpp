@@ -1,18 +1,20 @@
 #include "operator/compaction_operator.hpp"
+
 #include "catalog/column.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "common/result.hpp"
 #include "types/data_type.hpp"
 #include "types/value.hpp"
+
 #include <algorithm>
 #include <vector>
 
 namespace velodb {
 
 CompactionOperator::CompactionOperator(Catalog& catalog,
-    std::unique_ptr<Schema> output_schema,
-    std::unique_ptr<AbstractOperator> child)
+                                       std::unique_ptr<Schema> output_schema,
+                                       std::unique_ptr<AbstractOperator> child)
     : UnaryOperator(catalog, std::move(output_schema), std::move(child))
 {
 }

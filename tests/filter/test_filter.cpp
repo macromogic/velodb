@@ -1,4 +1,3 @@
-#include "SQLParser.h"
 #include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
@@ -6,6 +5,9 @@
 #include "execution/execution_engine.hpp"
 #include "planner/planner.hpp"
 #include "types/data_type.hpp"
+
+#include <SQLParser.h>
+
 #include <gtest/gtest.h>
 
 using namespace velodb;
@@ -63,8 +65,13 @@ protected:
         insertProduct(concrete_table, 8, "Monitor", 299.99, 0, "Electronics", false);
     }
 
-    void insertProduct(Table* table, int id, const std::string& name, double price,
-        int quantity, const std::string& category, bool in_stock)
+    void insertProduct(Table* table,
+                       int id,
+                       const std::string& name,
+                       double price,
+                       int quantity,
+                       const std::string& category,
+                       bool in_stock)
     {
         std::vector<Value> values;
         values.push_back(Value::createInteger(id));
@@ -149,7 +156,8 @@ TEST_F(WhereClauseTest, QuantityBasedFiltering)
 
     ASSERT_TRUE(query_result.ok());
     auto& view = query_result.value();
-    EXPECT_EQ(view.getRowCount(), 4); // Laptop (10), Desk (5), Chair (0), Monitor (0)
+    EXPECT_EQ(view.getRowCount(),
+              4); // Laptop (10), Desk (5), Chair (0), Monitor (0)
 
     for (const auto& tuple : view) {
         EXPECT_LE(tuple.getValue(3).getInteger(), 10); // quantity <= 10
@@ -182,7 +190,8 @@ TEST_F(WhereClauseTest, CategoryFiltering)
 TEST_F(WhereClauseTest, MultiCategoryFiltering)
 {
     // Test multiple categories using OR
-    std::string sql = "SELECT * FROM products WHERE category = 'Furniture' OR category = 'Books'";
+    std::string sql = "SELECT * FROM products WHERE category = 'Furniture' OR "
+                      "category = 'Books'";
     auto result = parseSQL(sql);
 
     ASSERT_TRUE(result->isValid());
@@ -250,7 +259,8 @@ TEST_F(WhereClauseTest, OutOfStockFiltering)
 TEST_F(WhereClauseTest, AvailableElectronicsQuery)
 {
     // Test available electronics (in_stock = true AND category = 'Electronics')
-    std::string sql = "SELECT * FROM products WHERE in_stock = true AND category = 'Electronics'";
+    std::string sql = "SELECT * FROM products WHERE in_stock = true AND "
+                      "category = 'Electronics'";
     auto result = parseSQL(sql);
 
     ASSERT_TRUE(result->isValid());
@@ -495,7 +505,8 @@ TEST_F(WhereClauseTest, EmptyResultSet)
 TEST_F(WhereClauseTest, ComplexLogicalAndConditions)
 {
     // Test multiple AND conditions
-    std::string sql = "SELECT * FROM products WHERE category = 'Electronics' AND price > 50.0 AND in_stock = true";
+    std::string sql = "SELECT * FROM products WHERE category = 'Electronics' "
+                      "AND price > 50.0 AND in_stock = true";
     auto result = parseSQL(sql);
 
     ASSERT_TRUE(result->isValid());
@@ -518,7 +529,8 @@ TEST_F(WhereClauseTest, ComplexLogicalAndConditions)
 TEST_F(WhereClauseTest, ComplexLogicalOrConditions)
 {
     // Test multiple OR conditions
-    std::string sql = "SELECT * FROM products WHERE price < 20.0 OR quantity > 100 OR category = 'Furniture'";
+    std::string sql = "SELECT * FROM products WHERE price < 20.0 OR quantity > "
+                      "100 OR category = 'Furniture'";
     auto result = parseSQL(sql);
 
     ASSERT_TRUE(result->isValid());
@@ -532,7 +544,8 @@ TEST_F(WhereClauseTest, ComplexLogicalOrConditions)
     EXPECT_EQ(view.getRowCount(), 4); // Book, Pen, Desk, Chair
 
     for (const auto& tuple : view) {
-        bool condition_met = tuple.getValue(2).getDouble() < 20.0f || tuple.getValue(3).getInteger() > 100 || tuple.getValue(4).getString() == "Furniture";
+        bool condition_met = tuple.getValue(2).getDouble() < 20.0f || tuple.getValue(3).getInteger() > 100
+            || tuple.getValue(4).getString() == "Furniture";
         EXPECT_TRUE(condition_met);
     }
 }
@@ -540,7 +553,8 @@ TEST_F(WhereClauseTest, ComplexLogicalOrConditions)
 TEST_F(WhereClauseTest, MixedAndOrConditions)
 {
     // Test mixed AND/OR conditions with precedence
-    std::string sql = "SELECT * FROM products WHERE (category = 'Electronics' OR category = 'Books') AND price < 100.0";
+    std::string sql = "SELECT * FROM products WHERE (category = 'Electronics' "
+                      "OR category = 'Books') AND price < 100.0";
     auto result = parseSQL(sql);
 
     ASSERT_TRUE(result->isValid());
@@ -711,7 +725,9 @@ TEST_F(WhereClauseTest, NoRowsMatchFilter)
 TEST_F(WhereClauseTest, ComplexNestedConditions)
 {
     // Test deeply nested logical conditions
-    std::string sql = "SELECT * FROM products WHERE ((category = 'Electronics' AND price > 50.0) OR (category = 'Furniture' AND in_stock = true)) AND quantity > 5";
+    std::string sql = "SELECT * FROM products WHERE ((category = 'Electronics' "
+                      "AND price > 50.0) OR (category = "
+                      "'Furniture' AND in_stock = true)) AND quantity > 5";
     auto result = parseSQL(sql);
 
     ASSERT_TRUE(result->isValid());
@@ -721,8 +737,9 @@ TEST_F(WhereClauseTest, ComplexNestedConditions)
     auto query_result = engine_->executePlan(std::move(plan));
 
     ASSERT_TRUE(query_result.ok());
-    // Should match: Laptop (Electronics, price>50, qty=10), Keyboard (Electronics, price>50, qty=25)
-    // Should not match Desk (Furniture, in_stock=1, but only qty=5)
+    // Should match: Laptop (Electronics, price>50, qty=10), Keyboard
+    // (Electronics, price>50, qty=25) Should not match Desk (Furniture,
+    // in_stock=1, but only qty=5)
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 2);
 
@@ -732,7 +749,8 @@ TEST_F(WhereClauseTest, ComplexNestedConditions)
         bool in_stock = tuple.getValue(5).getBoolean();
         int quantity = tuple.getValue(3).getInteger();
 
-        bool condition_met = ((category == "Electronics" && price > 50.0) || (category == "Furniture" && in_stock)) && quantity > 5;
+        bool condition_met = ((category == "Electronics" && price > 50.0) || (category == "Furniture" && in_stock))
+            && quantity > 5;
         EXPECT_TRUE(condition_met);
     }
 }
@@ -776,7 +794,8 @@ TEST_F(WhereClauseTest, ZeroQuantityFilter)
 
     for (const auto& tuple : view) {
         EXPECT_EQ(tuple.getValue(3).getInteger(), 0); // quantity = 0
-        EXPECT_EQ(tuple.getValue(5).getBoolean(), false); // should be out of stock
+        EXPECT_EQ(tuple.getValue(5).getBoolean(),
+                  false); // should be out of stock
     }
 }
 
@@ -826,7 +845,8 @@ TEST_F(WhereClauseTest, StringInequalityTests)
 TEST_F(WhereClauseTest, ThreeConditionAND)
 {
     // Test three conditions with AND
-    std::string sql = "SELECT * FROM products WHERE category = 'Electronics' AND price < 100.0 AND in_stock = true";
+    std::string sql = "SELECT * FROM products WHERE category = 'Electronics' "
+                      "AND price < 100.0 AND in_stock = true";
     auto result = parseSQL(sql);
 
     ASSERT_TRUE(result->isValid());
@@ -849,7 +869,8 @@ TEST_F(WhereClauseTest, ThreeConditionAND)
 TEST_F(WhereClauseTest, ThreeConditionOR)
 {
     // Test three conditions with OR
-    std::string sql = "SELECT * FROM products WHERE category = 'Books' OR category = 'Stationery' OR price > 500.0";
+    std::string sql = "SELECT * FROM products WHERE category = 'Books' OR "
+                      "category = 'Stationery' OR price > 500.0";
     auto result = parseSQL(sql);
 
     ASSERT_TRUE(result->isValid());
@@ -968,7 +989,9 @@ TEST_F(WhereClauseTest, LargeIntegerComparison)
 TEST_F(WhereClauseTest, ComplexBooleanExpression)
 {
     // Test complex boolean logic with mixed operators
-    std::string sql = "SELECT * FROM products WHERE (category = 'Electronics' OR category = 'Furniture') AND (price > 20.0 AND price < 1000.0) AND in_stock = true";
+    std::string sql = "SELECT * FROM products WHERE (category = 'Electronics' "
+                      "OR category = 'Furniture') AND (price > "
+                      "20.0 AND price < 1000.0) AND in_stock = true";
     auto result = parseSQL(sql);
 
     ASSERT_TRUE(result->isValid());
@@ -987,7 +1010,8 @@ TEST_F(WhereClauseTest, ComplexBooleanExpression)
         double price = tuple.getValue(2).getDouble();
         bool in_stock = tuple.getValue(5).getBoolean();
 
-        bool condition_met = (category == "Electronics" || category == "Furniture") && (price > 20.0 && price < 1000.0) && in_stock;
+        bool condition_met = (category == "Electronics" || category == "Furniture") && (price > 20.0 && price < 1000.0)
+            && in_stock;
         EXPECT_TRUE(condition_met);
     }
 }
@@ -995,7 +1019,8 @@ TEST_F(WhereClauseTest, ComplexBooleanExpression)
 TEST_F(WhereClauseTest, NegationWithComplexConditions)
 {
     // Test NOT with complex nested conditions
-    std::string sql = "SELECT * FROM products WHERE NOT (category = 'Electronics' AND price > 100.0)";
+    std::string sql = "SELECT * FROM products WHERE NOT (category = "
+                      "'Electronics' AND price > 100.0)";
     auto result = parseSQL(sql);
 
     ASSERT_TRUE(result->isValid());
@@ -1005,8 +1030,8 @@ TEST_F(WhereClauseTest, NegationWithComplexConditions)
     auto query_result = engine_->executePlan(std::move(plan));
 
     ASSERT_TRUE(query_result.ok());
-    // Should exclude: Laptop (Electronics, price=999.99), Monitor (Electronics, price=299.99)
-    // Should include: All others (6 items)
+    // Should exclude: Laptop (Electronics, price=999.99), Monitor (Electronics,
+    // price=299.99) Should include: All others (6 items)
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 6);
 

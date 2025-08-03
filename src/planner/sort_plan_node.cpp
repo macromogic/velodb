@@ -1,13 +1,15 @@
 #include "planner/sort_plan_node.hpp"
+
 #include "common/exception.hpp"
+
 #include <stdexcept>
 
 namespace velodb {
 
 // SortPlanNode implementation
 SortPlanNode::SortPlanNode(std::unique_ptr<Schema> output_schema,
-    std::vector<std::unique_ptr<AbstractExpression>> sort_expressions,
-    std::vector<bool> ascending_flags)
+                           std::vector<std::unique_ptr<AbstractExpression>> sort_expressions,
+                           std::vector<bool> ascending_flags)
     : AbstractPlanNode(PlanType::SORT, std::move(output_schema))
     , sort_expressions_(std::move(sort_expressions))
     , ascending_flags_(std::move(ascending_flags))

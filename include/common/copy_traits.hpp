@@ -22,19 +22,13 @@ private:
 template <typename T>
 class Cloneable {
 public:
-    T clone() const
-    {
-        return static_cast<const T*>(this)->cloneImpl();
-    }
+    T clone() const { return static_cast<const T*>(this)->cloneImpl(); }
 };
 
 template <typename T>
 class UniqueCloneable {
 public:
-    std::unique_ptr<T> cloneUnique() const
-    {
-        return static_cast<const T*>(this)->cloneUniqueImpl();
-    }
+    std::unique_ptr<T> cloneUnique() const { return static_cast<const T*>(this)->cloneUniqueImpl(); }
 };
 
 } // namespace velodb

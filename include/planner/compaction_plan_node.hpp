@@ -3,6 +3,7 @@
 #include "catalog/table.hpp"
 #include "expression/expression.hpp"
 #include "planner/abstract_plan_node.hpp"
+
 #include <memory>
 #include <string>
 

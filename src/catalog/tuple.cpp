@@ -1,6 +1,8 @@
 #include "catalog/tuple.hpp"
+
 #include "catalog/table.hpp"
 #include "common/exception.hpp"
+
 #include <fmt/core.h>
 
 namespace velodb {

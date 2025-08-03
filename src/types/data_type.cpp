@@ -1,5 +1,7 @@
 #include "types/data_type.hpp"
+
 #include "common/exception.hpp"
+
 #include <stdexcept>
 
 namespace velodb {

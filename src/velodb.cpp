@@ -1,5 +1,7 @@
 #include "velodb.hpp"
-#include "fmt/core.h"
+
+#include <fmt/core.h>
+
 #include <stdexcept>
 
 namespace velodb {
@@ -121,8 +123,8 @@ std::string Database::getDatabaseInfo() const
                        "  Tables: {}\n"
                        "\nCatalog Details:\n"
                        "{}",
-        getTableCount(),
-        catalog_->toString());
+                       getTableCount(),
+                       catalog_->toString());
 }
 
 } // namespace velodb

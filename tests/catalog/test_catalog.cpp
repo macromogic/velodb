@@ -2,16 +2,14 @@
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "types/data_type.hpp"
+
 #include <gtest/gtest.h>
 
 using namespace velodb;
 
 class CatalogTest : public ::testing::Test {
 protected:
-    void SetUp() override
-    {
-        catalog_ = std::make_unique<Catalog>();
-    }
+    void SetUp() override { catalog_ = std::make_unique<Catalog>(); }
 
     void TearDown() override
     {
@@ -107,7 +105,8 @@ TEST_F(CatalogTest, GetNonexistentTable)
     EXPECT_FALSE(result.has_value());
 }
 
-// TODO: Add more comprehensive catalog tests when additional features are implemented
+// TODO: Add more comprehensive catalog tests when additional features are
+// implemented
 // - Database/schema management tests
 // - Index catalog tests
 // - View catalog tests

@@ -1,6 +1,8 @@
 #include "expression/cast_expression.hpp"
+
 #include "common/exception.hpp"
 #include "types/type_checker.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <climits>
@@ -205,7 +207,8 @@ Value CastExpression::castToDate(const Value& value)
 {
     switch (value.getTypeId()) {
     case DataTypeId::VARCHAR: {
-        // Basic date parsing - in a real implementation, you'd use a proper date library
+        // Basic date parsing - in a real implementation, you'd use a proper
+        // date library
         std::string date_str = value.getString();
         std::regex date_pattern(R"(\d{4}-\d{2}-\d{2})");
         if (std::regex_match(date_str, date_pattern)) {

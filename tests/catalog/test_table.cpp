@@ -1,6 +1,7 @@
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "types/data_type.hpp"
+
 #include <gtest/gtest.h>
 
 using namespace velodb;
@@ -71,7 +72,8 @@ TEST_F(TableTest, InsertAndRetrieveTuple)
     EXPECT_EQ(table.getValue(0, 1).getString(), "Alice");
 }
 
-// TODO: Add more comprehensive table tests when table operations are implemented
+// TODO: Add more comprehensive table tests when table operations are
+// implemented
 // - Insert tuple tests
 // - Delete tuple tests
 // - Update tuple tests
