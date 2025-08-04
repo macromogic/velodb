@@ -1,10 +1,13 @@
 #include "operator/projection_operator.hpp"
 
 #include "catalog/table.hpp"
+#include "common/fmt.hpp"
 #include "common/result.hpp"
 #include "execution/execution_engine.hpp"
 #include "expression/expression.hpp"
 #include "operator/scan_filter_operator.hpp"
+
+#include <fmt/format.h>
 
 namespace velodb {
 
@@ -34,8 +37,6 @@ Result<View> ProjectionOperator::execute() const
     ViewTuple dummy_tuple(child_view, 0);
     size_t output_columns = output_schema_->getColumnCount();
     if (expressions_.empty()) {
-        // TODO: handle select * case.
-        // For now, output all columns not starting with '$'
         for (size_t i = 0; i < output_columns; ++i) {
             const auto& column_info = output_schema_->getColumnInfo(i);
             if (column_info.getName()[0] != '$') {
@@ -60,7 +61,7 @@ Result<View> ProjectionOperator::execute() const
                 break;
             }
             default:
-                VELODB_THROW(ExecutionError, "Unsupported expression type in projection: " + expr->toString());
+                VELODB_THROW(ExecutionError, fmt::format("Unsupported expression type in projection: {}", *expr));
                 break;
             }
         }

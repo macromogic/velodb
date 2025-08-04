@@ -1,6 +1,9 @@
 #include "catalog/schema.hpp"
 
 #include "common/exception.hpp"
+#include "common/fmt.hpp"
+
+#include <fmt/ranges.h>
 
 #include <stdexcept>
 #include <utility>
@@ -61,14 +64,7 @@ std::unique_ptr<Schema> Schema::cloneUniqueImpl() const
 
 std::string Schema::toString() const
 {
-    std::string result = "(";
-    for (size_t i = 0; i < columns_.size(); ++i) {
-        if (i > 0)
-            result += ", ";
-        result += columns_[i].toString();
-    }
-    result += ")";
-    return result;
+    return fmt::format("({})", fmt::join(columns_, ", "));
 }
 
 } // namespace velodb

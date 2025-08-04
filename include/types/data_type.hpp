@@ -2,6 +2,8 @@
 
 #include "common/copy_traits.hpp"
 
+#include <fmt/format.h>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -132,7 +134,7 @@ public:
         : DataType(DataTypeId::VARCHAR, max_length)
     {
     }
-    std::string toString() const override { return "VARCHAR(" + std::to_string(size_) + ")"; }
+    std::string toString() const override { return fmt::format("VARCHAR({})", size_); }
     bool isFixedSize() const override { return false; }
     bool isNumeric() const override { return false; }
 };

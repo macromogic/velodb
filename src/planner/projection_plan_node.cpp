@@ -1,8 +1,11 @@
 #include "planner/projection_plan_node.hpp"
 
 #include "common/exception.hpp"
+#include "common/fmt.hpp"
 #include "operator/projection_operator.hpp"
 #include "planner/execution_context.hpp"
+
+#include <fmt/ranges.h>
 
 #include <stdexcept>
 
@@ -33,20 +36,11 @@ std::unique_ptr<AbstractOperator> ProjectionPlanNode::createOperator(ExecutionCo
 
 std::string ProjectionPlanNode::toString() const
 {
-    std::string result = "Projection(";
-
     if (expressions_.empty()) {
-        result += "*";
+        return "Projection(*)";
     } else {
-        for (size_t i = 0; i < expressions_.size(); ++i) {
-            if (i > 0)
-                result += ", ";
-            result += expressions_[i]->toString();
-        }
+        return fmt::format("Projection({})", fmt::join(expressions_, ", "));
     }
-
-    result += ")";
-    return result;
 }
 
 } // namespace velodb

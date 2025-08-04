@@ -1,5 +1,7 @@
 #include "expression/column_ref_expression.hpp"
 
+#include <fmt/format.h>
+
 #include <utility>
 
 namespace velodb {
@@ -38,7 +40,7 @@ std::vector<size_t> ColumnRefExpression::getRequiredColumns(const Schema& schema
 std::string ColumnRefExpression::toString() const
 {
     if (has_column_index_) {
-        return "col_" + std::to_string(column_index_);
+        return fmt::format("col_{}", column_index_);
     }
     return column_name_;
 }

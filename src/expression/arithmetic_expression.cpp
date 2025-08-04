@@ -1,12 +1,31 @@
 #include "expression/arithmetic_expression.hpp"
 
 #include "common/exception.hpp"
+#include "common/fmt.hpp"
 #include "types/type_checker.hpp"
 
 #include <algorithm>
 #include <stdexcept>
 
 namespace velodb {
+
+auto format_as(ArithmeticType arith_type)
+{
+    switch (arith_type) {
+    case ArithmeticType::PLUS:
+        return "+";
+    case ArithmeticType::MINUS:
+        return "-";
+    case ArithmeticType::MULTIPLY:
+        return "*";
+    case ArithmeticType::DIVIDE:
+        return "/";
+    case ArithmeticType::MODULO:
+        return "%";
+    default:
+        return "(unknown)";
+    }
+}
 
 ArithmeticExpression::ArithmeticExpression(ArithmeticType arith_type,
                                            std::unique_ptr<AbstractExpression> left,
@@ -52,26 +71,7 @@ std::vector<size_t> ArithmeticExpression::getRequiredColumns(const Schema& schem
 
 std::string ArithmeticExpression::toString() const
 {
-    std::string op_str;
-    switch (arith_type_) {
-    case ArithmeticType::PLUS:
-        op_str = "+";
-        break;
-    case ArithmeticType::MINUS:
-        op_str = "-";
-        break;
-    case ArithmeticType::MULTIPLY:
-        op_str = "*";
-        break;
-    case ArithmeticType::DIVIDE:
-        op_str = "/";
-        break;
-    case ArithmeticType::MODULO:
-        op_str = "%";
-        break;
-    }
-
-    return "(" + left_->toString() + " " + op_str + " " + right_->toString() + ")";
+    return fmt::format("({} {} {})", *left_, arith_type_, *right_);
 }
 
 Value ArithmeticExpression::computeArithmetic(const Value& left_val, const Value& right_val, ArithmeticType op_type)

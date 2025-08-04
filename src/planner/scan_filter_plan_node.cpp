@@ -1,5 +1,6 @@
 #include "planner/scan_filter_plan_node.hpp"
 
+#include "common/fmt.hpp"
 #include "operator/compaction_operator.hpp"
 #include "operator/scan_filter_operator.hpp"
 #include "planner/execution_context.hpp"
@@ -25,7 +26,7 @@ std::string ScanFilterPlanNode::toString() const
 {
     std::string result = fmt::format("ScanFilter({})", table_.getName());
     if (predicate_) {
-        result += fmt::format(" WHERE {}", predicate_->toString());
+        result += fmt::format(" WHERE {}", *predicate_);
     }
     return result;
 }

@@ -39,8 +39,6 @@ private:
                                            std::string& result,
                                            int level);
 
-    static std::string planTypeToString(PlanType type);
-    static std::string getNodeLabel(const AbstractPlanNode& node);
     static std::string getNodeShape(PlanType type);
     static std::string getNodeColor(PlanType type);
     static std::string escapeForDot(const std::string& str);

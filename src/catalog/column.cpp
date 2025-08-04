@@ -1,6 +1,7 @@
 #include "catalog/column.hpp"
 
 #include "common/exception.hpp"
+#include "common/fmt.hpp"
 
 #include <fmt/core.h>
 
@@ -26,7 +27,7 @@ ColumnInfo ColumnInfo::cloneImpl() const
 
 std::string ColumnInfo::toString() const
 {
-    std::string result = fmt::format("{} {}", name_, type_->toString());
+    std::string result = fmt::format("{} {}", name_, *type_);
     if (!is_nullable_) {
         result += " NOT NULL";
     }
@@ -120,7 +121,7 @@ ViewColumn ValueColumn::viewAs(std::string alias) const
 
 std::string ValueColumn::toString() const
 {
-    std::string result = fmt::format("ValueColumn(name={}, type={}, size={}", getName(), type_->toString(), size());
+    std::string result = fmt::format("ValueColumn(name={}, type={}, size={}", getName(), *type_, size());
     if (!isNullable()) {
         result += ", not null";
     }
@@ -303,7 +304,7 @@ ViewColumn ViewColumn::viewAs(std::string alias) const
 
 std::string ViewColumn::toString() const
 {
-    std::string result = fmt::format("ViewColumn(name={}, type={}, size={}", getName(), type_.toString(), size());
+    std::string result = fmt::format("ViewColumn(name={}, type={}, size={}", getName(), type_, size());
 
     std::visit(
         [&result](const auto& mode) {

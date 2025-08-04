@@ -1,6 +1,7 @@
 #include "expression/cast_expression.hpp"
 
 #include "common/exception.hpp"
+#include "common/fmt.hpp"
 #include "types/type_checker.hpp"
 
 #include <algorithm>
@@ -35,7 +36,7 @@ std::vector<size_t> CastExpression::getRequiredColumns(const Schema& schema) con
 
 std::string CastExpression::toString() const
 {
-    return "CAST(" + operand_->toString() + " AS " + target_type_->toString() + ")";
+    return fmt::format("CAST({} AS {})", *operand_, *target_type_);
 }
 
 Value CastExpression::performCast(const Value& value, const DataType& target_type)
@@ -64,10 +65,10 @@ Value CastExpression::performCast(const Value& value, const DataType& target_typ
         case DataTypeId::TIMESTAMP:
             return castToTimestamp(value);
         default:
-            VELODB_THROW(TypeError, "Unsupported cast target type: " + target_type.toString());
+            VELODB_THROW(TypeError, fmt::format("Unsupported cast target type: {}", target_type));
         }
     } catch (const std::exception& e) {
-        VELODB_THROW(TypeError, "Cast operation failed: " + std::string(e.what()));
+        VELODB_THROW(TypeError, fmt::format("Cast operation failed: {}", e.what()));
     }
 }
 
@@ -90,11 +91,11 @@ Value CastExpression::castToBoolean(const Value& value)
         } else if (str == "false" || str == "f" || str == "0") {
             return Value::createBoolean(false);
         } else {
-            VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to boolean");
+            VELODB_THROW(TypeError, fmt::format("Cannot convert string '{}' to boolean", value.getString()));
         }
     }
     default:
-        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to boolean");
+        VELODB_THROW(TypeError, fmt::format("Cannot cast {} to boolean", value));
     }
 }
 
@@ -124,11 +125,11 @@ Value CastExpression::castToInteger(const Value& value)
             int32_t int_val = std::stoi(value.getString());
             return Value::createInteger(int_val);
         } catch (const std::exception&) {
-            VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to integer");
+            VELODB_THROW(TypeError, fmt::format("Cannot convert string '{}' to integer", value.getString()));
         }
     }
     default:
-        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to integer");
+        VELODB_THROW(TypeError, fmt::format("Cannot cast {} to integer", value));
     }
 }
 
@@ -153,11 +154,11 @@ Value CastExpression::castToBigInt(const Value& value)
             int64_t bigint_val = std::stoll(value.getString());
             return Value::createBigInt(bigint_val);
         } catch (const std::exception&) {
-            VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to bigint");
+            VELODB_THROW(TypeError, fmt::format("Cannot convert string '{}' to bigint", value.getString()));
         }
     }
     default:
-        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to bigint");
+        VELODB_THROW(TypeError, fmt::format("Cannot cast {} to bigint", value));
     }
 }
 
@@ -177,11 +178,11 @@ Value CastExpression::castToDouble(const Value& value)
             double double_val = std::stod(value.getString());
             return Value::createDouble(double_val);
         } catch (const std::exception&) {
-            VELODB_THROW(TypeError, "Cannot convert string '" + value.getString() + "' to double");
+            VELODB_THROW(TypeError, fmt::format("Cannot convert string '{}' to double", value.getString()));
         }
     }
     default:
-        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to double");
+        VELODB_THROW(TypeError, fmt::format("Cannot cast {} to double", value));
     }
 }
 
@@ -221,7 +222,7 @@ Value CastExpression::castToDate(const Value& value)
         // Extract date part from timestamp
         return Value::createString(value.getString().substr(0, 10)); // Simplified
     default:
-        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to date");
+        VELODB_THROW(TypeError, fmt::format("Cannot cast {} to date", value));
     }
 }
 
@@ -242,7 +243,7 @@ Value CastExpression::castToTimestamp(const Value& value)
         // Add default time to date
         return Value::createString(value.getString() + " 00:00:00"); // Simplified
     default:
-        VELODB_THROW(TypeError, "Cannot cast " + value.toString() + " to timestamp");
+        VELODB_THROW(TypeError, fmt::format("Cannot cast {} to timestamp", value));
     }
 }
 

@@ -10,8 +10,6 @@
 
 namespace velodb {
 
-// TODO: Implement full execution engine with late materialization
-
 // ExecutionEngine implementation
 ExecutionEngine::ExecutionEngine(Catalog& catalog)
     : catalog_(catalog)
@@ -22,7 +20,6 @@ ExecutionEngine::ExecutionEngine(Catalog& catalog)
 
 Result<View> ExecutionEngine::executeQuery(const std::string& sql)
 {
-    // TODO: Implement full SQL query execution
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(sql, &result);
 
@@ -39,7 +36,6 @@ Result<View> ExecutionEngine::executeQuery(const std::string& sql)
 
 Result<View> ExecutionEngine::executeStatement(const hsql::SQLStatement* statement)
 {
-    // TODO: Implement statement type dispatch
     switch (statement->type()) {
     case hsql::kStmtSelect:
         return executeSelect(dynamic_cast<const hsql::SelectStatement*>(statement));
@@ -50,7 +46,6 @@ Result<View> ExecutionEngine::executeStatement(const hsql::SQLStatement* stateme
 
 Result<View> ExecutionEngine::executeSelect(const hsql::SelectStatement* select_stmt)
 {
-    // TODO: Implement SELECT statement execution
     auto plan = planner_->planSelect(select_stmt);
     return executePlan(std::move(plan));
 }
@@ -66,7 +61,6 @@ Result<View> ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNode> plan
 
 std::unique_ptr<AbstractOperator> ExecutionEngine::createOperatorTree(const AbstractPlanNode& plan_node)
 {
-    // TODO: Implement plan node to operator conversion
     return plan_node.createOperator(*context_);
 }
 

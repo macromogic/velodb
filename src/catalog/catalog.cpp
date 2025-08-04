@@ -1,12 +1,13 @@
 #include "catalog/catalog.hpp"
 
+#include "common/fmt.hpp"
+
 #include <fmt/core.h>
 
 #include <stdexcept>
 
 namespace velodb {
 
-// TODO: Implement full catalog functionality
 bool Catalog::createTable(const std::string& table_name, std::unique_ptr<Schema> schema)
 {
     if (hasTable(table_name)) {
@@ -88,13 +89,12 @@ std::string Catalog::toString() const
     std::string result = fmt::format("Catalog: {} tables\n", tables_.size());
 
     for (const auto& pair : tables_) {
-        result += fmt::format("  Table: {} {}\n", pair.first, pair.second->getSchema().toString());
+        result += fmt::format("  Table: {} {}\n", pair.first, pair.second->getSchema());
     }
 
     return result;
 }
 
-// TODO: Implement catalog builder functionality
 CatalogBuilder& CatalogBuilder::addTable(const std::string& table_name, std::unique_ptr<Schema> schema)
 {
     catalog_->createTable(table_name, std::move(schema));

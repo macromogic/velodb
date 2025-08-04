@@ -2,8 +2,10 @@
 
 #include "catalog/table.hpp"
 #include "common/exception.hpp"
+#include "common/fmt.hpp"
 
 #include <fmt/core.h>
+#include <fmt/ranges.h>
 
 namespace velodb {
 
@@ -41,14 +43,7 @@ const Value& ValueTuple::getValue(const std::string& column_name) const
 
 std::string ValueTuple::toString() const
 {
-    std::string result = "(";
-    for (size_t i = 0; i < values_.size(); ++i) {
-        if (i > 0)
-            result += ", ";
-        result += values_[i].toString();
-    }
-    result += ")";
-    return result;
+    return fmt::format("({})", fmt::join(values_, ", "));
 }
 
 ViewTuple::ViewTuple(const TableBase& table, uint64_t row_id)

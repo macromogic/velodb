@@ -1,12 +1,12 @@
 #include "velodb.hpp"
 
+#include "common/fmt.hpp"
+
 #include <fmt/core.h>
 
 #include <stdexcept>
 
 namespace velodb {
-
-// TODO: Implement full Database class functionality
 
 // Database implementation
 Database::Database()
@@ -124,7 +124,7 @@ std::string Database::getDatabaseInfo() const
                        "\nCatalog Details:\n"
                        "{}",
                        getTableCount(),
-                       catalog_->toString());
+                       *catalog_);
 }
 
 } // namespace velodb

@@ -1,10 +1,33 @@
 #include "expression/comparison_expression.hpp"
 
 #include "common/exception.hpp"
+#include "common/fmt.hpp"
+
+#include <fmt/format.h>
 
 #include <stdexcept>
 
 namespace velodb {
+
+static auto format_as(ComparisonType comp_type)
+{
+    switch (comp_type) {
+    case ComparisonType::EQUAL:
+        return "=";
+    case ComparisonType::NOT_EQUAL:
+        return "!=";
+    case ComparisonType::LESS_THAN:
+        return "<";
+    case ComparisonType::LESS_THAN_OR_EQUAL:
+        return "<=";
+    case ComparisonType::GREATER_THAN:
+        return ">";
+    case ComparisonType::GREATER_THAN_OR_EQUAL:
+        return ">=";
+    default:
+        return "(unknown)";
+    }
+}
 
 ComparisonExpression::ComparisonExpression(ComparisonType comp_type,
                                            std::unique_ptr<AbstractExpression> left,
@@ -33,36 +56,11 @@ std::vector<size_t> ComparisonExpression::getRequiredColumns(const Schema& schem
 
 std::string ComparisonExpression::toString() const
 {
-    std::string op_str;
-    switch (comp_type_) {
-    case ComparisonType::EQUAL:
-        op_str = "=";
-        break;
-    case ComparisonType::NOT_EQUAL:
-        op_str = "!=";
-        break;
-    case ComparisonType::LESS_THAN:
-        op_str = "<";
-        break;
-    case ComparisonType::LESS_THAN_OR_EQUAL:
-        op_str = "<=";
-        break;
-    case ComparisonType::GREATER_THAN:
-        op_str = ">";
-        break;
-    case ComparisonType::GREATER_THAN_OR_EQUAL:
-        op_str = ">=";
-        break;
-    default:
-        op_str = "?";
-        break;
-    }
-    return "(" + left_->toString() + " " + op_str + " " + right_->toString() + ")";
+    return fmt::format("({} {} {})", *left_, comp_type_, *right_);
 }
 
 Value ComparisonExpression::compareValues(const Value& left_val, const Value& right_val) const
 {
-    // TODO: Implement full comparison logic for all types
     if (left_val.isNull() || right_val.isNull()) {
         return Value::createNull(DataTypeId::BOOLEAN);
     }
@@ -88,8 +86,7 @@ Value ComparisonExpression::compareValues(const Value& left_val, const Value& ri
         result = (left_val >= right_val);
         break;
     default:
-        VELODB_THROW(ExecutionError,
-                     "Comparison operator not implemented: " + std::to_string(static_cast<int>(comp_type_)));
+        VELODB_THROW(ExecutionError, fmt::format("Comparison operator {} not implemented", comp_type_));
     }
 
     return Value::createBoolean(result);

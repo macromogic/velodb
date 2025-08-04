@@ -1,5 +1,6 @@
 #include "types/type_checker.hpp"
 
+#include "common/fmt.hpp"
 #include "expression/expression.hpp"
 
 #include <fmt/core.h>
@@ -233,12 +234,12 @@ bool TypeChecker::validateArithmeticOperands(const DataType& left_type,
 {
     // All arithmetic operations require numeric operands
     if (!isNumericType(left_type)) {
-        setError(fmt::format("Left operand of arithmetic operation must be numeric, got {}", left_type.toString()));
+        setError(fmt::format("Left operand of arithmetic operation must be numeric, got {}", left_type));
         return false;
     }
 
     if (!isNumericType(right_type)) {
-        setError(fmt::format("Right operand of arithmetic operation must be numeric, got {}", right_type.toString()));
+        setError(fmt::format("Right operand of arithmetic operation must be numeric, got {}", right_type));
         return false;
     }
 
@@ -306,7 +307,7 @@ bool TypeChecker::validateComparisonOperands(const DataType& left_type,
         return true;
     }
 
-    setError(fmt::format("Cannot compare {} with {}", left_type.toString(), right_type.toString()));
+    setError(fmt::format("Cannot compare {} with {}", left_type, right_type));
     return false;
 }
 

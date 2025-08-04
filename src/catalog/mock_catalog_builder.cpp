@@ -358,7 +358,7 @@ std::unique_ptr<Schema> MockCatalogBuilder::createGenericSchema(const std::strin
 
     // Create generic columns with predictable names
     for (size_t i = 0; i < column_count; ++i) {
-        std::string column_name = "col_" + std::to_string(i);
+        std::string column_name = fmt::format("col_{}", i);
 
         // Vary the types to make it more realistic
         DataTypeId type;

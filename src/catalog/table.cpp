@@ -2,6 +2,7 @@
 
 #include "catalog/column.hpp"
 #include "common/exception.hpp"
+#include "common/fmt.hpp"
 
 #include <fmt/core.h>
 
@@ -34,9 +35,9 @@ TableBase::TableBase(std::unique_ptr<TableInfo> table_info)
 std::string TableBase::toString() const
 {
     std::string result = fmt::format("Table: {}\n", getName());
-    result += fmt::format("Schema: {}\n", getSchema().toString());
+    result += fmt::format("Schema: {}\n", getSchema());
     for (const auto& tuple : *this) {
-        result += fmt::format("{}\n", tuple.toString());
+        result += fmt::format("{}\n", tuple);
     }
     return result;
 }

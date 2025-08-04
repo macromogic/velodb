@@ -1,5 +1,9 @@
 #include "expression/logical_expression.hpp"
 
+#include "common/fmt.hpp"
+
+#include <fmt/format.h>
+
 namespace velodb {
 
 BinaryLogicalExpression::BinaryLogicalExpression(ConnectiveType connective_type,
@@ -49,8 +53,7 @@ std::vector<size_t> BinaryLogicalExpression::getRequiredColumns(const Schema& sc
 
 std::string BinaryLogicalExpression::toString() const
 {
-    return "(" + left_->toString() + (connective_type_ == ConnectiveType::AND ? " AND " : " OR ") + right_->toString()
-        + ")";
+    return fmt::format("({} {} {})", *left_, connective_type_ == ConnectiveType::AND ? "AND" : "OR", *right_);
 }
 
 LogicalNotExpression::LogicalNotExpression(std::unique_ptr<AbstractExpression> operand)
@@ -75,7 +78,7 @@ std::vector<size_t> LogicalNotExpression::getRequiredColumns(const Schema& schem
 
 std::string LogicalNotExpression::toString() const
 {
-    return "NOT (" + operand_->toString() + ")";
+    return fmt::format("NOT ({})", *operand_);
 }
 
 } // namespace velodb

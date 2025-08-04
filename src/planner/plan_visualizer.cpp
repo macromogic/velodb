@@ -1,10 +1,42 @@
 #include "planner/plan_visualizer.hpp"
 
+#include "common/fmt.hpp"
+
+#include <fmt/format.h>
+
 #include <iomanip>
 #include <map>
 #include <ostream>
 
 namespace velodb {
+
+auto format_as(PlanType type)
+{
+    switch (type) {
+    case PlanType::SCAN_FILTER:
+        return "Scan Filter";
+    case PlanType::COMPACTION:
+        return "Compaction";
+    case PlanType::PROJECTION:
+        return "Projection";
+    case PlanType::NESTED_LOOP_JOIN:
+        return "Nested Loop Join";
+    case PlanType::HASH_JOIN:
+        return "Hash Join";
+    case PlanType::MERGE_SORT_JOIN:
+        return "Merge Sort Join";
+    case PlanType::SORT:
+        return "Sort";
+    case PlanType::LIMIT:
+        return "Limit";
+    case PlanType::AGGREGATE:
+        return "Aggregate";
+    case PlanType::INVALID:
+        return "Invalid";
+    default:
+        return "Unknown";
+    }
+}
 
 // Static method implementations
 std::string PlanVisualizer::visualizeAsText(const std::unique_ptr<AbstractPlanNode>& plan_node, int indent)
@@ -75,12 +107,10 @@ void PlanVisualizer::visualizeTextRecursive(const std::unique_ptr<AbstractPlanNo
     }
 
     // Add node information
-    result += getNodeLabel(*plan_node);
-    result += " [" + planTypeToString(plan_node->getPlanType()) + "]";
-
-    // Add schema information
-    const auto& schema = plan_node->getOutputSchema();
-    result += " (cols: " + std::to_string(schema.getColumnCount()) + ")\n";
+    result += fmt::format("{} [{}] (cols: {})\n",
+                          *plan_node,
+                          plan_node->getPlanType(),
+                          plan_node->getOutputSchema().getColumnCount());
 
     // Recursively process children
     const auto& children = plan_node->getChildren();
@@ -100,11 +130,12 @@ void PlanVisualizer::visualizeGraphvizRecursive(const std::unique_ptr<AbstractPl
     int current_node = node_counter++;
 
     // Create node
-    result += "  node" + std::to_string(current_node) + " [";
-    result += "label=\"" + escapeForDot(getNodeLabel(*plan_node)) + "\", ";
-    result += "shape=" + getNodeShape(plan_node->getPlanType()) + ", ";
-    result += "fillcolor=\"" + getNodeColor(plan_node->getPlanType()) + "\"";
-    result += "];\n";
+    auto plan_type = plan_node->getPlanType();
+    result += fmt::format("  node {} [label=\"{}\", shape={}, fillcolor=\"{}\"];\n",
+                          current_node,
+                          escapeForDot(plan_node->toString()),
+                          getNodeShape(plan_type),
+                          getNodeColor(plan_type));
 
     // Process children and create edges
     const auto& children = plan_node->getChildren();
@@ -113,7 +144,7 @@ void PlanVisualizer::visualizeGraphvizRecursive(const std::unique_ptr<AbstractPl
         visualizeGraphvizRecursive(child, result, node_counter);
 
         // Create edge from current node to child
-        result += "  node" + std::to_string(current_node) + " -> node" + std::to_string(child_node) + ";\n";
+        result += fmt::format("  node {} -> node {};\n", current_node, child_node);
     }
 }
 
@@ -127,29 +158,31 @@ void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPl
 
     // Create level indicator
     std::string prefix(level * 2, ' ');
-    result += prefix + "Level " + std::to_string(level) + ": ";
-
-    // Node type and basic info
-    result += planTypeToString(plan_node->getPlanType()) + "\n";
-    result += prefix + "  Description: " + plan_node->toString() + "\n";
-
-    // Schema details
     const auto& schema = plan_node->getOutputSchema();
-    result += prefix + "  Output Schema:\n";
-    result += prefix + "    Column Count: " + std::to_string(schema.getColumnCount()) + "\n";
+    result += fmt::format("{}Level {}: {}\n"
+                          "{}  Description: {}\n"
+                          "{}  Output Schema:\n"
+                          "{}    Column Count: {}\n",
+                          prefix,
+                          level,
+                          plan_node->getPlanType(),
+                          prefix,
+                          *plan_node,
+                          prefix,
+                          prefix,
+                          schema.getColumnCount());
 
     for (size_t i = 0; i < schema.getColumnCount(); ++i) {
         const auto& column = schema.getColumnInfo(i);
-        result += prefix + "    [" + std::to_string(i) + "] " + column.getName() + " (" + column.getType().toString()
-            + ")\n";
+        result += fmt::format("{}    [{}] {} ({})\n", prefix, i, column.getName(), column.getType());
     }
 
     // Children info
     const auto& children = plan_node->getChildren();
     if (!children.empty()) {
-        result += prefix + "  Children: " + std::to_string(children.size()) + "\n";
+        result += fmt::format("{}  Children: {}\n", prefix, children.size());
         for (size_t i = 0; i < children.size(); ++i) {
-            result += prefix + "  Child " + std::to_string(i) + ":\n";
+            result += fmt::format("{}  Child {}:\n", prefix, i);
             visualizeDetailedRecursive(children[i], result, level + 1);
         }
     } else {
@@ -157,39 +190,6 @@ void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPl
     }
 
     result += "\n";
-}
-
-std::string PlanVisualizer::planTypeToString(PlanType type)
-{
-    switch (type) {
-    case PlanType::SCAN_FILTER:
-        return "Scan Filter";
-    case PlanType::COMPACTION:
-        return "Compaction";
-    case PlanType::PROJECTION:
-        return "Projection";
-    case PlanType::NESTED_LOOP_JOIN:
-        return "Nested Loop Join";
-    case PlanType::HASH_JOIN:
-        return "Hash Join";
-    case PlanType::MERGE_SORT_JOIN:
-        return "Merge Sort Join";
-    case PlanType::SORT:
-        return "Sort";
-    case PlanType::LIMIT:
-        return "Limit";
-    case PlanType::AGGREGATE:
-        return "Aggregate";
-    case PlanType::INVALID:
-        return "Invalid";
-    default:
-        return "Unknown";
-    }
-}
-
-std::string PlanVisualizer::getNodeLabel(const AbstractPlanNode& node)
-{
-    return node.toString();
 }
 
 std::string PlanVisualizer::getNodeShape(PlanType type)

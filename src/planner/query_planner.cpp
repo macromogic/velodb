@@ -9,6 +9,72 @@
 #include "types/data_type.hpp"
 
 #include <SQLParser.h>
+#include <fmt/format.h>
+
+namespace hsql {
+
+static auto format_as(OperatorType op_type)
+{
+    switch (op_type) {
+    case OperatorType::kOpNone:
+        return "NONE";
+    case OperatorType::kOpBetween:
+        return "BETWEEN";
+    case OperatorType::kOpCase:
+        return "CASE";
+    case OperatorType::kOpCaseListElement:
+        return "WHEN ... THEN";
+    case OperatorType::kOpPlus:
+        return "+";
+    case OperatorType::kOpMinus:
+        return "-";
+    case OperatorType::kOpAsterisk:
+        return "*";
+    case OperatorType::kOpSlash:
+        return "/";
+    case OperatorType::kOpPercentage:
+        return "%";
+    case OperatorType::kOpCaret:
+        return "^";
+    case OperatorType::kOpEquals:
+        return "=";
+    case OperatorType::kOpNotEquals:
+        return "!=";
+    case OperatorType::kOpLess:
+        return "<";
+    case OperatorType::kOpLessEq:
+        return "<=";
+    case OperatorType::kOpGreater:
+        return ">";
+    case OperatorType::kOpGreaterEq:
+        return ">=";
+    case OperatorType::kOpLike:
+        return "LIKE";
+    case OperatorType::kOpNotLike:
+        return "NOT LIKE";
+    case OperatorType::kOpILike:
+        return "ILIKE";
+    case OperatorType::kOpAnd:
+        return "AND";
+    case OperatorType::kOpOr:
+        return "OR";
+    case OperatorType::kOpIn:
+        return "IN";
+    case OperatorType::kOpConcat:
+        return "CONCAT";
+    case OperatorType::kOpNot:
+        return "NOT";
+    case OperatorType::kOpUnaryMinus:
+        return "- (unary)";
+    case OperatorType::kOpIsNull:
+        return "IS NULL";
+    case OperatorType::kOpExists:
+        return "EXISTS";
+    }
+    __builtin_unreachable();
+}
+
+} // namespace hsql
 
 namespace velodb {
 
@@ -53,7 +119,6 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
 std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRef* table_ref,
                                                              std::unique_ptr<AbstractExpression> predicate)
 {
-    // TODO: Implement full table reference planning
     switch (table_ref->type) {
     case hsql::kTableName: {
         std::string const table_name = table_ref->name;
@@ -75,9 +140,10 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRe
     case hsql::kTableJoin:
         // TODO: Handle joins
         VELODB_THROW(ExecutionError, "Joins not implemented");
-    default:
-        VELODB_THROW(ExecutionError, "Unsupported table reference type");
+    case hsql::kTableCrossProduct:
+        VELODB_THROW(ExecutionError, "Cross products not supported");
     }
+    __builtin_unreachable();
 }
 
 std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::TableRef* table_ref,
@@ -102,9 +168,7 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::Tab
     case hsql::kExprOperator:
         return planOperator(table_ref, expr);
     case hsql::kExprStar:
-        VELODB_THROW(ExecutionError,
-                     "* expression should be handled in planSelectList, not "
-                     "planExpression");
+        VELODB_THROW(ExecutionError, "* expression should be handled in planSelectList, not planExpression");
     default:
         VELODB_THROW(ExecutionError, "Expression type not implemented");
     }
@@ -233,13 +297,8 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planOperator(const hsql::Table
                                                          std::move(left_comparison),
                                                          std::move(right_comparison));
     }
-    case hsql::kOpIn: {
-        // TODO: Implement IN operator
-        VELODB_THROW(ExecutionError, "IN operator not implemented");
-    }
-    // TODO: Implement other complex operators
     default:
-        VELODB_THROW(ExecutionError, "Operator not implemented: " + std::to_string(static_cast<int>(expr->opType)));
+        VELODB_THROW(ExecutionError, fmt::format("Operator '{}' not implemented", expr->opType));
     }
 }
 
@@ -297,7 +356,7 @@ std::unique_ptr<Schema> QueryPlanner::inferProjectionSchema(
             break;
         case ExpressionType::CONSTANT:
         default:
-            columns.emplace_back("col_" + std::to_string(i), std::move(return_type));
+            columns.emplace_back(fmt::format("col_{}", i), std::move(return_type));
             break;
         }
     }

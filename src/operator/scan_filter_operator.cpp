@@ -1,5 +1,6 @@
 #include "operator/scan_filter_operator.hpp"
 
+#include "common/fmt.hpp"
 #include "execution/execution_engine.hpp"
 #include "expression/expression.hpp"
 
@@ -43,7 +44,7 @@ std::string ScanFilterOperator::toString() const
 {
     std::string result = fmt::format("ScanFilterOperator({})", table_.getName());
     if (predicate_) {
-        result += fmt::format(" WHERE {}", predicate_->toString());
+        result += fmt::format(" WHERE {}", *predicate_);
     }
     return result;
 }
