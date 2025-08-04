@@ -34,7 +34,7 @@ Result<View> ScanFilterOperator::execute() const
         ++row_id;
     }
 
-    auto view = table_.viewAs("seq_scan_result");
+    auto view = table_.view();
     view.addColumn(rowids.view());
     view.addColumn(masks.view());
     return Result<View>::success(std::move(view));

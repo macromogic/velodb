@@ -13,6 +13,8 @@
 
 namespace velodb {
 
+constexpr size_t MAX_BATCH_SIZE = 32;
+
 // Forward declarations
 class ExecutionContext;
 class View;

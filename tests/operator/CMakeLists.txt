@@ -1,14 +1,7 @@
 add_executable(test_operator test_operator.cpp ../test_main.cpp)
 
-target_link_libraries(
-  test_operator
-  ${ALL_OBJS}
-  sqlparser
-  backward
-  fmt::fmt
-  GTest::GTest
-  GTest::Main
-  pthread)
+target_link_libraries(test_operator ${ALL_OBJS} ${DEPENDENCY_LIBS} GTest::GTest
+                      GTest::Main pthread)
 
 set_property(TARGET test_operator PROPERTY CXX_STANDARD 17)
 set_property(TARGET test_operator PROPERTY CXX_STANDARD_REQUIRED ON)

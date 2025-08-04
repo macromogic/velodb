@@ -1,15 +1,8 @@
 add_executable(test_filter test_filter_complex.cpp test_filter.cpp
                            ../test_main.cpp)
 
-target_link_libraries(
-  test_filter
-  ${ALL_OBJS}
-  sqlparser
-  backward
-  fmt::fmt
-  GTest::GTest
-  GTest::Main
-  pthread)
+target_link_libraries(test_filter ${ALL_OBJS} ${DEPENDENCY_LIBS} GTest::GTest
+                      GTest::Main pthread)
 
 set_property(TARGET test_filter PROPERTY CXX_STANDARD 17)
 set_property(TARGET test_filter PROPERTY CXX_STANDARD_REQUIRED ON)

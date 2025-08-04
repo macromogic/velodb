@@ -1,7 +1,6 @@
 #pragma once
 
 #include <backward.hpp>
-#include <fmt/core.h>
 
 #include <exception>
 #include <memory>

@@ -13,11 +13,7 @@ add_library(
   seq_scan_plan_node.cpp
   sort_plan_node.cpp)
 
-target_include_directories(
-  velodb_planner PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/src
-                         ${CMAKE_SOURCE_DIR}/thirdparty/backward-cpp)
-
-target_link_libraries(velodb_planner fmt::fmt)
+target_link_libraries(velodb_planner ${DEPENDENCY_LIBS})
 
 set(ALL_OBJS
     ${ALL_OBJS} $<TARGET_OBJECTS:velodb_planner>

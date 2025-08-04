@@ -98,6 +98,54 @@ private:
     std::variant<T, E> value_;
 };
 
+template <typename E>
+class Result<void, E> {
+public:
+    explicit Result(E&& error)
+        : error_(std::forward<E>(error))
+    {
+    }
+    explicit Result(const E& error)
+        : error_(error)
+    {
+    }
+    // Query methods
+    bool ok() const noexcept { return !error_.has_value(); }
+
+    bool err() const noexcept { return error_.has_value(); }
+
+    explicit operator bool() const noexcept { return ok(); }
+
+    // Access methods
+    const E& error() const&
+    {
+        if (!err()) {
+            VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
+        }
+        return *error_;
+    }
+
+    E&& error() &&
+    {
+        if (!err()) {
+            VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
+        }
+        return std::move(*error_);
+    }
+
+    // Factory methods
+    static Result success() { return Result(); }
+
+    static Result failure(E&& error) { return Result(std::forward<E>(error)); }
+
+    static Result failure(const E& error) { return Result(error); }
+
+private:
+    Result() = default;
+
+    std::optional<E> error_;
+};
+
 // Convenience aliases
 template <typename T>
 using UniqueResult = Result<std::unique_ptr<T>, std::string>;

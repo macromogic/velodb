@@ -1,6 +1,7 @@
 #include "velodb.hpp"
 
 #include "common/fmt.hpp"
+#include "kernels/warmup.hpp"
 
 #include <fmt/core.h>
 
@@ -15,11 +16,14 @@ Database::Database()
     execution_engine_ = std::make_unique<ExecutionEngine>(*catalog_);
 }
 
-bool Database::initialize()
+void Database::initialize()
 {
     // TODO: Implement database initialization
+    auto result = runtime_warmup();
+    if (!result.ok()) {
+        throw std::runtime_error(fmt::format("Failed to initialize database: {}", result.error()));
+    }
     initialized_ = true;
-    return true;
 }
 
 void Database::shutdown()

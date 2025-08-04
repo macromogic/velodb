@@ -10,11 +10,7 @@ add_library(
   seq_scan_operator.cpp
   sort_operator.cpp)
 
-target_include_directories(
-  velodb_operator PRIVATE ${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/src
-                          ${CMAKE_SOURCE_DIR}/thirdparty/backward-cpp)
-
-target_link_libraries(velodb_operator fmt::fmt)
+target_link_libraries(velodb_operator ${DEPENDENCY_LIBS})
 
 set(ALL_OBJS
     ${ALL_OBJS} $<TARGET_OBJECTS:velodb_operator>

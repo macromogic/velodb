@@ -1,5 +1,7 @@
 #include "common/exception.hpp"
 
+#include <fmt/format.h>
+
 #include <sstream>
 
 namespace velodb {

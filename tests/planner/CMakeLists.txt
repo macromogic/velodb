@@ -1,15 +1,8 @@
 add_executable(test_planner test_plan_visualization.cpp test_planner.cpp
                             ../test_main.cpp)
 
-target_link_libraries(
-  test_planner
-  ${ALL_OBJS}
-  sqlparser
-  backward
-  fmt::fmt
-  GTest::GTest
-  GTest::Main
-  pthread)
+target_link_libraries(test_planner ${ALL_OBJS} ${DEPENDENCY_LIBS} GTest::GTest
+                      GTest::Main pthread)
 
 set_property(TARGET test_planner PROPERTY CXX_STANDARD 17)
 set_property(TARGET test_planner PROPERTY CXX_STANDARD_REQUIRED ON)

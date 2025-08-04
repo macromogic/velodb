@@ -37,7 +37,7 @@ public:
     Database& operator=(const Database&) = delete;
 
     // Database operations
-    bool initialize();
+    void initialize();
     void shutdown();
 
     // Table management
