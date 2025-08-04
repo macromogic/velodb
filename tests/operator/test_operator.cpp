@@ -1,8 +1,8 @@
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "expression/expression.hpp"
-#include "operator/compaction_operator.hpp"
-#include "operator/scan_filter_operator.hpp"
+#include "operator/filter_compaction_operator.hpp"
+#include "operator/seq_scan_operator.hpp"
 #include "types/data_type.hpp"
 
 #include <gtest/gtest.h>
@@ -67,11 +67,11 @@ TEST_F(OperatorTest, ScanFilterOperatorWithPredicate)
 
     auto& test_table = catalog_->getTable("test_table").value().get();
     auto scan_op = std::make_unique<ScanFilterOperator>(*catalog_, test_table, std::move(predicate));
-    auto compaction_op = std::make_unique<CompactionOperator>(*catalog_,
-                                                              scan_op->getOutputSchema().cloneUnique(),
-                                                              std::move(scan_op));
+    auto filter_compaction_op = std::make_unique<FilterCompactionOperator>(*catalog_,
+                                                                           scan_op->getOutputSchema().cloneUnique(),
+                                                                           std::move(scan_op));
 
-    auto view_result = compaction_op->execute();
+    auto view_result = filter_compaction_op->execute();
     EXPECT_TRUE(view_result.ok());
     auto view = std::move(view_result.value());
 

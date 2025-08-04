@@ -1,4 +1,4 @@
-#include "operator/scan_filter_operator.hpp"
+#include "operator/seq_scan_operator.hpp"
 
 #include "common/fmt.hpp"
 #include "execution/execution_engine.hpp"
@@ -34,7 +34,7 @@ Result<View> ScanFilterOperator::execute() const
         ++row_id;
     }
 
-    auto view = table_.viewAs("scan_filter_result");
+    auto view = table_.viewAs("seq_scan_result");
     view.addColumn(rowids.view());
     view.addColumn(masks.view());
     return Result<View>::success(std::move(view));

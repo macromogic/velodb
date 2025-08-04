@@ -13,10 +13,10 @@ namespace velodb {
 auto format_as(PlanType type)
 {
     switch (type) {
-    case PlanType::SCAN_FILTER:
+    case PlanType::SEQ_SCAN:
         return "Scan Filter";
     case PlanType::COMPACTION:
-        return "Compaction";
+        return "FilterCompaction";
     case PlanType::PROJECTION:
         return "Projection";
     case PlanType::NESTED_LOOP_JOIN:
@@ -195,7 +195,7 @@ void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPl
 std::string PlanVisualizer::getNodeShape(PlanType type)
 {
     switch (type) {
-    case PlanType::SCAN_FILTER:
+    case PlanType::SEQ_SCAN:
         return "diamond";
     case PlanType::PROJECTION:
         return "ellipse";
@@ -217,7 +217,7 @@ std::string PlanVisualizer::getNodeShape(PlanType type)
 std::string PlanVisualizer::getNodeColor(PlanType type)
 {
     switch (type) {
-    case PlanType::SCAN_FILTER:
+    case PlanType::SEQ_SCAN:
         return "yellow";
     case PlanType::PROJECTION:
         return "lightgreen";

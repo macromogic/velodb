@@ -65,7 +65,7 @@ static auto format_as(OperatorType op_type)
     case OperatorType::kOpNot:
         return "NOT";
     case OperatorType::kOpUnaryMinus:
-        return "- (unary)";
+        return "-";
     case OperatorType::kOpIsNull:
         return "IS NULL";
     case OperatorType::kOpExists:
@@ -127,12 +127,12 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRe
             VELODB_THROW(CatalogError, "Table not found: " + table_name);
         }
         auto output_schema = inferScanFilterSchema(table->get().getSchema());
-        auto scan_filter_plan = std::make_unique<ScanFilterPlanNode>(*table,
-                                                                     output_schema->cloneUnique(),
-                                                                     std::move(predicate));
-        auto compaction_plan = std::make_unique<CompactionPlanNode>(std::move(output_schema));
-        compaction_plan->addChild(std::move(scan_filter_plan));
-        return compaction_plan;
+        auto seq_scan_plan = std::make_unique<ScanFilterPlanNode>(*table,
+                                                                  output_schema->cloneUnique(),
+                                                                  std::move(predicate));
+        auto filter_compaction_plan = std::make_unique<FilterCompactionPlanNode>(std::move(output_schema));
+        filter_compaction_plan->addChild(std::move(seq_scan_plan));
+        return filter_compaction_plan;
     }
     case hsql::kTableSelect:
         // TODO: Handle subqueries

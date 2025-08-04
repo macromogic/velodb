@@ -17,7 +17,7 @@ class ExecutionContext;
 // Plan node types
 enum class PlanType {
     INVALID = 0,
-    SCAN_FILTER,
+    SEQ_SCAN,
     COMPACTION,
     PROJECTION,
     NESTED_LOOP_JOIN,

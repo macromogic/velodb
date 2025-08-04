@@ -1,4 +1,4 @@
-#include "operator/compaction_operator.hpp"
+#include "operator/filter_compaction_operator.hpp"
 
 #include "catalog/column.hpp"
 #include "catalog/schema.hpp"
@@ -12,18 +12,18 @@
 
 namespace velodb {
 
-CompactionOperator::CompactionOperator(Catalog& catalog,
-                                       std::unique_ptr<Schema> output_schema,
-                                       std::unique_ptr<AbstractOperator> child)
+FilterCompactionOperator::FilterCompactionOperator(Catalog& catalog,
+                                                   std::unique_ptr<Schema> output_schema,
+                                                   std::unique_ptr<AbstractOperator> child)
     : UnaryOperator(catalog, std::move(output_schema), std::move(child))
 {
 }
 
-Result<View> CompactionOperator::execute() const
+Result<View> FilterCompactionOperator::execute() const
 {
     auto* child = getChild();
     if (!child) {
-        return Result<View>::failure("CompactionOperator requires a child operator");
+        return Result<View>::failure("FilterCompactionOperator requires a child operator");
     }
 
     // Execute child operator first

@@ -1,8 +1,8 @@
-#include "planner/scan_filter_plan_node.hpp"
+#include "planner/seq_scan_plan_node.hpp"
 
 #include "common/fmt.hpp"
-#include "operator/compaction_operator.hpp"
-#include "operator/scan_filter_operator.hpp"
+#include "operator/filter_compaction_operator.hpp"
+#include "operator/seq_scan_operator.hpp"
 #include "planner/execution_context.hpp"
 
 namespace velodb {
@@ -11,7 +11,7 @@ namespace velodb {
 ScanFilterPlanNode::ScanFilterPlanNode(const TableBase& table,
                                        std::unique_ptr<Schema> output_schema,
                                        std::unique_ptr<AbstractExpression> predicate)
-    : AbstractPlanNode(PlanType::SCAN_FILTER, std::move(output_schema))
+    : AbstractPlanNode(PlanType::SEQ_SCAN, std::move(output_schema))
     , table_(table)
     , predicate_(std::move(predicate))
 {

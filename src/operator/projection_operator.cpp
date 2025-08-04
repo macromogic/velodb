@@ -5,7 +5,7 @@
 #include "common/result.hpp"
 #include "execution/execution_engine.hpp"
 #include "expression/expression.hpp"
-#include "operator/scan_filter_operator.hpp"
+#include "operator/seq_scan_operator.hpp"
 
 #include <fmt/format.h>
 
