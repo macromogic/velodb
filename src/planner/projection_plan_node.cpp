@@ -1,9 +1,9 @@
 #include "planner/projection_plan_node.hpp"
 
+#include "catalog/execution_context.hpp"
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
 #include "operator/projection_operator.hpp"
-#include "planner/execution_context.hpp"
 
 #include <fmt/ranges.h>
 
@@ -28,7 +28,7 @@ std::unique_ptr<AbstractOperator> ProjectionPlanNode::createOperator(ExecutionCo
 
     auto child_operator = children_[0]->createOperator(context);
 
-    return std::make_unique<ProjectionOperator>(context.getCatalog(),
+    return std::make_unique<ProjectionOperator>(context,
                                                 output_schema_->cloneUnique(),
                                                 std::move(child_operator),
                                                 std::move(expressions_));

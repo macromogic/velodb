@@ -29,8 +29,6 @@ public:
     std::optional<std::reference_wrapper<Table>> getTable(const std::string& table_name) const;
     std::optional<std::reference_wrapper<Table>> getTable(const char* table_name) const;
 
-    ValueColumn& createTemporaryColumn(const std::string& column_name, std::unique_ptr<DataType> type);
-
     // Catalog information
     std::vector<std::string> getTableNames() const;
     size_t getTableCount() const { return tables_.size(); }

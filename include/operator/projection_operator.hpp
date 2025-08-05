@@ -15,13 +15,13 @@ class TableBase;
 // Projection operator - handles final materialization and projection
 class ProjectionOperator : public UnaryOperator {
 public:
-    ProjectionOperator(Catalog& catalog,
+    ProjectionOperator(ExecutionContext& context,
                        std::unique_ptr<Schema> output_schema,
                        std::unique_ptr<AbstractOperator> child,
                        std::vector<std::unique_ptr<AbstractExpression>> expressions);
     ~ProjectionOperator() override = default;
 
-    Result<View> execute() const override;
+    Result<View> next() const override;
 
 private:
     std::vector<std::unique_ptr<AbstractExpression>> expressions_;

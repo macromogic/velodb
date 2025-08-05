@@ -12,14 +12,14 @@
 
 namespace velodb {
 
-FilterCompactionOperator::FilterCompactionOperator(Catalog& catalog,
+FilterCompactionOperator::FilterCompactionOperator(ExecutionContext& context,
                                                    std::unique_ptr<Schema> output_schema,
                                                    std::unique_ptr<AbstractOperator> child)
-    : UnaryOperator(catalog, std::move(output_schema), std::move(child))
+    : UnaryOperator(context, std::move(output_schema), std::move(child))
 {
 }
 
-Result<View> FilterCompactionOperator::execute() const
+Result<View> FilterCompactionOperator::next() const
 {
     auto* child = getChild();
     if (!child) {
@@ -27,7 +27,7 @@ Result<View> FilterCompactionOperator::execute() const
     }
 
     // Execute child operator first
-    auto child_result = child->execute();
+    auto child_result = child->next();
     if (!child_result) {
         return child_result; // Propagate error from child
     }
@@ -44,7 +44,7 @@ Result<View> FilterCompactionOperator::execute() const
     columns.reserve(column_count);
     for (size_t i = 0; i < column_count; ++i) {
         const auto& column_info = output_schema_->getColumnInfo(i);
-        columns.push_back(catalog_.createTemporaryColumn(column_info.getName(), column_info.getType().cloneUnique()));
+        columns.push_back(context_.createTemporaryColumn(column_info.getName(), column_info.getType().cloneUnique()));
     }
     for (const auto& tuple : input_view) {
         // Check if the row should be included based on $_mask

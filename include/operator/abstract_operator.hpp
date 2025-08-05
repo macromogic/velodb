@@ -1,6 +1,6 @@
 #pragma once
 
-#include "catalog/catalog.hpp"
+#include "catalog/execution_context.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "common/copy_traits.hpp"
@@ -13,8 +13,6 @@
 
 namespace velodb {
 
-constexpr size_t MAX_BATCH_SIZE = 32;
-
 // Forward declarations
 class ExecutionContext;
 class View;
@@ -22,22 +20,24 @@ class View;
 // Abstract base class for all operators
 class AbstractOperator : private NonCopyable {
 public:
-    explicit AbstractOperator(Catalog& catalog, std::unique_ptr<Schema> output_schema);
+    explicit AbstractOperator(ExecutionContext& context, std::unique_ptr<Schema> output_schema);
     virtual ~AbstractOperator() = default;
 
     const Schema& getOutputSchema() const { return *output_schema_; }
 
-    virtual Result<View> execute() const = 0;
+    virtual Result<View> next() const = 0;
     virtual bool isUnary() const = 0;
 
+    static constexpr size_t MAX_BATCH_SIZE = 32;
+
 protected:
-    Catalog& catalog_; // Reference to the catalog for table access
+    ExecutionContext& context_;
     std::unique_ptr<Schema> output_schema_;
 };
 
 class UnaryOperator : public AbstractOperator {
 public:
-    explicit UnaryOperator(Catalog& catalog,
+    explicit UnaryOperator(ExecutionContext& context,
                            std::unique_ptr<Schema> output_schema,
                            std::unique_ptr<AbstractOperator> child);
 
@@ -51,7 +51,7 @@ private:
 
 class BinaryOperator : public AbstractOperator {
 public:
-    BinaryOperator(Catalog& catalog,
+    BinaryOperator(ExecutionContext& context,
                    std::unique_ptr<Schema> output_schema,
                    std::unique_ptr<AbstractOperator> left_child,
                    std::unique_ptr<AbstractOperator> right_child);

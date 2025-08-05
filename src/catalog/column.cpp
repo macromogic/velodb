@@ -119,6 +119,36 @@ ViewColumn ValueColumn::viewAs(std::string alias) const
     return { *type_, std::move(alias), values_ };
 }
 
+ViewColumn ValueColumn::slice(size_t start_row, size_t end_row) const
+{
+    if (start_row > end_row || end_row > values_.size()) {
+        VELODB_THROW(CatalogError, "Invalid slice range");
+    }
+    return { *type_, getName(), values_, start_row, end_row };
+}
+
+ViewColumn ValueColumn::indices(const std::vector<size_t>& indices) const
+{
+    // Validate all indices are within bounds
+    for (size_t idx : indices) {
+        if (idx >= values_.size()) {
+            VELODB_THROW(CatalogError, "Index out of range in column indices view");
+        }
+    }
+    return { *type_, getName(), values_, indices };
+}
+
+ViewColumn ValueColumn::filterValues(std::function<bool(const Value&)> predicate) const
+{
+    std::vector<size_t> matching_indices;
+    for (size_t i = 0; i < values_.size(); ++i) {
+        if (predicate(values_[i])) {
+            matching_indices.push_back(i);
+        }
+    }
+    return { *type_, getName(), values_, std::move(matching_indices) };
+}
+
 std::string ValueColumn::toString() const
 {
     std::string result = fmt::format("ValueColumn(name={}, type={}, size={}", getName(), *type_, size());

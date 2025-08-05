@@ -11,11 +11,11 @@ class View;
 
 class FilterCompactionOperator : public UnaryOperator {
 public:
-    FilterCompactionOperator(Catalog& catalog,
+    FilterCompactionOperator(ExecutionContext& context,
                              std::unique_ptr<Schema> output_schema,
                              std::unique_ptr<AbstractOperator> child);
     ~FilterCompactionOperator() override = default;
-    Result<View> execute() const override;
+    Result<View> next() const override;
 };
 
 } // namespace velodb

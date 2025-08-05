@@ -3,6 +3,7 @@
 #include "common/copy_traits.hpp"
 #include "types/value.hpp"
 
+#include <functional>
 #include <variant>
 #include <vector>
 
@@ -86,6 +87,11 @@ public:
 
     ViewColumn view() const override;
     ViewColumn viewAs(std::string alias) const override;
+
+    // Enhanced view creation methods (similar to Table interface)
+    ViewColumn slice(size_t start_row, size_t end_row) const;
+    ViewColumn indices(const std::vector<size_t>& indices) const;
+    ViewColumn filterValues(std::function<bool(const Value&)> predicate) const;
 
     std::string toString() const override;
 

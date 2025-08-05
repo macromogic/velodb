@@ -2,7 +2,6 @@ add_library(
   velodb_planner OBJECT
   abstract_plan_node.cpp
   filter_compaction_plan_node.cpp
-  execution_context.cpp
   hash_join_plan_node.cpp
   limit_plan_node.cpp
   merge_sort_join_plan_node.cpp

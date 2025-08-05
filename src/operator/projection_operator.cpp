@@ -12,22 +12,22 @@
 namespace velodb {
 
 // ProjectionOperator implementation
-ProjectionOperator::ProjectionOperator(Catalog& catalog,
+ProjectionOperator::ProjectionOperator(ExecutionContext& context,
                                        std::unique_ptr<Schema> output_schema,
                                        std::unique_ptr<AbstractOperator> child,
                                        std::vector<std::unique_ptr<AbstractExpression>> expressions)
-    : UnaryOperator(catalog, std::move(output_schema), std::move(child))
+    : UnaryOperator(context, std::move(output_schema), std::move(child))
     , expressions_(std::move(expressions))
 {
 }
 
-Result<View> ProjectionOperator::execute() const
+Result<View> ProjectionOperator::next() const
 {
     auto* child = getChild();
     if (!child) {
         return Result<View>::failure("ProjectionOperator requires a child operator");
     }
-    auto child_result = child->execute();
+    auto child_result = child->next();
     if (!child_result) {
         return child_result; // Propagate error from child
     }
@@ -54,7 +54,7 @@ Result<View> ProjectionOperator::execute() const
                 break;
             }
             case ExpressionType::CONSTANT: {
-                ValueColumn& constant_col = catalog_.createTemporaryColumn(column_info.getName(),
+                ValueColumn& constant_col = context_.createTemporaryColumn(column_info.getName(),
                                                                            expr->getReturnType().cloneUnique());
                 constant_col.fill(expr->evaluate(dummy_tuple, child_view.getSchema()), child_view.getRowCount());
                 view.addColumn(constant_col.view());

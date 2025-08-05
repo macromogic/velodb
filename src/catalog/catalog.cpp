@@ -52,14 +52,6 @@ std::optional<std::reference_wrapper<Table>> Catalog::getTable(const char* table
     return getTable(std::string(table_name));
 }
 
-ValueColumn& Catalog::createTemporaryColumn(const std::string& column_name, std::unique_ptr<DataType> type)
-{
-    auto column = std::make_unique<ValueColumn>(column_name, std::move(type));
-    auto& ref = *column;
-    temporary_columns_.push_back(std::move(column));
-    return ref;
-}
-
 std::vector<std::string> Catalog::getTableNames() const
 {
     std::vector<std::string> names;

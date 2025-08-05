@@ -159,7 +159,7 @@ View Table::slice(size_t start_row, size_t end_row) const
         sliced_columns.emplace_back(column.getType(), column.getName(), column.getValues(), start_row, end_row);
     }
 
-    return View(std::make_unique<TableInfo>(table_info_->getName() + "_slice", table_info_->getSchema().cloneUnique()),
+    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
                 std::move(sliced_columns));
 }
 
@@ -179,9 +179,8 @@ View Table::indices(const std::vector<size_t>& indices) const
         indexed_columns.emplace_back(column.getType(), column.getName(), column.getValues(), indices);
     }
 
-    return View(
-        std::make_unique<TableInfo>(table_info_->getName() + "_indexed", table_info_->getSchema().cloneUnique()),
-        std::move(indexed_columns));
+    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
+                std::move(indexed_columns));
 }
 
 View Table::filterRows(std::function<bool(const ViewTuple&)> predicate) const

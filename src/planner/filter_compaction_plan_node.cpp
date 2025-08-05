@@ -1,7 +1,7 @@
 #include "planner/filter_compaction_plan_node.hpp"
 
+#include "catalog/execution_context.hpp"
 #include "operator/filter_compaction_operator.hpp"
-#include "planner/execution_context.hpp"
 
 namespace velodb {
 
@@ -16,7 +16,7 @@ std::unique_ptr<AbstractOperator> FilterCompactionPlanNode::createOperator(Execu
         VELODB_THROW(ExecutionError, "FilterCompactionPlanNode must have exactly one child");
     }
     auto child_operator = children_[0]->createOperator(context);
-    return std::make_unique<FilterCompactionOperator>(context.getCatalog(),
+    return std::make_unique<FilterCompactionOperator>(context,
                                                       output_schema_->cloneUnique(),
                                                       std::move(child_operator));
 }

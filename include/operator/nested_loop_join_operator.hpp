@@ -14,7 +14,7 @@ class AbstractExpression;
 // Nested loop join operator
 class NestedLoopJoinOperator : public BinaryOperator {
 public:
-    NestedLoopJoinOperator(Catalog& catalog,
+    NestedLoopJoinOperator(ExecutionContext& context,
                            std::unique_ptr<Schema> output_schema,
                            std::unique_ptr<AbstractOperator> left_child,
                            std::unique_ptr<AbstractOperator> right_child,
@@ -22,7 +22,7 @@ public:
                            JoinType join_type = JoinType::INNER);
     ~NestedLoopJoinOperator() override = default;
 
-    Result<View> execute() const override;
+    Result<View> next() const override;
 
 private:
     std::unique_ptr<AbstractExpression> join_predicate_;

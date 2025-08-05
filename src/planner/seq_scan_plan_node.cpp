@@ -1,9 +1,9 @@
 #include "planner/seq_scan_plan_node.hpp"
 
+#include "catalog/execution_context.hpp"
 #include "common/fmt.hpp"
 #include "operator/filter_compaction_operator.hpp"
 #include "operator/seq_scan_operator.hpp"
-#include "planner/execution_context.hpp"
 
 namespace velodb {
 
@@ -19,7 +19,7 @@ ScanFilterPlanNode::ScanFilterPlanNode(const TableBase& table,
 
 std::unique_ptr<AbstractOperator> ScanFilterPlanNode::createOperator(ExecutionContext& context) const
 {
-    return std::make_unique<ScanFilterOperator>(context.getCatalog(), table_, predicate_);
+    return std::make_unique<ScanFilterOperator>(context, table_, predicate_);
 }
 
 std::string ScanFilterPlanNode::toString() const

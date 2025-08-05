@@ -14,7 +14,7 @@ class AbstractExpression;
 // Hash join operator
 class HashJoinOperator : public BinaryOperator {
 public:
-    HashJoinOperator(Catalog& catalog,
+    HashJoinOperator(ExecutionContext& context,
                      std::unique_ptr<Schema> output_schema,
                      std::unique_ptr<AbstractOperator> left_child,
                      std::unique_ptr<AbstractOperator> right_child,
@@ -23,7 +23,7 @@ public:
                      JoinType join_type = JoinType::INNER);
     ~HashJoinOperator() override = default;
 
-    Result<View> execute() const override;
+    Result<View> next() const override;
 
 private:
     std::unique_ptr<AbstractExpression> left_key_expr_;

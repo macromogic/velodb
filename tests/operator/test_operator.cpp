@@ -1,3 +1,4 @@
+#include "catalog/execution_context.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "expression/expression.hpp"
@@ -45,7 +46,8 @@ protected:
 TEST_F(OperatorTest, ScanFilterOperatorCreation)
 {
     auto& test_table = catalog_->getTable("test_table").value().get();
-    ScanFilterOperator scan_op(*catalog_, test_table, nullptr);
+    auto context = ExecutionContext(*catalog_);
+    ScanFilterOperator scan_op(context, test_table, nullptr);
 
     EXPECT_EQ(scan_op.getOutputSchema().getColumnCount(), 2);
     EXPECT_EQ(scan_op.getOutputSchema().getColumnInfo(0).getName(), "id");
@@ -66,12 +68,13 @@ TEST_F(OperatorTest, ScanFilterOperatorWithPredicate)
                                                                                            std::move(const_expr));
 
     auto& test_table = catalog_->getTable("test_table").value().get();
-    auto scan_op = std::make_unique<ScanFilterOperator>(*catalog_, test_table, std::move(predicate));
-    auto filter_compaction_op = std::make_unique<FilterCompactionOperator>(*catalog_,
+    auto context = ExecutionContext(*catalog_);
+    auto scan_op = std::make_unique<ScanFilterOperator>(context, test_table, std::move(predicate));
+    auto filter_compaction_op = std::make_unique<FilterCompactionOperator>(context,
                                                                            scan_op->getOutputSchema().cloneUnique(),
                                                                            std::move(scan_op));
 
-    auto view_result = filter_compaction_op->execute();
+    auto view_result = filter_compaction_op->next();
     EXPECT_TRUE(view_result.ok());
     auto view = std::move(view_result.value());
 

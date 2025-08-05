@@ -56,7 +56,7 @@ Result<View> ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNode> plan
     auto op = createOperatorTree(*plan);
 
     // Execute the operator tree
-    return op->execute();
+    return op->next();
 }
 
 std::unique_ptr<AbstractOperator> ExecutionEngine::createOperatorTree(const AbstractPlanNode& plan_node)

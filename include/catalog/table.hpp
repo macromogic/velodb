@@ -63,6 +63,10 @@ public:
     virtual View viewAs(std::string alias) const = 0;
     virtual const Value& getValue(uint64_t row_id, size_t column_index) const = 0;
 
+    virtual View slice(size_t start_row, size_t end_row) const = 0;
+    virtual View indices(const std::vector<size_t>& indices) const = 0;
+    virtual View filterRows(std::function<bool(const ViewTuple&)> predicate) const = 0;
+
     std::string toString() const;
 
 protected:
@@ -88,9 +92,9 @@ public:
     void insertRow(std::vector<Value>&& values);
 
     // Enhanced view creation methods
-    View slice(size_t start_row, size_t end_row) const;
-    View indices(const std::vector<size_t>& indices) const;
-    View filterRows(std::function<bool(const ViewTuple&)> predicate) const;
+    View slice(size_t start_row, size_t end_row) const override;
+    View indices(const std::vector<size_t>& indices) const override;
+    View filterRows(std::function<bool(const ViewTuple&)> predicate) const override;
 
     // Column access
     ViewColumn getColumn(const std::string& name) const;
@@ -133,9 +137,9 @@ public:
     ViewColumn getColumn(size_t column_index) const;
 
     // Enhanced view creation methods
-    View slice(size_t start_row, size_t end_row) const;
-    View indices(const std::vector<size_t>& indices) const;
-    View filterRows(std::function<bool(const ViewTuple&)> predicate) const;
+    View slice(size_t start_row, size_t end_row) const override;
+    View indices(const std::vector<size_t>& indices) const override;
+    View filterRows(std::function<bool(const ViewTuple&)> predicate) const override;
 
     // Column-based access methods (similar to Table)
     const Value& getValue(uint64_t row_id, size_t column_index) const override;
