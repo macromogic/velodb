@@ -46,7 +46,7 @@ std::string ValueTuple::toString() const
     return fmt::format("({})", fmt::join(values_, ", "));
 }
 
-ViewTuple::ViewTuple(const TableBase& table, uint64_t row_id)
+ViewTuple::ViewTuple(const TableBase& table, size_t row_id)
     : table_(table)
     , row_id_(row_id)
 {
@@ -59,33 +59,39 @@ bool ViewTuple::operator==(const ViewTuple& other) const
 
 const Value& ViewTuple::getValue(size_t column_index) const
 {
-    if (column_index >= table_.getSchema().getColumnCount()) {
+    if (column_index >= table_.get().getSchema().getColumnCount()) {
         VELODB_THROW(CatalogError, "Column index out of range");
     }
-    return table_.getValue(row_id_, column_index);
+    return table_.get().getValue(row_id_, column_index);
 }
 
 const Value& ViewTuple::getValue(const std::string& column_name) const
 {
-    size_t const index = table_.getSchema().getColumnIndex(column_name);
+    size_t const index = table_.get().getSchema().getColumnIndex(column_name);
     return getValue(index);
 }
 
 size_t ViewTuple::getColumnCount() const
 {
-    return table_.getSchema().getColumnCount();
+    return table_.get().getSchema().getColumnCount();
 }
 
 std::string ViewTuple::toString() const
 {
     std::string result = "(";
-    for (size_t i = 0; i < table_.getSchema().getColumnCount(); ++i) {
+    for (size_t i = 0; i < table_.get().getSchema().getColumnCount(); ++i) {
         if (i > 0)
             result += ", ";
         result += getValue(i).toString();
     }
     result += ")";
     return result;
+}
+
+void ViewTuple::setTable(const TableBase& table, size_t row_id)
+{
+    table_ = table;
+    row_id_ = row_id;
 }
 
 } // namespace velodb

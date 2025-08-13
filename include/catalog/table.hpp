@@ -18,7 +18,7 @@ class Tuple;
 class View;
 class TableIterator;
 
-constexpr uint64_t INVALID_ROW_ID = UINT64_MAX;
+constexpr size_t INVALID_ROW_ID = UINT64_MAX;
 
 class TableInfo : private NonCopyable {
 public:
@@ -61,7 +61,7 @@ public:
     virtual bool isView() const = 0;
     virtual View view() const = 0;
     virtual View viewAs(std::string alias) const = 0;
-    virtual const Value& getValue(uint64_t row_id, size_t column_index) const = 0;
+    virtual const Value& getValue(size_t row_id, size_t column_index) const = 0;
 
     virtual View slice(size_t start_row, size_t end_row) const = 0;
     virtual View indices(const std::vector<size_t>& indices) const = 0;
@@ -101,7 +101,7 @@ public:
     ViewColumn getColumn(size_t column_index) const;
 
     // Efficient column-based access for late materialization
-    const Value& getValue(uint64_t row_id, size_t column_index) const override;
+    const Value& getValue(size_t row_id, size_t column_index) const override;
 
 private:
     // Column-based storage: each column is stored as a separate vector
@@ -142,7 +142,7 @@ public:
     View filterRows(std::function<bool(const ViewTuple&)> predicate) const override;
 
     // Column-based access methods (similar to Table)
-    const Value& getValue(uint64_t row_id, size_t column_index) const override;
+    const Value& getValue(size_t row_id, size_t column_index) const override;
 
 private:
     // Column-based storage: each column is stored as a separate vector
@@ -153,8 +153,7 @@ private:
 // Iterator for table scanning
 class TableIterator {
 public:
-    explicit TableIterator(const Table& table, uint64_t row_id = 0);
-    explicit TableIterator(const View& view, uint64_t row_id = 0);
+    explicit TableIterator(const TableBase& table, size_t row_id = 0);
     ~TableIterator() = default;
 
     bool operator==(const TableIterator& other) const;

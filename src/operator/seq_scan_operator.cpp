@@ -16,27 +16,29 @@ ScanFilterOperator::ScanFilterOperator(ExecutionContext& context,
                     nullptr) // NOTE: May support child operators in future
     , table_(table)
     , predicate_(predicate)
+    , rowids_(context.createTemporaryColumn("$_rowid", std::make_unique<BigIntType>()))
+    , masks_(context.createTemporaryColumn("$_mask", std::make_unique<BooleanType>()))
+    , current_row_id_(0)
+    , iterator_(table)
 {
 }
 
-Result<View> ScanFilterOperator::next() const
+Result<View> ScanFilterOperator::next()
 {
-    ValueColumn& rowids = context_.createTemporaryColumn("$_rowid", std::make_unique<BigIntType>());
-    ValueColumn& masks = context_.createTemporaryColumn("$_mask", std::make_unique<BooleanType>());
-    rowids.reserve(table_.getRowCount());
-    masks.reserve(table_.getRowCount());
-
-    uint64_t row_id = 0;
-    for (const auto& tuple : table_) {
+    size_t start_row_id = current_row_id_;
+    size_t end_row_id = std::min(start_row_id + MAX_BATCH_SIZE, table_.getRowCount());
+    while (current_row_id_ < end_row_id) {
+        const auto& tuple = *iterator_;
         Value result = predicate_ ? predicate_->evaluate(tuple, table_.getSchema()) : Value::createBoolean(true);
-        rowids.append(Value::createBigInt(row_id));
-        masks.append(result);
-        ++row_id;
+        rowids_.append(Value::createBigInt(current_row_id_));
+        masks_.append(result);
+        ++current_row_id_;
+        ++iterator_;
     }
 
-    auto view = table_.view();
-    view.addColumn(rowids.view());
-    view.addColumn(masks.view());
+    auto view = table_.slice(start_row_id, end_row_id);
+    view.addColumn(rowids_.slice(start_row_id, end_row_id));
+    view.addColumn(masks_.slice(start_row_id, end_row_id));
     return Result<View>::success(std::move(view));
 }
 

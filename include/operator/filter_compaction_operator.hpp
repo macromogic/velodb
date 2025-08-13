@@ -15,7 +15,7 @@ public:
                              std::unique_ptr<Schema> output_schema,
                              std::unique_ptr<AbstractOperator> child);
     ~FilterCompactionOperator() override = default;
-    Result<View> next() const override;
+    Result<View> next() override;
 };
 
 } // namespace velodb

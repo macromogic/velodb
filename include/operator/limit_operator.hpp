@@ -16,7 +16,7 @@ public:
                   size_t offset = 0);
     ~LimitOperator() override = default;
 
-    Result<View> next() const override;
+    Result<View> next() override;
 
 private:
     size_t limit_;

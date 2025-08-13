@@ -19,7 +19,7 @@ FilterCompactionOperator::FilterCompactionOperator(ExecutionContext& context,
 {
 }
 
-Result<View> FilterCompactionOperator::next() const
+Result<View> FilterCompactionOperator::next()
 {
     auto* child = getChild();
     if (!child) {
@@ -32,6 +32,9 @@ Result<View> FilterCompactionOperator::next() const
         return child_result; // Propagate error from child
     }
     const auto& input_view = child_result.value();
+    if (input_view.getRowCount() == 0) {
+        return child_result; // No rows to process
+    }
     const auto& schema = input_view.getTableInfo().getSchema();
     bool has_mask_column = schema.hasColumn("$_mask");
     if (!has_mask_column) {

@@ -17,7 +17,7 @@ NestedLoopJoinOperator::NestedLoopJoinOperator(ExecutionContext& context,
 {
 }
 
-Result<View> NestedLoopJoinOperator::next() const
+Result<View> NestedLoopJoinOperator::next()
 {
     // TODO: Implement nested loop join logic
     return Result<View>::failure("NestedLoopJoinOperator::execute not implemented yet");

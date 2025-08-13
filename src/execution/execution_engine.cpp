@@ -18,50 +18,50 @@ ExecutionEngine::ExecutionEngine(Catalog& catalog)
     context_ = std::make_unique<ExecutionContext>(catalog);
 }
 
-Result<View> ExecutionEngine::executeQuery(const std::string& sql)
+Result<QueryResult> ExecutionEngine::executeQuery(const std::string& sql)
 {
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(sql, &result);
 
     if (!result.isValid()) {
-        return Result<View>::failure("SQL parsing error: " + std::string(result.errorMsg()));
+        return Result<QueryResult>::failure("SQL parsing error: " + std::string(result.errorMsg()));
     }
-
     if (result.size() != 1) {
-        return Result<View>::failure("Multiple statements not supported");
+        return Result<QueryResult>::failure("Multiple statements not supported");
     }
 
-    return executeStatement(result.getStatement(0));
-}
-
-Result<View> ExecutionEngine::executeStatement(const hsql::SQLStatement* statement)
-{
-    switch (statement->type()) {
-    case hsql::kStmtSelect:
-        return executeSelect(dynamic_cast<const hsql::SelectStatement*>(statement));
-    default:
-        return Result<View>::failure("Non-select statements not supported");
+    auto* statement = result.getStatement(0);
+    if (statement->type() != hsql::kStmtSelect) {
+        return Result<QueryResult>::failure("Non-select statements not supported");
     }
-}
-
-Result<View> ExecutionEngine::executeSelect(const hsql::SelectStatement* select_stmt)
-{
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_->planSelect(static_cast<const hsql::SelectStatement*>(statement));
     return executePlan(std::move(plan));
 }
 
-Result<View> ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNode> plan)
+Result<QueryResult> ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNode> plan)
 {
-    // Create the operator tree from the plan
-    auto op = createOperatorTree(*plan);
+    if (!plan) {
+        return Result<QueryResult>::failure("Cannot execute null plan");
+    }
 
-    // Execute the operator tree
-    return op->next();
-}
+    auto operator_tree = plan->createOperator(*context_);
+    if (!operator_tree) {
+        return Result<QueryResult>::failure("Failed to create operator tree from plan");
+    }
 
-std::unique_ptr<AbstractOperator> ExecutionEngine::createOperatorTree(const AbstractPlanNode& plan_node)
-{
-    return plan_node.createOperator(*context_);
+    QueryResult result(operator_tree->getOutputSchema().cloneUnique());
+    while (true) {
+        auto batch_result = operator_tree->next();
+        if (!batch_result) {
+            return Result<QueryResult>::failure(batch_result.error());
+        }
+        auto batch = std::move(batch_result.value());
+        if (batch.getRowCount() == 0) {
+            break; // No more results
+        }
+        result.append(std::move(batch));
+    }
+    return Result<QueryResult>::success(std::move(result));
 }
 
 // ExecutionStats implementation

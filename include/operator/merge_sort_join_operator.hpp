@@ -23,7 +23,7 @@ public:
                           JoinType join_type = JoinType::INNER);
     ~MergeSortJoinOperator() override = default;
 
-    Result<View> next() const override;
+    Result<View> next() override;
 
 private:
     std::unique_ptr<AbstractExpression> left_key_expr_;
@@ -31,7 +31,7 @@ private:
     JoinType join_type_;
 
     // TODO: Add state for merge sort join with late materialization
-    std::vector<uint64_t> result_row_ids_;
+    std::vector<size_t> result_row_ids_;
     size_t current_result_index_ { 0 };
     bool inputs_sorted_ { false };
 };

@@ -46,7 +46,7 @@ private:
 
 class ViewTuple : public Tuple {
 public:
-    ViewTuple(const TableBase& table, uint64_t row_id);
+    ViewTuple(const TableBase& table, size_t row_id);
     ~ViewTuple() = default;
 
     bool operator==(const ViewTuple& other) const;
@@ -57,10 +57,13 @@ public:
     std::string toString() const override;
 
 private:
-    const TableBase& table_;
-    uint64_t row_id_;
+    void setTable(const TableBase& table, size_t row_id = 0);
 
-    friend class TableIterator; // Allow iterator access to private members
+    std::reference_wrapper<const TableBase> table_;
+    size_t row_id_;
+
+    friend class TableIterator;
+    friend class QueryResultIterator;
 };
 
 } // namespace velodb

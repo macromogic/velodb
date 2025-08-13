@@ -18,7 +18,7 @@ SortOperator::SortOperator(ExecutionContext& context,
 {
 }
 
-Result<View> SortOperator::next() const
+Result<View> SortOperator::next()
 {
     // TODO: Implement sorting logic
     return Result<View>::failure("SortOperator::execute not implemented yet");

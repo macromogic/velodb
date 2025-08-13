@@ -20,7 +20,7 @@ void Database::initialize()
 {
     // TODO: Implement database initialization
     auto result = runtime_warmup();
-    if (!result.ok()) {
+    if (!result) {
         throw std::runtime_error(fmt::format("Failed to initialize database: {}", result.error()));
     }
     initialized_ = true;
@@ -96,10 +96,10 @@ bool Database::insertTuple(const std::string& table_name, Tuple&& tuple)
     return true;
 }
 
-Result<View> Database::executeQuery(const std::string& sql)
+Result<QueryResult> Database::executeQuery(const std::string& sql)
 {
     if (!initialized_) {
-        return Result<View>::failure("Database not initialized");
+        return Result<QueryResult>::failure("Database not initialized");
     }
     return execution_engine_->executeQuery(sql);
 }

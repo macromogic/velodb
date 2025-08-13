@@ -1,6 +1,7 @@
 #pragma once
 
 #include "catalog/catalog.hpp"
+#include "execution/query_result.hpp"
 #include "expression/expression.hpp"
 #include "operator/operator.hpp"
 #include "planner/planner.hpp"
@@ -27,19 +28,13 @@ public:
     ExecutionEngine& operator=(const ExecutionEngine&) = delete;
 
     // Main execution interface
-    Result<View> executeQuery(const std::string& sql);
-    Result<View> executeStatement(const hsql::SQLStatement* statement);
-    Result<View> executeSelect(const hsql::SelectStatement* select_stmt);
-
-    // Plan execution
-    Result<View> executePlan(std::unique_ptr<AbstractPlanNode> plan);
+    Result<QueryResult> executeQuery(const std::string& sql);
 
     size_t getLastExecutionRowCount() const { return last_execution_row_count_; }
     double getLastExecutionTimeMs() const { return last_execution_time_ms_; }
 
 private:
-    // Helper methods
-    std::unique_ptr<AbstractOperator> createOperatorTree(const AbstractPlanNode& plan_node);
+    Result<QueryResult> executePlan(std::unique_ptr<AbstractPlanNode> plan);
 
     Catalog& catalog_;
     std::unique_ptr<QueryPlanner> planner_;

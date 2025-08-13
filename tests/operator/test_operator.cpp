@@ -75,7 +75,7 @@ TEST_F(OperatorTest, ScanFilterOperatorWithPredicate)
                                                                            std::move(scan_op));
 
     auto view_result = filter_compaction_op->next();
-    EXPECT_TRUE(view_result.ok());
+    EXPECT_TRUE(static_cast<bool>(view_result));
     auto view = std::move(view_result.value());
 
     // Should only get one tuple (id = 1)

@@ -22,15 +22,15 @@ public:
                            JoinType join_type = JoinType::INNER);
     ~NestedLoopJoinOperator() override = default;
 
-    Result<View> next() const override;
+    Result<View> next() override;
 
 private:
     std::unique_ptr<AbstractExpression> join_predicate_;
     JoinType join_type_;
 
     // TODO: Add state for join iteration with late materialization
-    std::vector<uint64_t> left_row_ids_;
-    std::vector<uint64_t> right_row_ids_;
+    std::vector<size_t> left_row_ids_;
+    std::vector<size_t> right_row_ids_;
     size_t current_left_index_ { 0 };
     size_t current_right_index_ { 0 };
     bool initialized_ { false };

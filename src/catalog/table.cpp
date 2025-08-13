@@ -95,7 +95,7 @@ void Table::insertRow(const std::vector<Value>& values)
         VELODB_THROW(CatalogError, "Value count mismatch with schema");
     }
 
-    const uint64_t new_row_id = row_count_;
+    const size_t new_row_id = row_count_;
     ensureColumnCapacity(row_count_ + 1);
 
     // Insert each value into its respective column
@@ -113,8 +113,8 @@ View Table::view() const
     for (const auto& column : columns_) {
         columns.emplace_back(column.view());
     }
-    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
-                std::move(columns));
+    return { std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
+             std::move(columns) };
 }
 
 View Table::viewAs(std::string alias) const
@@ -124,8 +124,8 @@ View Table::viewAs(std::string alias) const
     for (const auto& column : columns_) {
         columns.emplace_back(column.view());
     }
-    return View(std::make_unique<TableInfo>(std::move(alias), table_info_->getSchema().cloneUnique()),
-                std::move(columns));
+    return { std::make_unique<TableInfo>(std::move(alias), table_info_->getSchema().cloneUnique()),
+             std::move(columns) };
 }
 
 void Table::insertRow(std::vector<Value>&& values)
@@ -134,7 +134,7 @@ void Table::insertRow(std::vector<Value>&& values)
         VELODB_THROW(CatalogError, "Value count mismatch with schema");
     }
 
-    const uint64_t new_row_id = row_count_;
+    const size_t new_row_id = row_count_;
     ensureColumnCapacity(row_count_ + 1);
 
     // Move each value into its respective column
@@ -159,8 +159,8 @@ View Table::slice(size_t start_row, size_t end_row) const
         sliced_columns.emplace_back(column.getType(), column.getName(), column.getValues(), start_row, end_row);
     }
 
-    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
-                std::move(sliced_columns));
+    return { std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
+             std::move(sliced_columns) };
 }
 
 View Table::indices(const std::vector<size_t>& indices) const
@@ -179,8 +179,8 @@ View Table::indices(const std::vector<size_t>& indices) const
         indexed_columns.emplace_back(column.getType(), column.getName(), column.getValues(), indices);
     }
 
-    return View(std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
-                std::move(indexed_columns));
+    return { std::make_unique<TableInfo>(table_info_->getName(), table_info_->getSchema().cloneUnique()),
+             std::move(indexed_columns) };
 }
 
 View Table::filterRows(std::function<bool(const ViewTuple&)> predicate) const
@@ -213,7 +213,7 @@ ViewColumn Table::getColumn(size_t column_index) const
 }
 
 // Efficient column-based access for late materialization
-const Value& Table::getValue(uint64_t row_id, size_t column_index) const
+const Value& Table::getValue(size_t row_id, size_t column_index) const
 {
     if (row_id >= row_count_) {
         VELODB_THROW(CatalogError, "Row ID out of range");
@@ -310,8 +310,8 @@ View View::viewAs(std::string alias) const
     for (const auto& column : columns_) {
         columns.push_back(column.view());
     }
-    return View(std::make_unique<TableInfo>(std::move(alias), table_info_->getSchema().cloneUnique()),
-                std::move(columns));
+    return { std::make_unique<TableInfo>(std::move(alias), table_info_->getSchema().cloneUnique()),
+             std::move(columns) };
 }
 
 View View::slice(size_t start_row, size_t end_row) const
@@ -327,8 +327,8 @@ View View::slice(size_t start_row, size_t end_row) const
         sliced_columns.emplace_back(column.slice(start_row, end_row));
     }
 
-    return View(std::make_unique<TableInfo>(table_info_->getName() + "_slice", table_info_->getSchema().cloneUnique()),
-                std::move(sliced_columns));
+    return { std::make_unique<TableInfo>(table_info_->getName() + "_slice", table_info_->getSchema().cloneUnique()),
+             std::move(sliced_columns) };
 }
 
 View View::indices(const std::vector<size_t>& indices) const
@@ -346,9 +346,8 @@ View View::indices(const std::vector<size_t>& indices) const
         indexed_columns.emplace_back(column.indices(indices));
     }
 
-    return View(
-        std::make_unique<TableInfo>(table_info_->getName() + "_indexed", table_info_->getSchema().cloneUnique()),
-        std::move(indexed_columns));
+    return { std::make_unique<TableInfo>(table_info_->getName() + "_indexed", table_info_->getSchema().cloneUnique()),
+             std::move(indexed_columns) };
 }
 
 View View::filterRows(std::function<bool(const ViewTuple&)> predicate) const
@@ -367,7 +366,7 @@ View View::filterRows(std::function<bool(const ViewTuple&)> predicate) const
 }
 
 // Column-based access methods
-const Value& View::getValue(uint64_t row_id, size_t column_index) const
+const Value& View::getValue(size_t row_id, size_t column_index) const
 {
     if (row_id >= row_count_) {
         VELODB_THROW(CatalogError, "Row ID out of range");
@@ -380,15 +379,9 @@ const Value& View::getValue(uint64_t row_id, size_t column_index) const
 }
 
 // TableIterator implementation
-TableIterator::TableIterator(const Table& table, uint64_t row_id)
+TableIterator::TableIterator(const TableBase& table, size_t row_id)
     : table_(table)
     , current_tuple_(table, row_id)
-{
-}
-
-TableIterator::TableIterator(const View& view, uint64_t row_id)
-    : table_(view)
-    , current_tuple_(view, row_id)
 {
 }
 
@@ -415,7 +408,7 @@ TableIterator& TableIterator::operator++()
 TableIterator TableIterator::operator++(int)
 {
     TableIterator temp = *this;
-    ++(*this);
+    operator++();
     return temp;
 }
 

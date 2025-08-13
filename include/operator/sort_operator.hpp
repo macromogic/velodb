@@ -20,7 +20,7 @@ public:
                  std::vector<bool> ascending_flags);
     ~SortOperator() override = default;
 
-    Result<View> next() const override;
+    Result<View> next() override;
 
 private:
     std::vector<std::unique_ptr<AbstractExpression>> sort_expressions_;

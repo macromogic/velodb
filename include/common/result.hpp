@@ -2,15 +2,42 @@
 
 #include "common/exception.hpp"
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <variant>
 
 namespace velodb {
 
+// Forward declaration
+template <typename T, typename E>
+class Result;
+
+// Helper trait to detect Result types
+template <typename T>
+struct IsResult : std::false_type { };
+
+template <typename T, typename E>
+struct IsResult<Result<T, E>> : std::true_type { };
+
+template <typename T>
+inline constexpr bool IsResultV = IsResult<T>::value;
+
 template <typename T, typename E = std::string>
 class Result {
+private:
+    // Type aliases for cleaner andThen signatures
+    template <typename F, typename Arg>
+    using InvokeResult = std::invoke_result_t<F, Arg>;
+
+    template <typename F>
+    using InvokeResultVoid = std::invoke_result_t<F>;
+
+    template <typename F, typename Arg>
+    using EnableResultReturning = std::enable_if_t<IsResultV<InvokeResult<F, Arg>>, InvokeResult<F, Arg>>;
+
 public:
     // Success constructor
     explicit Result(T&& value)
@@ -32,17 +59,35 @@ public:
     {
     }
 
-    // Query methods
-    bool ok() const noexcept { return std::holds_alternative<T>(value_); }
+    // Copy constructor
+    Result(const Result&) = default;
 
-    bool err() const noexcept { return std::holds_alternative<E>(value_); }
+    // Move constructor
+    Result(Result&&) = default;
 
-    explicit operator bool() const noexcept { return ok(); }
+    // Copy assignment operator
+    Result& operator=(const Result&) = default;
+
+    // Move assignment operator
+    Result& operator=(Result&&) = default;
+
+    // Destructor
+    ~Result() = default;
+
+    std::optional<T> ok() const noexcept
+    {
+        if (std::holds_alternative<T>(value_)) {
+            return std::get<T>(value_);
+        }
+        return std::nullopt;
+    }
+
+    explicit operator bool() const noexcept { return std::holds_alternative<T>(value_); }
 
     // Access methods
     T& value() &
     {
-        if (!ok()) {
+        if (!*this) {
             VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::get<T>(value_);
@@ -50,7 +95,7 @@ public:
 
     const T& value() const&
     {
-        if (!ok()) {
+        if (!*this) {
             VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::get<T>(value_);
@@ -58,7 +103,7 @@ public:
 
     T&& value() &&
     {
-        if (!ok()) {
+        if (!*this) {
             VELODB_THROW(DatabaseError, "Attempted to access value of Result containing error");
         }
         return std::move(std::get<T>(value_));
@@ -66,7 +111,7 @@ public:
 
     const E& error() const&
     {
-        if (!err()) {
+        if (*this) {
             VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
         return std::get<E>(value_);
@@ -74,16 +119,56 @@ public:
 
     E&& error() &&
     {
-        if (!err()) {
+        if (*this) {
             VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
         return std::move(std::get<E>(value_));
     }
 
     // Convenience methods
-    T value_or(const T& default_value) const& { return ok() ? value() : default_value; }
+    T value_or(const T& default_value) const& { return *this ? value() : default_value; }
 
-    T value_or(T&& default_value) && { return ok() ? std::move(value()) : std::move(default_value); }
+    T value_or(T&& default_value) && { return *this ? std::move(value()) : std::move(default_value); }
+
+    // Monadic operations
+    template <typename F>
+    auto andThen(F&& f) & -> EnableResultReturning<F, T&>
+    {
+        static_assert(std::is_invocable_v<F, T&>, "Function must be invocable with T&");
+        static_assert(IsResultV<InvokeResult<F, T&>>, "Function must return a Result type");
+        if (*this) {
+            return std::invoke(std::forward<F>(f), value());
+        } else {
+            using ReturnType = InvokeResult<F, T&>;
+            return ReturnType::failure(error());
+        }
+    }
+
+    template <typename F>
+    auto andThen(F&& f) const& -> EnableResultReturning<F, const T&>
+    {
+        static_assert(std::is_invocable_v<F, const T&>, "Function must be invocable with const T&");
+        static_assert(IsResultV<InvokeResult<F, const T&>>, "Function must return a Result type");
+        if (*this) {
+            return std::invoke(std::forward<F>(f), value());
+        } else {
+            using ReturnType = InvokeResult<F, const T&>;
+            return ReturnType::failure(error());
+        }
+    }
+
+    template <typename F>
+    auto andThen(F&& f) && -> EnableResultReturning<F, T&&>
+    {
+        static_assert(std::is_invocable_v<F, T&&>, "Function must be invocable with T&&");
+        static_assert(IsResultV<InvokeResult<F, T&&>>, "Function must return a Result type");
+        if (*this) {
+            return std::invoke(std::forward<F>(f), std::move(value()));
+        } else {
+            using ReturnType = InvokeResult<F, T&&>;
+            return ReturnType::failure(std::move(error()));
+        }
+    }
 
     // Factory methods
     static Result success(T&& value) { return Result(std::forward<T>(value)); }
@@ -100,6 +185,14 @@ private:
 
 template <typename E>
 class Result<void, E> {
+private:
+    // Type aliases for cleaner andThen signatures
+    template <typename F>
+    using InvokeResult = std::invoke_result_t<F>;
+
+    template <typename F>
+    using EnableResultReturning = std::enable_if_t<IsResultV<InvokeResult<F>>, InvokeResult<F>>;
+
 public:
     explicit Result(E&& error)
         : error_(std::forward<E>(error))
@@ -109,17 +202,28 @@ public:
         : error_(error)
     {
     }
-    // Query methods
-    bool ok() const noexcept { return !error_.has_value(); }
 
-    bool err() const noexcept { return error_.has_value(); }
+    // Copy constructor
+    Result(const Result&) = default;
 
-    explicit operator bool() const noexcept { return ok(); }
+    // Move constructor
+    Result(Result&&) = default;
+
+    // Copy assignment operator
+    Result& operator=(const Result&) = default;
+
+    // Move assignment operator
+    Result& operator=(Result&&) = default;
+
+    // Destructor
+    ~Result() = default;
+
+    explicit operator bool() const noexcept { return !error_.has_value(); }
 
     // Access methods
     const E& error() const&
     {
-        if (!err()) {
+        if (*this) {
             VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
         return *error_;
@@ -127,10 +231,50 @@ public:
 
     E&& error() &&
     {
-        if (!err()) {
+        if (*this) {
             VELODB_THROW(DatabaseError, "Attempted to access error of Result containing value");
         }
         return std::move(*error_);
+    }
+
+    // Monadic operations
+    template <typename F>
+    auto andThen(F&& f) & -> EnableResultReturning<F>
+    {
+        static_assert(std::is_invocable_v<F>, "Function must be invocable with no arguments");
+        static_assert(IsResultV<InvokeResult<F>>, "Function must return a Result type");
+        if (*this) {
+            return std::invoke(std::forward<F>(f));
+        } else {
+            using ReturnType = InvokeResult<F>;
+            return ReturnType::failure(error());
+        }
+    }
+
+    template <typename F>
+    auto andThen(F&& f) const& -> EnableResultReturning<F>
+    {
+        static_assert(std::is_invocable_v<F>, "Function must be invocable with no arguments");
+        static_assert(IsResultV<InvokeResult<F>>, "Function must return a Result type");
+        if (*this) {
+            return std::invoke(std::forward<F>(f));
+        } else {
+            using ReturnType = InvokeResult<F>;
+            return ReturnType::failure(error());
+        }
+    }
+
+    template <typename F>
+    auto andThen(F&& f) && -> EnableResultReturning<F>
+    {
+        static_assert(std::is_invocable_v<F>, "Function must be invocable with no arguments");
+        static_assert(IsResultV<InvokeResult<F>>, "Function must return a Result type");
+        if (*this) {
+            return std::invoke(std::forward<F>(f));
+        } else {
+            using ReturnType = InvokeResult<F>;
+            return ReturnType::failure(std::move(error()));
+        }
     }
 
     // Factory methods
@@ -145,15 +289,5 @@ private:
 
     std::optional<E> error_;
 };
-
-// Convenience aliases
-template <typename T>
-using UniqueResult = Result<std::unique_ptr<T>, std::string>;
-
-template <typename T>
-using SharedResult = Result<std::shared_ptr<T>, std::string>;
-
-template <typename T>
-using OptionalResult = Result<std::optional<T>, std::string>;
 
 } // namespace velodb

@@ -21,7 +21,7 @@ public:
                        std::vector<std::unique_ptr<AbstractExpression>> expressions);
     ~ProjectionOperator() override = default;
 
-    Result<View> next() const override;
+    Result<View> next() override;
 
 private:
     std::vector<std::unique_ptr<AbstractExpression>> expressions_;

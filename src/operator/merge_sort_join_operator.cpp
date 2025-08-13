@@ -21,7 +21,7 @@ MergeSortJoinOperator::MergeSortJoinOperator(ExecutionContext& context,
 {
 }
 
-Result<View> MergeSortJoinOperator::next() const
+Result<View> MergeSortJoinOperator::next()
 {
     // TODO: Implement merge sort join logic
     return Result<View>::failure("MergeSortJoinOperator::execute not implemented yet");

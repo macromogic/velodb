@@ -51,7 +51,7 @@ public:
     bool insertTuple(const std::string& table_name, Tuple&& tuple);
 
     // Query execution
-    Result<View> executeQuery(const std::string& sql);
+    Result<QueryResult> executeQuery(const std::string& sql);
 
     // Statistics
     size_t getTableCount() const;

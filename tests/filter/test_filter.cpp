@@ -84,13 +84,6 @@ protected:
         table->insertRow(values);
     }
 
-    std::unique_ptr<hsql::SQLParserResult> parseSQL(const std::string& sql)
-    {
-        auto result = std::make_unique<hsql::SQLParserResult>();
-        hsql::SQLParser::parse(sql, result.get());
-        return result;
-    }
-
     std::unique_ptr<Catalog> catalog_;
     std::unique_ptr<QueryPlanner> planner_;
     std::unique_ptr<ExecutionEngine> engine_;
@@ -102,15 +95,9 @@ TEST_F(WhereClauseTest, PriceRangeQueries)
 {
     // Test expensive items
     std::string sql = "SELECT * FROM products WHERE price > 100.0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Laptop, Desk, Monitor
 
@@ -123,15 +110,9 @@ TEST_F(WhereClauseTest, PriceBetweenRange)
 {
     // Test products in medium price range
     std::string sql = "SELECT * FROM products WHERE price >= 20.0 AND price <= 100.0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Mouse, Chair, Keyboard
 
@@ -146,15 +127,9 @@ TEST_F(WhereClauseTest, QuantityBasedFiltering)
 {
     // Test low stock items
     std::string sql = "SELECT * FROM products WHERE quantity <= 10";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(),
               4); // Laptop (10), Desk (5), Chair (0), Monitor (0)
@@ -170,15 +145,9 @@ TEST_F(WhereClauseTest, CategoryFiltering)
 {
     // Test electronics category
     std::string sql = "SELECT * FROM products WHERE category = 'Electronics'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Laptop, Mouse, Keyboard, Monitor
 
@@ -192,15 +161,9 @@ TEST_F(WhereClauseTest, MultiCategoryFiltering)
     // Test multiple categories using OR
     std::string sql = "SELECT * FROM products WHERE category = 'Furniture' OR "
                       "category = 'Books'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Desk, Chair, Book
 
@@ -216,15 +179,9 @@ TEST_F(WhereClauseTest, InStockFiltering)
 {
     // Test in-stock items
     std::string sql = "SELECT * FROM products WHERE in_stock = true";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 6); // All except Chair and Monitor
 
@@ -237,15 +194,9 @@ TEST_F(WhereClauseTest, OutOfStockFiltering)
 {
     // Test out-of-stock items
     std::string sql = "SELECT * FROM products WHERE in_stock = false";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 2); // Chair and Monitor
 
@@ -261,15 +212,9 @@ TEST_F(WhereClauseTest, AvailableElectronicsQuery)
     // Test available electronics (in_stock = true AND category = 'Electronics')
     std::string sql = "SELECT * FROM products WHERE in_stock = true AND "
                       "category = 'Electronics'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Laptop, Mouse, Keyboard
 
@@ -283,15 +228,9 @@ TEST_F(WhereClauseTest, LowStockHighValueQuery)
 {
     // Test low stock but high value items
     std::string sql = "SELECT * FROM products WHERE quantity <= 10 AND price > 50.0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Laptop, Desk, Chair, Monitor
 
@@ -305,15 +244,9 @@ TEST_F(WhereClauseTest, ReorderCandidatesQuery)
 {
     // Test items that need reordering (quantity <= 5 OR in_stock = false)
     std::string sql = "SELECT * FROM products WHERE quantity <= 5 OR in_stock = false";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Desk (5), Chair (0), Monitor (0)
 
@@ -330,15 +263,9 @@ TEST_F(WhereClauseTest, NameStartsWith)
 {
     // Test products whose names start with specific letters
     std::string sql = "SELECT * FROM products WHERE name = 'Laptop' OR name = 'Mouse'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 2); // Laptop and Mouse
 
@@ -354,15 +281,9 @@ TEST_F(WhereClauseTest, NotElectronicsQuery)
 {
     // Test non-electronics items
     std::string sql = "SELECT * FROM products WHERE category != 'Electronics'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Desk, Chair, Book, Pen
 
@@ -375,15 +296,9 @@ TEST_F(WhereClauseTest, NotLowPriceQuery)
 {
     // Test items that are not cheap (price > 20)
     std::string sql = "SELECT * FROM products WHERE price > 20.0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 6); // All except Book and Pen
 
@@ -398,15 +313,9 @@ TEST_F(WhereClauseTest, ProjectedExpensiveItems)
 {
     // Test selecting specific columns for expensive items
     std::string sql = "SELECT name, price, category FROM products WHERE price > 100.0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Laptop, Desk, Monitor
     EXPECT_EQ(view.getSchema().getColumnCount(), 3); // name, price, category
@@ -422,15 +331,9 @@ TEST_F(WhereClauseTest, ProjectedStockStatus)
 {
     // Test selecting name and stock status for electronics
     std::string sql = "SELECT name, in_stock FROM products WHERE category = 'Electronics'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Laptop, Mouse, Keyboard, Monitor
     EXPECT_EQ(view.getSchema().getColumnCount(), 2); // name, in_stock
@@ -446,15 +349,9 @@ TEST_F(WhereClauseTest, ExactPriceMatch)
 {
     // Test exact price matching
     std::string sql = "SELECT * FROM products WHERE price = 25.50";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 1); // Mouse
 
@@ -466,15 +363,9 @@ TEST_F(WhereClauseTest, ZeroQuantityItems)
 {
     // Test items with zero quantity
     std::string sql = "SELECT * FROM products WHERE quantity = 0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 2); // Chair and Monitor
 
@@ -487,15 +378,9 @@ TEST_F(WhereClauseTest, EmptyResultSet)
 {
     // Test query that returns no results
     std::string sql = "SELECT * FROM products WHERE price > 10000.0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 0); // No results
 }
@@ -507,15 +392,9 @@ TEST_F(WhereClauseTest, ComplexLogicalAndConditions)
     // Test multiple AND conditions
     std::string sql = "SELECT * FROM products WHERE category = 'Electronics' "
                       "AND price > 50.0 AND in_stock = true";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 2); // Laptop and Keyboard
 
@@ -531,15 +410,9 @@ TEST_F(WhereClauseTest, ComplexLogicalOrConditions)
     // Test multiple OR conditions
     std::string sql = "SELECT * FROM products WHERE price < 20.0 OR quantity > "
                       "100 OR category = 'Furniture'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Book, Pen, Desk, Chair
 
@@ -555,15 +428,9 @@ TEST_F(WhereClauseTest, MixedAndOrConditions)
     // Test mixed AND/OR conditions with precedence
     std::string sql = "SELECT * FROM products WHERE (category = 'Electronics' "
                       "OR category = 'Books') AND price < 100.0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Mouse, Keyboard, Book
 
@@ -580,15 +447,9 @@ TEST_F(WhereClauseTest, EqualityComparisons)
 {
     // Test exact equality matches
     std::string sql = "SELECT * FROM products WHERE price = 25.50";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 1); // Mouse
 
@@ -600,15 +461,9 @@ TEST_F(WhereClauseTest, InequalityComparisons)
 {
     // Test not equal operator
     std::string sql = "SELECT * FROM products WHERE category != 'Electronics'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Desk, Chair, Book, Pen
 
@@ -621,15 +476,9 @@ TEST_F(WhereClauseTest, BoundaryValueTests)
 {
     // Test boundary conditions
     std::string sql = "SELECT * FROM products WHERE quantity = 0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 2); // Chair and Monitor
 
@@ -645,15 +494,9 @@ TEST_F(WhereClauseTest, StringLengthBasedFiltering)
     // Test filtering by string characteristics
     // Note: This uses a workaround since LIKE is not implemented
     std::string sql = "SELECT * FROM products WHERE name = 'Pen'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 1); // Pen
 
@@ -666,15 +509,9 @@ TEST_F(WhereClauseTest, MultiColumnComparisons)
 {
     // Test filtering on multiple different column types
     std::string sql = "SELECT * FROM products WHERE id >= 5 AND category = 'Electronics'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 2); // Keyboard and Monitor
 
@@ -690,15 +527,9 @@ TEST_F(WhereClauseTest, AllRowsMatchFilter)
 {
     // Test query where all rows match the condition
     std::string sql = "SELECT * FROM products WHERE id > 0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 8); // All products
 }
@@ -707,15 +538,9 @@ TEST_F(WhereClauseTest, NoRowsMatchFilter)
 {
     // Test query where no rows match the condition
     std::string sql = "SELECT * FROM products WHERE id < 0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 0); // No products
 }
@@ -728,15 +553,9 @@ TEST_F(WhereClauseTest, ComplexNestedConditions)
     std::string sql = "SELECT * FROM products WHERE ((category = 'Electronics' "
                       "AND price > 50.0) OR (category = "
                       "'Furniture' AND in_stock = true)) AND quantity > 5";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     // Should match: Laptop (Electronics, price>50, qty=10), Keyboard
     // (Electronics, price>50, qty=25) Should not match Desk (Furniture,
     // in_stock=1, but only qty=5)
@@ -761,15 +580,9 @@ TEST_F(WhereClauseTest, ExactBoundaryValues)
 {
     // Test exact match on boundary values
     std::string sql = "SELECT * FROM products WHERE price = 999.99";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 1); // Only Laptop
 
@@ -780,15 +593,9 @@ TEST_F(WhereClauseTest, ZeroQuantityFilter)
 {
     // Test filtering for zero quantity items
     std::string sql = "SELECT * FROM products WHERE quantity = 0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 2); // Chair and Monitor
 
@@ -805,15 +612,9 @@ TEST_F(WhereClauseTest, StringEqualityTests)
 {
     // Test exact string matching
     std::string sql = "SELECT * FROM products WHERE name = 'Laptop'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 1);
     EXPECT_EQ(view.getValue(0, 1).getString(), "Laptop");
@@ -823,15 +624,9 @@ TEST_F(WhereClauseTest, StringInequalityTests)
 {
     // Test string inequality
     std::string sql = "SELECT * FROM products WHERE name != 'Laptop'";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 7); // All except Laptop
 
@@ -847,15 +642,9 @@ TEST_F(WhereClauseTest, ThreeConditionAND)
     // Test three conditions with AND
     std::string sql = "SELECT * FROM products WHERE category = 'Electronics' "
                       "AND price < 100.0 AND in_stock = true";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 2); // Mouse and Keyboard
 
@@ -871,15 +660,9 @@ TEST_F(WhereClauseTest, ThreeConditionOR)
     // Test three conditions with OR
     std::string sql = "SELECT * FROM products WHERE category = 'Books' OR "
                       "category = 'Stationery' OR price > 500.0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Book, Pen, Laptop
 
@@ -913,15 +696,9 @@ TEST_F(WhereClauseTest, SingleRowTable)
 
     // Test matching condition
     std::string sql = "SELECT * FROM single_item WHERE id = 1";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 1);
 }
@@ -930,15 +707,9 @@ TEST_F(WhereClauseTest, AllRowsFiltered)
 {
     // Test condition that filters out all rows
     std::string sql = "SELECT * FROM products WHERE price < 0.0";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 0);
 }
@@ -949,15 +720,9 @@ TEST_F(WhereClauseTest, FloatingPointPrecision)
 {
     // Test floating point comparisons with precise values
     std::string sql = "SELECT * FROM products WHERE price = 25.50";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 1); // Mouse
     EXPECT_EQ(view.getValue(0, 1).getString(), "Mouse");
@@ -967,15 +732,9 @@ TEST_F(WhereClauseTest, LargeIntegerComparison)
 {
     // Test with large quantity values
     std::string sql = "SELECT * FROM products WHERE quantity >= 100";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 2); // Book (100), Pen (200)
 
@@ -992,15 +751,9 @@ TEST_F(WhereClauseTest, ComplexBooleanExpression)
     std::string sql = "SELECT * FROM products WHERE (category = 'Electronics' "
                       "OR category = 'Furniture') AND (price > "
                       "20.0 AND price < 1000.0) AND in_stock = true";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     // Should match: Laptop, Mouse, Keyboard, Desk
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 4);
@@ -1021,15 +774,9 @@ TEST_F(WhereClauseTest, NegationWithComplexConditions)
     // Test NOT with complex nested conditions
     std::string sql = "SELECT * FROM products WHERE NOT (category = "
                       "'Electronics' AND price > 100.0)";
-    auto result = parseSQL(sql);
+    auto query_result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result->isValid());
-    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result->getStatement(0));
-
-    auto plan = planner_->planSelect(select_stmt);
-    auto query_result = engine_->executePlan(std::move(plan));
-
-    ASSERT_TRUE(query_result.ok());
+    ASSERT_TRUE(static_cast<bool>(query_result));
     // Should exclude: Laptop (Electronics, price=999.99), Monitor (Electronics,
     // price=299.99) Should include: All others (6 items)
     auto& view = query_result.value();

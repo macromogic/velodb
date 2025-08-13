@@ -25,7 +25,7 @@ public:
 
     const Schema& getOutputSchema() const { return *output_schema_; }
 
-    virtual Result<View> next() const = 0;
+    virtual Result<View> next() = 0;
     virtual bool isUnary() const = 0;
 
     static constexpr size_t MAX_BATCH_SIZE = 32;
@@ -43,7 +43,7 @@ public:
 
     bool isUnary() const override { return true; }
 
-    const AbstractOperator* getChild() const { return child_.get(); }
+    AbstractOperator* getChild() const { return child_.get(); }
 
 private:
     std::unique_ptr<AbstractOperator> child_; // Child operator
@@ -58,8 +58,8 @@ public:
 
     bool isUnary() const override { return false; }
 
-    const AbstractOperator* getLeftChild() const { return left_child_.get(); }
-    const AbstractOperator* getRightChild() const { return right_child_.get(); }
+    AbstractOperator* getLeftChild() const { return left_child_.get(); }
+    AbstractOperator* getRightChild() const { return right_child_.get(); }
 
 private:
     std::unique_ptr<AbstractOperator> left_child_;

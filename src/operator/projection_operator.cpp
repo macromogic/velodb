@@ -21,7 +21,7 @@ ProjectionOperator::ProjectionOperator(ExecutionContext& context,
 {
 }
 
-Result<View> ProjectionOperator::next() const
+Result<View> ProjectionOperator::next()
 {
     auto* child = getChild();
     if (!child) {
@@ -32,6 +32,9 @@ Result<View> ProjectionOperator::next() const
         return child_result; // Propagate error from child
     }
     auto& child_view = child_result.value();
+    if (child_view.getRowCount() == 0) {
+        return child_result; // No rows to process
+    }
 
     View view("projection_result");
     ViewTuple dummy_tuple(child_view, 0);
@@ -39,9 +42,7 @@ Result<View> ProjectionOperator::next() const
     if (expressions_.empty()) {
         for (size_t i = 0; i < output_columns; ++i) {
             const auto& column_info = output_schema_->getColumnInfo(i);
-            if (column_info.getName()[0] != '$') {
-                view.addColumn(child_view.getColumn(column_info.getName()).viewAs(column_info.getName()));
-            }
+            view.addColumn(child_view.getColumn(column_info.getName()).viewAs(column_info.getName()));
         }
     } else {
         for (size_t i = 0; i < output_columns; ++i) {

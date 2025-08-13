@@ -14,7 +14,7 @@ LimitOperator::LimitOperator(ExecutionContext& context,
 {
 }
 
-Result<View> LimitOperator::next() const
+Result<View> LimitOperator::next()
 {
     // TODO: Implement limit and offset logic
     return Result<View>::failure("LimitOperator::execute not implemented yet");

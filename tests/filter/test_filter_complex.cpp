@@ -124,7 +124,7 @@ TEST_F(FilterComplexTest, BoundaryValueEquals)
     std::string sql = "SELECT * FROM test_data WHERE score = 80.0";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 2); // Records 4 and 5
 
@@ -138,7 +138,7 @@ TEST_F(FilterComplexTest, BoundaryValueRange)
     std::string sql = "SELECT * FROM test_data WHERE score >= 80.0 AND score <= 95.0";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Records 1, 4, 5
 
@@ -154,7 +154,7 @@ TEST_F(FilterComplexTest, MinMaxValues)
     std::string sql = "SELECT * FROM test_data WHERE score = 0.0 OR score = 100.0";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 2); // Records 7 and 8
 
@@ -173,7 +173,7 @@ TEST_F(FilterComplexTest, MultiColumnComplexFilter)
                       "AND active = true AND priority <= 2)";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Records 1, 2, 8
 
@@ -196,7 +196,7 @@ TEST_F(FilterComplexTest, ThreeWayLogicalCombination)
                       "score >= 75.0) OR (tag = 'Special' AND score >= 80.0)";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     // Records 1, 8 (priority 1 & active), Record 2 (Standard & score >= 75),
     // Record 4 (Special & score >= 80), Record 5 (Standard & score >= 75)
@@ -224,7 +224,7 @@ TEST_F(FilterComplexTest, NotEqualsWithMultipleValues)
                       "tag != 'Regular'";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Records 1, 4, 5, 8
 
@@ -240,7 +240,7 @@ TEST_F(FilterComplexTest, ComplexNegationLogic)
                       "OR priority = 3) AND active = true";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Records 1, 2, 4, 8
 
@@ -262,14 +262,14 @@ TEST_F(FilterComplexTest, MultipleRangeConditions)
                       "95.0 AND priority BETWEEN 1 AND 2";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     // This would work if BETWEEN is implemented, otherwise we test the
     // equivalent Let's use the equivalent for now
     std::string equivalent_sql = "SELECT * FROM test_data WHERE score >= 75.0 AND score <= 95.0 AND "
                                  "priority >= 1 AND priority <= 2";
     result = engine_->executeQuery(equivalent_sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Records 1, 2, 4
 
@@ -290,7 +290,7 @@ TEST_F(FilterComplexTest, StringPatternCombinations)
                       "OR tag = 'Special')";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Records 1, 4, 5, 8
 
@@ -311,7 +311,7 @@ TEST_F(FilterComplexTest, EmptyResultSet)
     std::string sql = "SELECT * FROM test_data WHERE category = 'NonExistent'";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 0);
 }
@@ -321,7 +321,7 @@ TEST_F(FilterComplexTest, AllRecordsMatch)
     std::string sql = "SELECT * FROM test_data WHERE id > 0";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 8); // All records
 }
@@ -331,7 +331,7 @@ TEST_F(FilterComplexTest, ContradictoryConditions)
     std::string sql = "SELECT * FROM test_data WHERE score > 100.0 AND score < 50.0";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 0); // Impossible condition
 }
@@ -344,7 +344,7 @@ TEST_F(FilterComplexTest, ComplexProjectionWithFilter)
                       "> 90.0 OR priority = 1) AND active = true";
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Records 1, 4, 6, 8
     EXPECT_EQ(view.getSchema().getColumnCount(), 3); // Only id, category, score
@@ -370,7 +370,7 @@ TEST_F(FilterComplexTest, SelectiveProjectionComplexFilter)
                                  "(priority = 1 OR priority = 3)";
     auto result = engine_->executeQuery(equivalent_sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Records 1, 3, 7, 8
     EXPECT_EQ(view.getSchema().getColumnCount(), 2); // Only tag, active
@@ -398,7 +398,7 @@ TEST_F(FilterComplexTest, VeryComplexCondition)
 
     auto result = engine_->executeQuery(sql);
 
-    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
     // This should be a comprehensive test of the query engine's ability to
     // handle complex logic Expected: Records that match the complex boolean

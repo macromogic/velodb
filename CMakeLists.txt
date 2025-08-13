@@ -40,7 +40,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -Wextra -Werror")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 set(CMAKE_CUDA_FLAGS_DEBUG
     "-g -G -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -Werror")
-set(CMAKE_CUDA_FLAGS_RELEASE "-O3 --use-fast-math")
+set(CMAKE_CUDA_FLAGS_RELEASE "-O3 --use_fast_math")
 
 # Generate version header from template
 configure_file("${CMAKE_SOURCE_DIR}/include/velodb_version.hpp.in"

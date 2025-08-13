@@ -21,7 +21,7 @@ HashJoinOperator::HashJoinOperator(ExecutionContext& context,
 {
 }
 
-Result<View> HashJoinOperator::next() const
+Result<View> HashJoinOperator::next()
 {
     // TODO: Implement hash join logic
     return Result<View>::failure("HashJoinOperator::execute not implemented yet");
