@@ -3,6 +3,7 @@
 #include "common/fmt.hpp"
 
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 
 #include <iomanip>
 #include <map>
@@ -41,34 +42,35 @@ auto format_as(PlanType type)
 // Static method implementations
 std::string PlanVisualizer::visualizeAsText(const std::unique_ptr<AbstractPlanNode>& plan_node, int indent)
 {
-    std::string result;
-    visualizeTextRecursive(plan_node, result, indent);
-    return result;
+    std::ostringstream oss;
+    visualizeTextRecursive(plan_node, oss, indent);
+    return oss.str();
 }
 
 std::string PlanVisualizer::visualizeAsGraphviz(const std::unique_ptr<AbstractPlanNode>& plan_node,
                                                 const std::string& graph_name)
 {
-    std::string result;
-    result += "digraph " + graph_name + " {\n";
-    result += "  rankdir=TB;\n";
-    result += "  node [shape=box, style=filled, fontname=\"Arial\", "
-              "fontsize=10];\n";
-    result += "  edge [fontname=\"Arial\", fontsize=8];\n\n";
+    std::ostringstream oss;
+    fmt::print(oss,
+               "digraph {} {{\n"
+               "  rankdir=TB;\n"
+               "  node [shape=box, style=filled, fontname=\"Arial\", fontsize=10];\n"
+               "  edge [fontname=\"Arial\", fontsize=8];\n\n",
+               graph_name);
 
     int node_counter = 0;
-    visualizeGraphvizRecursive(plan_node, result, node_counter);
+    visualizeGraphvizRecursive(plan_node, oss, node_counter);
 
-    result += "}\n";
-    return result;
+    oss << "}\n";
+    return oss.str();
 }
 
 std::string PlanVisualizer::visualizeDetailed(const std::unique_ptr<AbstractPlanNode>& plan_node)
 {
-    std::string result;
-    result += "=== Query Plan Analysis ===\n\n";
-    visualizeDetailedRecursive(plan_node, result, 0);
-    return result;
+    std::ostringstream oss;
+    oss << "=== Query Plan Analysis ===\n\n";
+    visualizeDetailedRecursive(plan_node, oss, 0);
+    return oss.str();
 }
 
 void PlanVisualizer::printPlan(const std::unique_ptr<AbstractPlanNode>& plan_node,
@@ -90,7 +92,7 @@ void PlanVisualizer::printPlan(const std::unique_ptr<AbstractPlanNode>& plan_nod
 
 // Private helper methods
 void PlanVisualizer::visualizeTextRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-                                            std::string& result,
+                                            std::ostringstream& oss,
                                             int indent)
 {
     if (!plan_node) {
@@ -99,28 +101,29 @@ void PlanVisualizer::visualizeTextRecursive(const std::unique_ptr<AbstractPlanNo
 
     // Create indentation
     std::string indent_str(indent, ' ');
-    result += indent_str;
+    oss << indent_str;
 
     // Add tree structure symbols
     if (indent > 0) {
-        result += "├── ";
+        oss << "├── ";
     }
 
     // Add node information
-    result += fmt::format("{} [{}] (cols: {})\n",
-                          *plan_node,
-                          plan_node->getPlanType(),
-                          plan_node->getOutputSchema().getColumnCount());
+    fmt::print(oss,
+               "{} [{}] (cols: {})\n",
+               *plan_node,
+               plan_node->getPlanType(),
+               plan_node->getOutputSchema().getColumnCount());
 
     // Recursively process children
     const auto& children = plan_node->getChildren();
     for (size_t i = 0; i < children.size(); ++i) {
-        visualizeTextRecursive(children[i], result, indent + 4);
+        visualizeTextRecursive(children[i], oss, indent + 4);
     }
 }
 
 void PlanVisualizer::visualizeGraphvizRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-                                                std::string& result,
+                                                std::ostringstream& oss,
                                                 int& node_counter)
 {
     if (!plan_node) {
@@ -131,25 +134,26 @@ void PlanVisualizer::visualizeGraphvizRecursive(const std::unique_ptr<AbstractPl
 
     // Create node
     auto plan_type = plan_node->getPlanType();
-    result += fmt::format("  node {} [label=\"{}\", shape={}, fillcolor=\"{}\"];\n",
-                          current_node,
-                          escapeForDot(plan_node->toString()),
-                          getNodeShape(plan_type),
-                          getNodeColor(plan_type));
+    fmt::print(oss,
+               "  node {} [label=\"{}\", shape={}, fillcolor=\"{}\"];\n",
+               current_node,
+               escapeForDot(plan_node->toString()),
+               getNodeShape(plan_type),
+               getNodeColor(plan_type));
 
     // Process children and create edges
     const auto& children = plan_node->getChildren();
     for (const auto& child : children) {
         int child_node = node_counter;
-        visualizeGraphvizRecursive(child, result, node_counter);
+        visualizeGraphvizRecursive(child, oss, node_counter);
 
         // Create edge from current node to child
-        result += fmt::format("  node {} -> node {};\n", current_node, child_node);
+        fmt::print(oss, "  node {} -> node {};\n", current_node, child_node);
     }
 }
 
 void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-                                                std::string& result,
+                                                std::ostringstream& oss,
                                                 int level)
 {
     if (!plan_node) {
@@ -159,37 +163,29 @@ void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPl
     // Create level indicator
     std::string prefix(level * 2, ' ');
     const auto& schema = plan_node->getOutputSchema();
-    result += fmt::format("{}Level {}: {}\n"
-                          "{}  Description: {}\n"
-                          "{}  Output Schema:\n"
-                          "{}    Column Count: {}\n",
-                          prefix,
-                          level,
-                          plan_node->getPlanType(),
-                          prefix,
-                          *plan_node,
-                          prefix,
-                          prefix,
-                          schema.getColumnCount());
+    fmt::print(oss, "{}Level {}: {}\n", prefix, level, format_as(plan_node->getPlanType()));
+    fmt::print(oss, "{}  Description: {}\n", prefix, plan_node->toString());
+    fmt::print(oss, "{}  Output Schema:\n", prefix);
+    fmt::print(oss, "{}    Column Count: {}\n", prefix, schema.getColumnCount());
 
     for (size_t i = 0; i < schema.getColumnCount(); ++i) {
         const auto& column = schema.getColumnInfo(i);
-        result += fmt::format("{}    [{}] {} ({})\n", prefix, i, column.getName(), column.getType());
+        fmt::print(oss, "{}    [{}] {} ({})\n", prefix, i, column.getName(), column.getType());
     }
 
     // Children info
     const auto& children = plan_node->getChildren();
     if (!children.empty()) {
-        result += fmt::format("{}  Children: {}\n", prefix, children.size());
+        fmt::print(oss, "{}  Children: {}\n", prefix, children.size());
         for (size_t i = 0; i < children.size(); ++i) {
-            result += fmt::format("{}  Child {}:\n", prefix, i);
-            visualizeDetailedRecursive(children[i], result, level + 1);
+            fmt::print(oss, "{}  Child {}:\n", prefix, i);
+            visualizeDetailedRecursive(children[i], oss, level + 1);
         }
     } else {
-        result += prefix + "  Children: None (leaf node)\n";
+        fmt::print(oss, "{}  Children: None (leaf node)\n", prefix);
     }
 
-    result += "\n";
+    oss << "\n";
 }
 
 std::string PlanVisualizer::getNodeShape(PlanType type)

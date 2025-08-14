@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <ostream>
+#include <sstream>
 #include <string>
 
 namespace velodb {
@@ -28,15 +29,15 @@ public:
 private:
     // Helper methods for different visualization formats
     static void visualizeTextRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-                                       std::string& result,
+                                       std::ostringstream& oss,
                                        int indent);
 
     static void visualizeGraphvizRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-                                           std::string& result,
+                                           std::ostringstream& oss,
                                            int& node_counter);
 
     static void visualizeDetailedRecursive(const std::unique_ptr<AbstractPlanNode>& plan_node,
-                                           std::string& result,
+                                           std::ostringstream& oss,
                                            int level);
 
     static std::string getNodeShape(PlanType type);
