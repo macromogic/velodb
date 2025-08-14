@@ -54,7 +54,7 @@ ViewTuple::ViewTuple(const TableBase& table, size_t row_id)
 
 bool ViewTuple::operator==(const ViewTuple& other) const
 {
-    return &table_ == &other.table_ && row_id_ == other.row_id_;
+    return &table_.get() == &other.table_.get() && row_id_ == other.row_id_;
 }
 
 const Value& ViewTuple::getValue(size_t column_index) const
