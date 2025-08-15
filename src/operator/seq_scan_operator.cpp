@@ -8,9 +8,9 @@
 
 namespace velodb {
 
-ScanFilterOperator::ScanFilterOperator(ExecutionContext& context,
-                                       const TableBase& table,
-                                       const std::unique_ptr<AbstractExpression>& predicate)
+SeqScanOperator::SeqScanOperator(ExecutionContext& context,
+                                 const TableBase& table,
+                                 const std::unique_ptr<AbstractExpression>& predicate)
     : UnaryOperator(context,
                     table.getSchema().cloneUnique(),
                     nullptr) // NOTE: May support child operators in future
@@ -23,7 +23,7 @@ ScanFilterOperator::ScanFilterOperator(ExecutionContext& context,
 {
 }
 
-Result<View> ScanFilterOperator::next()
+Result<View> SeqScanOperator::next()
 {
     size_t start_row_id = current_row_id_;
     size_t end_row_id = std::min(start_row_id + MAX_BATCH_SIZE, table_.getRowCount());
@@ -42,9 +42,9 @@ Result<View> ScanFilterOperator::next()
     return Result<View>::success(std::move(view));
 }
 
-std::string ScanFilterOperator::toString() const
+std::string SeqScanOperator::toString() const
 {
-    std::string result = fmt::format("ScanFilterOperator({})", table_.getName());
+    std::string result = fmt::format("SeqScanOperator({})", table_.getName());
     if (predicate_) {
         result += fmt::format(" WHERE {}", *predicate_);
     }

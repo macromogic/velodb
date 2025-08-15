@@ -7,24 +7,24 @@
 
 namespace velodb {
 
-// ScanFilterPlanNode implementation
-ScanFilterPlanNode::ScanFilterPlanNode(const TableBase& table,
-                                       std::unique_ptr<Schema> output_schema,
-                                       std::unique_ptr<AbstractExpression> predicate)
+// SeqScanPlanNode implementation
+SeqScanPlanNode::SeqScanPlanNode(const TableBase& table,
+                                 std::unique_ptr<Schema> output_schema,
+                                 std::unique_ptr<AbstractExpression> predicate)
     : AbstractPlanNode(PlanType::SEQ_SCAN, std::move(output_schema))
     , table_(table)
     , predicate_(std::move(predicate))
 {
 }
 
-std::unique_ptr<AbstractOperator> ScanFilterPlanNode::createOperator(ExecutionContext& context) const
+std::unique_ptr<AbstractOperator> SeqScanPlanNode::createOperator(ExecutionContext& context) const
 {
-    return std::make_unique<ScanFilterOperator>(context, table_, predicate_);
+    return std::make_unique<SeqScanOperator>(context, table_, predicate_);
 }
 
-std::string ScanFilterPlanNode::toString() const
+std::string SeqScanPlanNode::toString() const
 {
-    std::string result = fmt::format("ScanFilter({})", table_.getName());
+    std::string result = fmt::format("SeqScan({})", table_.getName());
     if (predicate_) {
         result += fmt::format(" WHERE {}", *predicate_);
     }

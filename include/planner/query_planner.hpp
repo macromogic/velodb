@@ -41,7 +41,7 @@ private:
     // SELECT list planning
     std::vector<std::unique_ptr<AbstractExpression>> planSelectList(const hsql::TableRef* table_ref,
                                                                     const std::vector<hsql::Expr*>* select_list);
-    std::unique_ptr<Schema> inferScanFilterSchema(const Schema& input_schema);
+    std::unique_ptr<Schema> inferSeqScanSchema(const Schema& input_schema);
     std::unique_ptr<Schema> inferProjectionSchema(const std::vector<std::unique_ptr<AbstractExpression>>& expressions,
                                                   const Schema& input_schema);
 

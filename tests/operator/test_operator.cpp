@@ -43,18 +43,18 @@ protected:
     std::unique_ptr<Catalog> catalog_; // Mock catalog for operator creation
 };
 
-TEST_F(OperatorTest, ScanFilterOperatorCreation)
+TEST_F(OperatorTest, SeqScanOperatorCreation)
 {
     auto& test_table = catalog_->getTable("test_table").value().get();
     auto context = ExecutionContext(*catalog_);
-    ScanFilterOperator scan_op(context, test_table, nullptr);
+    SeqScanOperator scan_op(context, test_table, nullptr);
 
     EXPECT_EQ(scan_op.getOutputSchema().getColumnCount(), 2);
     EXPECT_EQ(scan_op.getOutputSchema().getColumnInfo(0).getName(), "id");
     EXPECT_EQ(scan_op.getOutputSchema().getColumnInfo(1).getName(), "name");
 }
 
-TEST_F(OperatorTest, ScanFilterOperatorWithPredicate)
+TEST_F(OperatorTest, SeqScanOperatorWithPredicate)
 {
     // Create a predicate: id = 1
     Value target_val = Value::createInteger(1);
@@ -69,7 +69,7 @@ TEST_F(OperatorTest, ScanFilterOperatorWithPredicate)
 
     auto& test_table = catalog_->getTable("test_table").value().get();
     auto context = ExecutionContext(*catalog_);
-    auto scan_op = std::make_unique<ScanFilterOperator>(context, test_table, std::move(predicate));
+    auto scan_op = std::make_unique<SeqScanOperator>(context, test_table, std::move(predicate));
     auto filter_compaction_op = std::make_unique<FilterCompactionOperator>(context,
                                                                            scan_op->getOutputSchema().cloneUnique(),
                                                                            std::move(scan_op));

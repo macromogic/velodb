@@ -12,12 +12,12 @@ namespace velodb {
 class TableIterator;
 
 // Scan with filter operator
-class ScanFilterOperator : public UnaryOperator {
+class SeqScanOperator : public UnaryOperator {
 public:
-    explicit ScanFilterOperator(ExecutionContext& context,
-                                const TableBase& table,
-                                const std::unique_ptr<AbstractExpression>& predicate);
-    ~ScanFilterOperator() override = default;
+    explicit SeqScanOperator(ExecutionContext& context,
+                             const TableBase& table,
+                             const std::unique_ptr<AbstractExpression>& predicate);
+    ~SeqScanOperator() override = default;
 
     Result<View> next() override;
 

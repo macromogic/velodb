@@ -126,10 +126,10 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRe
         if (!table) {
             VELODB_THROW(CatalogError, "Table not found: " + table_name);
         }
-        auto output_schema = inferScanFilterSchema(table->get().getSchema());
-        auto seq_scan_plan = std::make_unique<ScanFilterPlanNode>(*table,
-                                                                  output_schema->cloneUnique(),
-                                                                  std::move(predicate));
+        auto output_schema = inferSeqScanSchema(table->get().getSchema());
+        auto seq_scan_plan = std::make_unique<SeqScanPlanNode>(*table,
+                                                               output_schema->cloneUnique(),
+                                                               std::move(predicate));
         auto filter_compaction_plan = std::make_unique<FilterCompactionPlanNode>(std::move(output_schema));
         filter_compaction_plan->addChild(std::move(seq_scan_plan));
         return filter_compaction_plan;
@@ -328,7 +328,7 @@ std::vector<std::unique_ptr<AbstractExpression>> QueryPlanner::planSelectList(
     return expressions;
 }
 
-std::unique_ptr<Schema> QueryPlanner::inferScanFilterSchema(const Schema& input_schema)
+std::unique_ptr<Schema> QueryPlanner::inferSeqScanSchema(const Schema& input_schema)
 {
     auto schema = input_schema.cloneUnique();
     schema->addColumnInfo({ "$_rowid", std::make_unique<BigIntType>(), false });
