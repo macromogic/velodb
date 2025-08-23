@@ -1,7 +1,10 @@
 add_library(
   velodb_catalog OBJECT
+  column/column_info.cpp
+  column/device_column.cpp
+  column/value_column.cpp
+  column/view_column.cpp
   schema.cpp
-  column.cpp
   table.cpp
   catalog.cpp
   tuple.cpp

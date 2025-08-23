@@ -180,7 +180,7 @@ std::unique_ptr<DataType> TypeChecker::promoteTypes(const DataType& left_type, c
 
     // If types are the same, return that type
     if (left_id == right_id) {
-        return DataType::createType(left_id, std::max(left_type.getSize(), right_type.getSize()));
+        return DataType::createType(left_id, std::max(left_type.size(), right_type.size()));
     }
 
     // Promote to the higher-ranked type
@@ -188,9 +188,9 @@ std::unique_ptr<DataType> TypeChecker::promoteTypes(const DataType& left_type, c
     int right_rank = getTypeRank(right_type);
 
     if (left_rank >= right_rank) {
-        return DataType::createType(left_id, left_type.getSize());
+        return DataType::createType(left_id, left_type.size());
     } else {
-        return DataType::createType(right_id, right_type.getSize());
+        return DataType::createType(right_id, right_type.size());
     }
 }
 

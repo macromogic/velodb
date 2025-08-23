@@ -15,7 +15,7 @@ namespace velodb {
 CastExpression::CastExpression(std::unique_ptr<AbstractExpression> operand, std::unique_ptr<DataType> target_type)
     : AbstractExpression(ExpressionType::CAST, std::move(target_type))
     , operand_(std::move(operand))
-    , target_type_(DataType::createType(return_type_->getTypeId(), return_type_->getSize()))
+    , target_type_(DataType::createType(return_type_->getTypeId(), return_type_->size()))
 {
     // Validate the cast operation at construction time
     if (!g_type_checker.validateCast(operand_->getReturnType(), *target_type_)) {

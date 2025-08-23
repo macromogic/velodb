@@ -1,182 +1,25 @@
-#include "catalog/column.hpp"
+#include "catalog/column/view_column.hpp"
 
+#include "catalog/column/column_base.hpp"
+#include "catalog/column/device_column.hpp"
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
 
-#include <fmt/core.h>
-
 namespace velodb {
 
-ColumnInfo::ColumnInfo(std::string name,
-                       std::unique_ptr<DataType> type,
-                       bool is_nullable,
-                       bool is_unique,
-                       bool is_primary_key)
-    : name_(std::move(name))
-    , type_(std::move(type))
-    , is_nullable_(is_nullable)
-    , is_unique_(is_unique)
-    , is_primary_key_(is_primary_key)
-{
-}
-
-ColumnInfo ColumnInfo::cloneImpl() const
-{
-    return { name_, type_->cloneUnique(), is_nullable_, is_unique_, is_primary_key_ };
-}
-
-std::string ColumnInfo::toString() const
-{
-    std::string result = fmt::format("{} {}", name_, *type_);
-    if (!is_nullable_) {
-        result += " NOT NULL";
-    }
-    if (is_unique_) {
-        result += " UNIQUE";
-    }
-    if (is_primary_key_) {
-        result += " PRIMARY KEY";
-    }
-    return result;
-}
-
-Column::Column(std::string name, bool is_nullable, bool is_unique, bool is_primary_key)
-    : name_(std::move(name))
-    , is_nullable_(is_nullable)
-    , is_unique_(is_unique)
-    , is_primary_key_(is_primary_key)
-{
-}
-
-ValueColumn::ValueColumn(std::string name,
-                         std::unique_ptr<DataType> type,
-                         bool is_nullable,
-                         bool is_unique,
-                         bool is_primary_key)
-    : Column(std::move(name), is_nullable, is_unique, is_primary_key)
-    , type_(std::move(type))
-{
-}
-
-ValueColumn::ValueColumn(const ColumnInfo& info)
-    : Column(info.getName(), info.isNullable(), info.isUnique(), info.isPrimaryKey())
-    , type_(info.getType().cloneUnique())
-{
-}
-
-void ValueColumn::resize(size_t new_size)
-{
-    values_.resize(new_size);
-}
-
-void ValueColumn::reserve(size_t new_capacity)
-{
-    values_.reserve(new_capacity);
-}
-
-size_t ValueColumn::size() const
-{
-    return values_.size();
-}
-
-const Value& ValueColumn::get(size_t row) const
-{
-    if (row >= values_.size()) {
-        VELODB_THROW(CatalogError, "Row index out of range");
-    }
-    return values_[row];
-}
-
-Value& ValueColumn::operator[](size_t row)
-{
-    if (row >= values_.size()) {
-        VELODB_THROW(CatalogError, "Row index out of range");
-    }
-    return values_[row];
-}
-
-void ValueColumn::append(const Value& value)
-{
-    if (value.getTypeId() != type_->getTypeId()) {
-        VELODB_THROW(CatalogError, "Value type does not match column type");
-    }
-    values_.push_back(value);
-}
-
-void ValueColumn::fill(const Value& value, size_t count)
-{
-    values_.clear();
-    values_.resize(count, value);
-}
-
-ViewColumn ValueColumn::view() const
-{
-    return { *type_, getName(), values_ };
-}
-
-ViewColumn ValueColumn::viewAs(std::string alias) const
-{
-    return { *type_, std::move(alias), values_ };
-}
-
-ViewColumn ValueColumn::slice(size_t start_row, size_t end_row) const
-{
-    if (start_row > end_row || end_row > values_.size()) {
-        VELODB_THROW(CatalogError, "Invalid slice range");
-    }
-    return { *type_, getName(), values_, start_row, end_row };
-}
-
-ViewColumn ValueColumn::indices(const std::vector<size_t>& indices) const
-{
-    // Validate all indices are within bounds
-    for (size_t idx : indices) {
-        if (idx >= values_.size()) {
-            VELODB_THROW(CatalogError, "Index out of range in column indices view");
-        }
-    }
-    return { *type_, getName(), values_, indices };
-}
-
-ViewColumn ValueColumn::filterValues(std::function<bool(const Value&)> predicate) const
-{
-    std::vector<size_t> matching_indices;
-    for (size_t i = 0; i < values_.size(); ++i) {
-        if (predicate(values_[i])) {
-            matching_indices.push_back(i);
-        }
-    }
-    return { *type_, getName(), values_, std::move(matching_indices) };
-}
-
-std::string ValueColumn::toString() const
-{
-    std::string result = fmt::format("ValueColumn(name={}, type={}, size={}", getName(), *type_, size());
-    if (!isNullable()) {
-        result += ", not null";
-    }
-    if (isUnique()) {
-        result += ", unique";
-    }
-    if (isPrimaryKey()) {
-        result += ", primary key";
-    }
-    result += ")";
-    return result;
-}
-
+// Host data constructors
 ViewColumn::ViewColumn(DataType& type, std::string name, const ValueVector& values)
-    : Column(std::move(name), true, false, false)
+    : ColumnBase(std::move(name), true, false, false)
     , type_(type)
-    , values_(values)
+    , data_source_(&values)
     , view_mode_(EntireView {})
 {
 }
 
 ViewColumn::ViewColumn(DataType& type, std::string name, const ValueVector& values, size_t start_row, size_t end_row)
-    : Column(std::move(name), true, false, false)
+    : ColumnBase(std::move(name), true, false, false)
     , type_(type)
-    , values_(values)
+    , data_source_(&values)
     , view_mode_(SliceView { start_row, end_row })
 {
     if (start_row > end_row || end_row > values.size()) {
@@ -185,9 +28,9 @@ ViewColumn::ViewColumn(DataType& type, std::string name, const ValueVector& valu
 }
 
 ViewColumn::ViewColumn(DataType& type, std::string name, const ValueVector& values, std::vector<size_t> indices)
-    : Column(std::move(name), true, false, false)
+    : ColumnBase(std::move(name), true, false, false)
     , type_(type)
-    , values_(values)
+    , data_source_(&values)
     , view_mode_(IndicesView { std::move(indices) })
 {
     const auto& idx_view = std::get<IndicesView>(view_mode_);
@@ -196,6 +39,53 @@ ViewColumn::ViewColumn(DataType& type, std::string name, const ValueVector& valu
             VELODB_THROW(CatalogError, "Index out of range in discrete view");
         }
     }
+}
+
+// Device data constructors
+ViewColumn::ViewColumn(DataType& type, std::string name, const DeviceColumn& device_column)
+    : ColumnBase(std::move(name), true, false, false)
+    , type_(type)
+    , data_source_(&device_column)
+    , view_mode_(EntireView {})
+{
+}
+
+ViewColumn::ViewColumn(DataType& type,
+                       std::string name,
+                       const DeviceColumn& device_column,
+                       size_t start_row,
+                       size_t end_row)
+    : ColumnBase(std::move(name), true, false, false)
+    , type_(type)
+    , data_source_(&device_column)
+    , view_mode_(SliceView { start_row, end_row })
+{
+    if (start_row > end_row || end_row > device_column.size()) {
+        VELODB_THROW(CatalogError, "Invalid slice range");
+    }
+}
+
+ViewColumn::ViewColumn(DataType& type, std::string name, const DeviceColumn& device_column, std::vector<size_t> indices)
+    : ColumnBase(std::move(name), true, false, false)
+    , type_(type)
+    , data_source_(&device_column)
+    , view_mode_(IndicesView { std::move(indices) })
+{
+    const auto& idx_view = std::get<IndicesView>(view_mode_);
+    for (size_t idx : idx_view.indices) {
+        if (idx >= device_column.size()) {
+            VELODB_THROW(CatalogError, "Index out of range in discrete view");
+        }
+    }
+}
+
+// Private constructor for internal operations
+ViewColumn::ViewColumn(DataType& type, std::string name, DataSource data_source, ViewMode view_mode)
+    : ColumnBase(std::move(name), true, false, false)
+    , type_(type)
+    , data_source_(data_source)
+    , view_mode_(std::move(view_mode))
+{
 }
 
 size_t ViewColumn::mapToActualRow(size_t view_row) const
@@ -227,7 +117,8 @@ size_t ViewColumn::size() const
             using T = std::decay_t<decltype(mode)>;
 
             if constexpr (std::is_same_v<T, EntireView>) {
-                return values_.size();
+                // Get size from data source
+                return std::visit([](const auto& data_source) -> size_t { return data_source->size(); }, data_source_);
             } else if constexpr (std::is_same_v<T, SliceView>) {
                 return mode.end_row - mode.start_row;
             } else if constexpr (std::is_same_v<T, IndicesView>) {
@@ -242,10 +133,25 @@ size_t ViewColumn::size() const
 const Value& ViewColumn::get(size_t row) const
 {
     size_t actual_row = mapToActualRow(row);
-    if (actual_row >= values_.size()) {
-        VELODB_THROW(CatalogError, "Row index out of range");
-    }
-    return values_[actual_row];
+
+    // Use variant to dispatch to appropriate data source
+    return std::visit(
+        [actual_row](const auto& data_source) -> const Value& {
+            using DataSourceType = std::decay_t<decltype(*data_source)>;
+
+            if constexpr (std::is_same_v<DataSourceType, ValueVector>) {
+                // Host data access - direct memory access
+                if (actual_row >= data_source->size()) {
+                    VELODB_THROW(CatalogError, "Row index out of range");
+                }
+                return (*data_source)[actual_row];
+            } else if constexpr (std::is_same_v<DataSourceType, DeviceColumn>) {
+                VELODB_THROW(CatalogError, "Cannot access device data");
+            } else {
+                static_assert(std::is_same_v<DataSourceType, void>, "Unhandled data source type");
+            }
+        },
+        data_source_);
 }
 
 ViewColumn ViewColumn::slice(size_t start_row, size_t end_row) const
@@ -259,11 +165,10 @@ ViewColumn ViewColumn::slice(size_t start_row, size_t end_row) const
             using T = std::decay_t<decltype(mode)>;
 
             if constexpr (std::is_same_v<T, EntireView> || std::is_same_v<T, SliceView>) {
-                // For entire and slice views, we can create a new slice
-                // directly
+                // For entire and slice views, we can create a new slice directly
                 size_t actual_start = mapToActualRow(start_row);
                 size_t actual_end = mapToActualRow(end_row - 1) + 1;
-                return ViewColumn(type_, getName(), values_, actual_start, actual_end);
+                return ViewColumn(type_, getName(), data_source_, SliceView { actual_start, actual_end });
             } else if constexpr (std::is_same_v<T, IndicesView>) {
                 // For indices view, create a new indices vector from the slice
                 std::vector<size_t> new_indices;
@@ -271,7 +176,7 @@ ViewColumn ViewColumn::slice(size_t start_row, size_t end_row) const
                 for (size_t i = start_row; i < end_row; ++i) {
                     new_indices.push_back(mode.indices[i]);
                 }
-                return ViewColumn(type_, getName(), values_, std::move(new_indices));
+                return ViewColumn(type_, getName(), data_source_, IndicesView { std::move(new_indices) });
             } else {
                 static_assert(std::is_same_v<T, void>, "Unhandled view mode type");
             }
@@ -291,7 +196,7 @@ ViewColumn ViewColumn::indices(const std::vector<size_t>& indices) const
         actual_indices.push_back(mapToActualRow(view_idx));
     }
 
-    return ViewColumn(type_, getName(), values_, std::move(actual_indices));
+    return ViewColumn(type_, getName(), data_source_, IndicesView { std::move(actual_indices) });
 }
 
 ViewColumn ViewColumn::view() const
@@ -301,11 +206,11 @@ ViewColumn ViewColumn::view() const
             using T = std::decay_t<decltype(mode)>;
 
             if constexpr (std::is_same_v<T, EntireView>) {
-                return { type_, getName(), values_ };
+                return ViewColumn(type_, getName(), data_source_, EntireView {});
             } else if constexpr (std::is_same_v<T, SliceView>) {
-                return { type_, getName(), values_, mode.start_row, mode.end_row };
+                return ViewColumn(type_, getName(), data_source_, SliceView { mode.start_row, mode.end_row });
             } else if constexpr (std::is_same_v<T, IndicesView>) {
-                return { type_, getName(), values_, mode.indices };
+                return ViewColumn(type_, getName(), data_source_, IndicesView { mode.indices });
             } else {
                 static_assert(std::is_same_v<T, void>, "Unhandled view mode type");
             }
@@ -320,11 +225,11 @@ ViewColumn ViewColumn::viewAs(std::string alias) const
             using T = std::decay_t<decltype(mode)>;
 
             if constexpr (std::is_same_v<T, EntireView>) {
-                return { type_, std::move(alias), values_ };
+                return ViewColumn(type_, std::move(alias), data_source_, EntireView {});
             } else if constexpr (std::is_same_v<T, SliceView>) {
-                return { type_, std::move(alias), values_, mode.start_row, mode.end_row };
+                return ViewColumn(type_, std::move(alias), data_source_, SliceView { mode.start_row, mode.end_row });
             } else if constexpr (std::is_same_v<T, IndicesView>) {
-                return { type_, std::move(alias), values_, mode.indices };
+                return ViewColumn(type_, std::move(alias), data_source_, IndicesView { mode.indices });
             } else {
                 static_assert(std::is_same_v<T, void>, "Unhandled view mode type");
             }
@@ -336,6 +241,19 @@ std::string ViewColumn::toString() const
 {
     std::string result = fmt::format("ViewColumn(name={}, type={}, size={}", getName(), type_, size());
 
+    // Add data source type information
+    std::visit(
+        [&result](const auto& data_source) {
+            using DataSourceType = std::decay_t<decltype(*data_source)>;
+            if constexpr (std::is_same_v<DataSourceType, ValueVector>) {
+                result += ", source=HOST";
+            } else if constexpr (std::is_same_v<DataSourceType, DeviceColumn>) {
+                result += ", source=DEVICE";
+            }
+        },
+        data_source_);
+
+    // Add view mode information
     std::visit(
         [&result](const auto& mode) {
             using T = std::decay_t<decltype(mode)>;

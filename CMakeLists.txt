@@ -50,7 +50,7 @@ configure_file("${CMAKE_SOURCE_DIR}/include/velodb_version.hpp.in"
 include_directories(${CMAKE_SOURCE_DIR}/include)
 include_directories(${CMAKE_BINARY_DIR}/include)
 include_directories(${CMAKE_SOURCE_DIR}/src)
-include_directories(${CUDA_INCLUDE_DIRS})
+include_directories(${CUDAToolkit_INCLUDE_DIRS})
 
 # Dependencies
 include(ExternalProject)

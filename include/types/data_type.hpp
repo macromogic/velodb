@@ -33,7 +33,7 @@ public:
     virtual ~DataType() = default;
 
     DataTypeId getTypeId() const { return type_id_; }
-    size_t getSize() const { return size_; }
+    size_t size() const { return size_; }
     virtual std::string toString() const = 0;
     virtual bool isFixedSize() const = 0;
     virtual bool isNumeric() const = 0;
