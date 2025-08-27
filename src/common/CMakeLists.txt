@@ -1,4 +1,4 @@
-add_library(velodb_common OBJECT exception.cpp)
+add_library(velodb_common OBJECT exception.cpp profiler.cpp)
 
 target_link_libraries(velodb_common ${DEPENDENCY_LIBS})
 

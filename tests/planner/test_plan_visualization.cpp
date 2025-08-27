@@ -1,3 +1,4 @@
+#include "../common/test_warmup_utility.hpp"
 #include "catalog/mock_catalog_builder.hpp"
 #include "planner/plan_visualizer.hpp"
 #include "planner/query_planner.hpp"
@@ -11,10 +12,11 @@
 
 using namespace velodb;
 
-class PlanVisualizationTest : public ::testing::Test {
+class PlanVisualizationTest : public test::VeloDBTest {
 protected:
     void SetUp() override
     {
+        test::VeloDBTest::SetUp();
         // Create mock catalog with sample data
         catalog_ = MockCatalogBuilder::createSampleCatalog();
         planner_ = std::make_unique<QueryPlanner>(*catalog_);

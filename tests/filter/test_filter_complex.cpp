@@ -1,3 +1,4 @@
+#include "../common/test_warmup_utility.hpp"
 #include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
@@ -10,10 +11,11 @@
 
 using namespace velodb;
 
-class FilterComplexTest : public ::testing::Test {
+class FilterComplexTest : public test::VeloDBTest {
 protected:
     void SetUp() override
     {
+        test::VeloDBTest::SetUp();
         catalog_ = std::make_unique<Catalog>();
         engine_ = std::make_unique<ExecutionEngine>(*catalog_);
 

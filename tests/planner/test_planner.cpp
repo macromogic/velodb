@@ -1,3 +1,4 @@
+#include "../common/test_warmup_utility.hpp"
 #include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
@@ -11,10 +12,11 @@
 
 using namespace velodb;
 
-class PlannerTest : public ::testing::Test {
+class PlannerTest : public test::VeloDBTest {
 protected:
     void SetUp() override
     {
+        test::VeloDBTest::SetUp();
         catalog_ = std::make_unique<Catalog>();
         planner_ = std::make_unique<QueryPlanner>(*catalog_);
 
@@ -27,6 +29,7 @@ protected:
 
     void TearDown() override
     {
+        test::VeloDBTest::TearDown();
         // Cleanup code if needed
     }
 

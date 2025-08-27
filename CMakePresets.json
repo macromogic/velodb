@@ -1,0 +1,138 @@
+{
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 15,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "debug",
+            "displayName": "Debug Build",
+            "description": "Debug build with tests and profiling enabled",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_CXX_STANDARD": "17",
+                "CMAKE_CUDA_STANDARD": "17",
+                "CMAKE_CUDA_ARCHITECTURES": "70;75;80;86;89;90",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "BUILD_TESTS": "ON",
+                "ENABLE_PROFILING": "ON"
+            }
+        },
+        {
+            "name": "debug-no-profiling",
+            "displayName": "Debug Build (No Profiling)",
+            "description": "Debug build with tests enabled, profiling disabled",
+            "inherits": "debug",
+            "cacheVariables": {
+                "ENABLE_PROFILING": "OFF"
+            }
+        },
+        {
+            "name": "release",
+            "displayName": "Release Build",
+            "description": "Release build with tests and profiling enabled",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_STANDARD": "17",
+                "CMAKE_CUDA_STANDARD": "17",
+                "CMAKE_CUDA_ARCHITECTURES": "70;75;80;86;89;90",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "BUILD_TESTS": "ON",
+                "ENABLE_PROFILING": "ON"
+            }
+        },
+        {
+            "name": "release-no-profiling",
+            "displayName": "Release Build (No Profiling)",
+            "description": "Release build with tests enabled, profiling disabled",
+            "inherits": "release",
+            "cacheVariables": {
+                "ENABLE_PROFILING": "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "debug",
+            "displayName": "Debug Build",
+            "configurePreset": "debug",
+            "jobs": 0
+        },
+        {
+            "name": "debug-no-profiling",
+            "displayName": "Debug Build (No Profiling)",
+            "configurePreset": "debug-no-profiling",
+            "jobs": 0
+        },
+        {
+            "name": "release",
+            "displayName": "Release Build",
+            "configurePreset": "release",
+            "jobs": 0
+        },
+        {
+            "name": "release-no-profiling",
+            "displayName": "Release Build (No Profiling)",
+            "configurePreset": "release-no-profiling",
+            "jobs": 0
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "debug",
+            "displayName": "Debug Tests",
+            "configurePreset": "debug",
+            "output": {
+                "outputOnFailure": true,
+                "verbosity": "verbose"
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
+        },
+        {
+            "name": "debug-no-profiling",
+            "displayName": "Debug Tests (No Profiling)",
+            "configurePreset": "debug-no-profiling",
+            "output": {
+                "outputOnFailure": true,
+                "verbosity": "verbose"
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
+        },
+        {
+            "name": "release",
+            "displayName": "Release Tests",
+            "configurePreset": "release",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
+        },
+        {
+            "name": "release-no-profiling",
+            "displayName": "Release Tests (No Profiling)",
+            "configurePreset": "release-no-profiling",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
+        }
+    ]
+}

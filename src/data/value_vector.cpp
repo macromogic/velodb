@@ -1,6 +1,7 @@
 #include "data/value_vector.hpp"
 
 #include "common/exception.hpp"
+#include "common/profiler.hpp"
 #include "data/data_type.hpp"
 #include "data/value.hpp"
 
@@ -10,9 +11,12 @@ namespace {
     // Helper function to create the appropriate ValueVectorImpl based on data type
     ValueVector::DataSource createDataSource(const DataType& type, size_t initial_capacity)
     {
+        PROFILE_SCOPE("createDataSource");
+
         switch (type.getTypeId()) {
 #define X(name, DT)                                                                                                    \
     case DataTypeId::name: {                                                                                           \
+        PROFILE_SCOPE("Creating ValueVectorImpl for " #name);                                                          \
         if constexpr (std::is_same_v<DT, FixedString>) {                                                               \
             return ValueVectorImpl<DT>(initial_capacity, type.size());                                                 \
         } else {                                                                                                       \
@@ -31,6 +35,7 @@ ValueVector::ValueVector(std::unique_ptr<DataType> type, size_t initial_capacity
     : type_(std::move(type))
     , data_source_(createDataSource(*type_, initial_capacity))
 {
+    PROFILE_SCOPE("ValueVector Constructor");
 }
 
 size_t ValueVector::size() const

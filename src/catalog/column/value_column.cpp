@@ -4,6 +4,7 @@
 #include "catalog/column/view_column.hpp"
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
+#include "common/profiler.hpp"
 
 #include <fmt/format.h>
 
@@ -25,6 +26,7 @@ ValueColumn::ValueColumn(const ColumnInfo& info)
     , type_(info.getType().cloneUnique())
     , values_(info.getType().cloneUnique())
 {
+    PROFILE_SCOPE("ValueColumn Constructor from ColumnInfo");
 }
 
 void ValueColumn::resize(size_t new_size)

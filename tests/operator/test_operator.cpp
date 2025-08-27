@@ -1,3 +1,4 @@
+#include "../common/test_warmup_utility.hpp"
 #include "catalog/execution_context.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
@@ -10,10 +11,11 @@
 
 using namespace velodb;
 
-class OperatorTest : public ::testing::Test {
+class OperatorTest : public test::VeloDBTest {
 protected:
     void SetUp() override
     {
+        test::VeloDBTest::SetUp();
         // Create a test table with sample data
         auto schema = std::make_unique<Schema>();
         schema->addColumnInfo({ "id", std::make_unique<IntegerType>() });
@@ -37,6 +39,7 @@ protected:
 
     void TearDown() override
     {
+        test::VeloDBTest::TearDown();
         // Cleanup code if needed
     }
 

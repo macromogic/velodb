@@ -87,6 +87,19 @@ set(DEPENDENCY_LIBS sqlparser argparse::argparse backward fmt::fmt CUDA::cudart)
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/src
                     ${CMAKE_SOURCE_DIR}/thirdparty/backward-cpp)
 
+# Options
+option(BUILD_TESTS "Build test programs" ON)
+option(ENABLE_PROFILING "Enable performance profiling" ON)
+
+# Profiling configuration (must be before add_subdirectory calls)
+if(ENABLE_PROFILING)
+  add_compile_definitions(VELODB_ENABLE_PROFILING=1)
+  message(STATUS "Performance profiling: ENABLED")
+else()
+  add_compile_definitions(VELODB_ENABLE_PROFILING=0)
+  message(STATUS "Performance profiling: DISABLED")
+endif()
+
 # Project source files
 add_subdirectory(src/common)
 add_subdirectory(src/data)
@@ -97,18 +110,17 @@ add_subdirectory(src/expression)
 add_subdirectory(src/operator)
 add_subdirectory(src/planner)
 
-# Tests
-option(BUILD_TESTS "Build test programs" ON)
-if(BUILD_TESTS)
-  enable_testing()
-  add_subdirectory(tests)
-endif()
-
 set(SOURCES src/main.cpp src/velodb.cpp ${ALL_OBJS})
 
 # Create main executable
 add_executable(velodb ${SOURCES})
 target_link_libraries(velodb ${DEPENDENCY_LIBS})
+
+# Tests
+if(BUILD_TESTS)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
 
 # Set executable properties
 set_target_properties(
@@ -130,5 +142,7 @@ message(STATUS "Configuration Summary:")
 message(STATUS "  Project: ${PROJECT_NAME} v${PROJECT_VERSION}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  C++ standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  Build tests: ${BUILD_TESTS}")
+message(STATUS "  Profiling: ${ENABLE_PROFILING}")
 message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "")

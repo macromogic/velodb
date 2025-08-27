@@ -1,3 +1,4 @@
+#include "../common/test_warmup_utility.hpp"
 #include "catalog/mock_catalog_builder.hpp"
 #include "planner/plan_visualizer.hpp"
 #include "planner/query_planner.hpp"
@@ -11,16 +12,18 @@
 
 using namespace velodb;
 
-class AdaptiveCatalogTest : public ::testing::Test {
+class AdaptiveCatalogTest : public test::VeloDBTest {
 protected:
     void SetUp() override
     {
+        test::VeloDBTest::SetUp();
         // Create adaptive catalog that can handle any query
         catalog_ = MockCatalogBuilder::createAdaptiveCatalog();
     }
 
     void TearDown() override
     {
+        test::VeloDBTest::TearDown();
         // Cleanup
     }
 

@@ -1,18 +1,21 @@
+#include "../common/test_warmup_utility.hpp"
 #include "data/data_type.hpp"
 
 #include <gtest/gtest.h>
 
 using namespace velodb;
 
-class DataTypeTest : public ::testing::Test {
+class DataTypeTest : public test::VeloDBTest {
 protected:
     void SetUp() override
     {
+        test::VeloDBTest::SetUp();
         // Setup code if needed
     }
 
     void TearDown() override
     {
+        test::VeloDBTest::TearDown();
         // Cleanup code if needed
     }
 };

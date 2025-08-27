@@ -9,3 +9,4 @@ compile_commands.json
 *.bak
 *.md
 !README.md
+*.dot

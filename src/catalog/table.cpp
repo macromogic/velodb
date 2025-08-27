@@ -3,6 +3,7 @@
 #include "catalog/column.hpp"
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
+#include "common/profiler.hpp"
 
 #include <fmt/core.h>
 
@@ -47,16 +48,36 @@ Table::Table(std::unique_ptr<TableInfo> table_info)
     : TableBase(std::move(table_info))
     , row_count_(0)
 {
-    initializeColumns();
+    PROFILE_SCOPE("Table Constructor");
+
+    {
+        PROFILE_SCOPE("Table initializeColumns call");
+        initializeColumns();
+    }
 }
 
 void Table::initializeColumns()
 {
+    PROFILE_SCOPE("initializeColumns");
+
     const size_t column_count = table_info_->getColumnCount();
-    auto& schema = table_info_->getSchema();
-    columns_.reserve(column_count);
-    for (auto& info : schema) {
-        columns_.emplace_back(info);
+
+    {
+        PROFILE_SCOPE("getSchema call");
+        auto& schema = table_info_->getSchema();
+
+        {
+            PROFILE_SCOPE("columns reserve");
+            columns_.reserve(column_count);
+        }
+
+        {
+            PROFILE_SCOPE("columns creation loop");
+            for (auto& info : schema) {
+                PROFILE_SCOPE("single column emplace_back");
+                columns_.emplace_back(info);
+            }
+        }
     }
 }
 

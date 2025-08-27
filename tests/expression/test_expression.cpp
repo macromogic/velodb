@@ -1,3 +1,4 @@
+#include "../common/test_warmup_utility.hpp"
 #include "data/data_type.hpp"
 #include "data/value.hpp"
 #include "expression/expression.hpp"
@@ -6,15 +7,17 @@
 
 using namespace velodb;
 
-class ExpressionTest : public ::testing::Test {
+class ExpressionTest : public test::VeloDBTest {
 protected:
     void SetUp() override
     {
+        test::VeloDBTest::SetUp();
         // Setup code if needed
     }
 
     void TearDown() override
     {
+        test::VeloDBTest::TearDown();
         // Cleanup code if needed
     }
 };

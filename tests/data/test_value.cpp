@@ -1,3 +1,4 @@
+#include "../common/test_warmup_utility.hpp"
 #include "data/data_type.hpp"
 #include "data/value.hpp"
 
@@ -5,15 +6,17 @@
 
 using namespace velodb;
 
-class ValueTest : public ::testing::Test {
+class ValueTest : public test::VeloDBTest {
 protected:
     void SetUp() override
     {
+        test::VeloDBTest::SetUp();
         // Setup code if needed
     }
 
     void TearDown() override
     {
+        test::VeloDBTest::TearDown();
         // Cleanup code if needed
     }
 };

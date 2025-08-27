@@ -1,3 +1,4 @@
+#include "../common/test_warmup_utility.hpp"
 #include "data/data_type.hpp"
 #include "data/type_checker.hpp"
 #include "data/value.hpp"
@@ -7,16 +8,18 @@
 
 using namespace velodb;
 
-class TypeCheckerTest : public ::testing::Test {
+class TypeCheckerTest : public test::VeloDBTest {
 protected:
     void SetUp() override
     {
+        test::VeloDBTest::SetUp();
         // Setup code if needed
     }
 
     void TearDown() override
     {
         // Cleanup code if needed
+        test::VeloDBTest::TearDown();
     }
 };
 
