@@ -1,7 +1,7 @@
 #include "velodb.hpp"
 
 #include "common/fmt.hpp"
-#include "kernels/warmup.hpp"
+#include "cuda/warmup.hpp"
 
 #include <fmt/core.h>
 

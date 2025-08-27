@@ -1,13 +1,16 @@
 #pragma once
 
 #include "catalog/column/column_base.hpp"
-#include "types/value.hpp"
+#include "data/value.hpp"
+#include "data/value_vector.hpp"
 
 #include <functional>
 
 namespace velodb {
 
-class ViewColumn; // Forward declaration
+// Forward declarations
+class ColumnInfo;
+class ViewColumn;
 
 class ValueColumn : public ColumnBase {
 public:
@@ -22,8 +25,8 @@ public:
     void resize(size_t new_size);
     void reserve(size_t new_capacity);
     size_t size() const override;
-    const Value& get(size_t row) const override;
-    Value& operator[](size_t row);
+    Value get(size_t row) const override;
+    Value operator[](size_t row);
     void append(const Value& value);
     void fill(const Value& value, size_t count);
 

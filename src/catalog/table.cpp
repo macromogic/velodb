@@ -67,13 +67,7 @@ void Table::ensureColumnCapacity(size_t new_row_count)
         if (new_row_count > old_size) {
             // Resize columns to accommodate new rows
             // Fill with null values for the appropriate type
-            column.resize(new_row_count);
-            if (old_size > 0) {
-                // Use the type from existing values in the column
-                for (size_t i = old_size; i < new_row_count; ++i) {
-                    column[i] = Value::createNull(column[0].getTypeId());
-                }
-            }
+            column.reserve(new_row_count);
         }
     }
 }
@@ -95,12 +89,11 @@ void Table::insertRow(const std::vector<Value>& values)
         VELODB_THROW(CatalogError, "Value count mismatch with schema");
     }
 
-    const size_t new_row_id = row_count_;
     ensureColumnCapacity(row_count_ + 1);
 
     // Insert each value into its respective column
     for (size_t col_idx = 0; col_idx < values.size(); ++col_idx) {
-        columns_[col_idx][new_row_id] = values[col_idx];
+        columns_[col_idx].append(values[col_idx]);
     }
 
     ++row_count_;
@@ -134,12 +127,11 @@ void Table::insertRow(std::vector<Value>&& values)
         VELODB_THROW(CatalogError, "Value count mismatch with schema");
     }
 
-    const size_t new_row_id = row_count_;
     ensureColumnCapacity(row_count_ + 1);
 
     // Move each value into its respective column
     for (size_t col_idx = 0; col_idx < values.size(); ++col_idx) {
-        columns_[col_idx][new_row_id] = std::move(values[col_idx]);
+        columns_[col_idx].append(std::move(values[col_idx]));
     }
 
     ++row_count_;
@@ -213,7 +205,7 @@ ViewColumn Table::getColumn(size_t column_index) const
 }
 
 // Efficient column-based access for late materialization
-const Value& Table::getValue(size_t row_id, size_t column_index) const
+const Value Table::getValue(size_t row_id, size_t column_index) const
 {
     if (row_id >= row_count_) {
         VELODB_THROW(CatalogError, "Row ID out of range");
@@ -366,7 +358,7 @@ View View::filterRows(std::function<bool(const ViewTuple&)> predicate) const
 }
 
 // Column-based access methods
-const Value& View::getValue(size_t row_id, size_t column_index) const
+const Value View::getValue(size_t row_id, size_t column_index) const
 {
     if (row_id >= row_count_) {
         VELODB_THROW(CatalogError, "Row ID out of range");

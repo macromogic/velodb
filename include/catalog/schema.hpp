@@ -2,7 +2,7 @@
 
 #include "catalog/column.hpp"
 #include "common/copy_traits.hpp"
-#include "types/data_type.hpp"
+#include "data/data_type.hpp"
 
 #include <memory>
 #include <string>

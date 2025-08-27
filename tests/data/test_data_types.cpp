@@ -1,4 +1,4 @@
-#include "types/data_type.hpp"
+#include "data/data_type.hpp"
 
 #include <gtest/gtest.h>
 

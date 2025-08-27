@@ -1,6 +1,7 @@
-#include "types/value.hpp"
+#include "data/value.hpp"
 
 #include "common/exception.hpp"
+#include "data/fixed_string.hpp"
 
 #include <fmt/core.h>
 
@@ -14,6 +15,9 @@ Value::Value(DataTypeId type_id, ValueData data)
     , data_(std::move(data))
     , is_null_(false)
 {
+    if (type_id == DataTypeId::BOOLEAN && !std::holds_alternative<bool>(data)) {
+        VELODB_THROW(TypeError, "Type mismatch");
+    }
 }
 
 Value::Value(DataTypeId type_id)
@@ -91,7 +95,7 @@ std::string Value::getString() const
         VELODB_THROW(TypeError, "Cannot get value from NULL");
     if (type_id_ != DataTypeId::VARCHAR)
         VELODB_THROW(TypeError, "Type mismatch");
-    return std::get<std::string>(data_);
+    return std::get<FixedString>(data_).toString();
 }
 
 bool Value::operator==(const Value& other) const
@@ -171,6 +175,78 @@ std::string Value::toString() const
     }
 }
 
+// Template specializations for universal get method
+template <>
+bool Value::get<bool>() const
+{
+    return getBoolean();
+}
+
+template <>
+uint8_t Value::get<uint8_t>() const
+{
+    return getBoolean() ? 1 : 0;
+}
+
+template <>
+int8_t Value::get<int8_t>() const
+{
+    return getTinyInt();
+}
+
+template <>
+int16_t Value::get<int16_t>() const
+{
+    return getSmallInt();
+}
+
+template <>
+int32_t Value::get<int32_t>() const
+{
+    return getInteger();
+}
+
+template <>
+int64_t Value::get<int64_t>() const
+{
+    return getBigInt();
+}
+
+template <>
+float Value::get<float>() const
+{
+    return getFloat();
+}
+
+template <>
+double Value::get<double>() const
+{
+    return getDouble();
+}
+
+template <>
+std::string Value::get<std::string>() const
+{
+    return getString();
+}
+
+template <>
+FixedString Value::get<FixedString>() const
+{
+    if (is_null_)
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
+    if (type_id_ != DataTypeId::VARCHAR)
+        VELODB_THROW(TypeError, "Type mismatch");
+    return std::get<FixedString>(data_);
+}
+
+const ValueData& Value::getData() const
+{
+    if (is_null_)
+        VELODB_THROW(TypeError, "Cannot get data from NULL value");
+    return data_;
+}
+
 Value Value::createBoolean(bool value)
 {
     return { DataTypeId::BOOLEAN, value };
@@ -208,7 +284,7 @@ Value Value::createDouble(double value)
 
 Value Value::createString(const std::string& value)
 {
-    return { DataTypeId::VARCHAR, value };
+    return { DataTypeId::VARCHAR, FixedString(value) };
 }
 
 Value Value::createNull(DataTypeId type_id)

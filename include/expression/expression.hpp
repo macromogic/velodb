@@ -3,7 +3,7 @@
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "common/copy_traits.hpp"
-#include "types/value.hpp"
+#include "data/value.hpp"
 
 #include <memory>
 #include <string>

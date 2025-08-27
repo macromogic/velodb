@@ -1,4 +1,5 @@
-#include "kernels/warmup.hpp"
+#include "cuda/helper.hpp"
+#include "cuda/warmup.hpp"
 
 #include <cstdint>
 
@@ -32,14 +33,6 @@ namespace gpu {
 
 Result<void> runtime_warmup()
 {
-#define CHECKED_CALL(call)                                                                                             \
-    do {                                                                                                               \
-        auto err = (call);                                                                                             \
-        if (err != cudaSuccess) {                                                                                      \
-            return Result<void>::failure(cudaGetErrorString(err));                                                     \
-        }                                                                                                              \
-    } while (0)
-
     // 1. Context initialization
     CHECKED_CALL(cudaFree(0));
 
@@ -63,7 +56,6 @@ Result<void> runtime_warmup()
     CHECKED_CALL(cudaFree(d_buf));
     CHECKED_CALL(cudaStreamDestroy(s));
 
-#undef CHECKED_CALL
     return Result<void>::success();
 }
 

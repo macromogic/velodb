@@ -1,7 +1,7 @@
 #include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
-#include "types/data_type.hpp"
+#include "data/data_type.hpp"
 
 #include <gtest/gtest.h>
 

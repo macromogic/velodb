@@ -2,14 +2,14 @@
 
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
-#include "types/type_checker.hpp"
+#include "data/type_checker.hpp"
 
 #include <algorithm>
 #include <stdexcept>
 
 namespace velodb {
 
-auto format_as(ArithmeticType arith_type)
+static auto format_as(ArithmeticType arith_type)
 {
     switch (arith_type) {
     case ArithmeticType::PLUS:

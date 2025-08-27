@@ -4,7 +4,7 @@
 
 #include "catalog/tuple.hpp"
 #include "common/copy_traits.hpp"
-#include "types/value.hpp"
+#include "data/value.hpp"
 
 #include <functional>
 #include <memory>
@@ -17,8 +17,6 @@ namespace velodb {
 class Tuple;
 class View;
 class TableIterator;
-
-constexpr size_t INVALID_ROW_ID = UINT64_MAX;
 
 class TableInfo : private NonCopyable {
 public:
@@ -61,7 +59,7 @@ public:
     virtual bool isView() const = 0;
     virtual View view() const = 0;
     virtual View viewAs(std::string alias) const = 0;
-    virtual const Value& getValue(size_t row_id, size_t column_index) const = 0;
+    virtual const Value getValue(size_t row_id, size_t column_index) const = 0;
 
     virtual View slice(size_t start_row, size_t end_row) const = 0;
     virtual View indices(const std::vector<size_t>& indices) const = 0;
@@ -101,7 +99,7 @@ public:
     ViewColumn getColumn(size_t column_index) const;
 
     // Efficient column-based access for late materialization
-    const Value& getValue(size_t row_id, size_t column_index) const override;
+    const Value getValue(size_t row_id, size_t column_index) const override;
 
 private:
     // Column-based storage: each column is stored as a separate vector
@@ -142,7 +140,7 @@ public:
     View filterRows(std::function<bool(const ViewTuple&)> predicate) const override;
 
     // Column-based access methods (similar to Table)
-    const Value& getValue(size_t row_id, size_t column_index) const override;
+    const Value getValue(size_t row_id, size_t column_index) const override;
 
 private:
     // Column-based storage: each column is stored as a separate vector

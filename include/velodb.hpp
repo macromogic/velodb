@@ -1,8 +1,8 @@
 #pragma once
 
 // Core type system
-#include "types/data_type.hpp"
-#include "types/value.hpp"
+#include "data/data_type.hpp"
+#include "data/value.hpp"
 
 // Catalog system
 #include "catalog/catalog.hpp"

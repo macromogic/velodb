@@ -15,19 +15,21 @@ ValueColumn::ValueColumn(std::string name,
                          bool is_unique,
                          bool is_primary_key)
     : ColumnBase(std::move(name), is_nullable, is_unique, is_primary_key)
-    , type_(std::move(type))
+    , type_(type->cloneUnique())
+    , values_(std::move(type))
 {
 }
 
 ValueColumn::ValueColumn(const ColumnInfo& info)
     : ColumnBase(info.getName(), info.isNullable(), info.isUnique(), info.isPrimaryKey())
     , type_(info.getType().cloneUnique())
+    , values_(info.getType().cloneUnique())
 {
 }
 
 void ValueColumn::resize(size_t new_size)
 {
-    values_.resize(new_size);
+    values_.resize(new_size, Value::createNull(type_->getTypeId()));
 }
 
 void ValueColumn::reserve(size_t new_capacity)
@@ -40,20 +42,20 @@ size_t ValueColumn::size() const
     return values_.size();
 }
 
-const Value& ValueColumn::get(size_t row) const
+Value ValueColumn::get(size_t row) const
 {
     if (row >= values_.size()) {
         VELODB_THROW(CatalogError, "Row index out of range");
     }
-    return values_[row];
+    return values_.get(row);
 }
 
-Value& ValueColumn::operator[](size_t row)
+Value ValueColumn::operator[](size_t row)
 {
     if (row >= values_.size()) {
         VELODB_THROW(CatalogError, "Row index out of range");
     }
-    return values_[row];
+    return values_.get(row);
 }
 
 void ValueColumn::append(const Value& value)
@@ -61,7 +63,7 @@ void ValueColumn::append(const Value& value)
     if (value.getTypeId() != type_->getTypeId()) {
         VELODB_THROW(CatalogError, "Value type does not match column type");
     }
-    values_.push_back(value);
+    values_.append(value);
 }
 
 void ValueColumn::fill(const Value& value, size_t count)

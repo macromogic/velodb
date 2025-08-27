@@ -36,11 +36,13 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # Compiler flags
-set(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -Wextra -Werror")
+set(CMAKE_CXX_FLAGS_DEBUG "-g3 -Wall -Wextra -Werror")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 set(CMAKE_CUDA_FLAGS_DEBUG
-    "-g -G -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -Werror")
-set(CMAKE_CUDA_FLAGS_RELEASE "-O3 --use_fast_math")
+    "-g3 -G -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -Werror --diag-suppress 128 --diag-suppress 2417"
+)
+set(CMAKE_CUDA_FLAGS_RELEASE
+    "-O3 --use_fast_math --diag-suppress 128 --diag-suppress 2417")
 
 # Generate version header from template
 configure_file("${CMAKE_SOURCE_DIR}/include/velodb_version.hpp.in"
@@ -87,10 +89,10 @@ include_directories(${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/src
 
 # Project source files
 add_subdirectory(src/common)
-add_subdirectory(src/types)
+add_subdirectory(src/data)
 add_subdirectory(src/catalog)
 add_subdirectory(src/execution)
-add_subdirectory(src/kernels)
+add_subdirectory(src/cuda)
 add_subdirectory(src/expression)
 add_subdirectory(src/operator)
 add_subdirectory(src/planner)

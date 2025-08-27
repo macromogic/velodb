@@ -1,7 +1,7 @@
 #pragma once
 
 #include "common/copy_traits.hpp"
-#include "types/data_type.hpp"
+#include "data/data_type.hpp"
 
 #include <string>
 
@@ -14,7 +14,7 @@ class Value;
 class ColumnBase : private NonCopyable {
 public:
     virtual size_t size() const = 0;
-    virtual const Value& get(size_t row) const = 0;
+    virtual Value get(size_t row) const = 0;
 
     virtual DataType& getType() const = 0;
     std::string getName() const { return name_; }

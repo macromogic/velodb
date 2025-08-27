@@ -1,10 +1,10 @@
 #include "catalog/execution_context.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
+#include "data/data_type.hpp"
 #include "expression/expression.hpp"
 #include "operator/filter_compaction_operator.hpp"
 #include "operator/seq_scan_operator.hpp"
-#include "types/data_type.hpp"
 
 #include <gtest/gtest.h>
 

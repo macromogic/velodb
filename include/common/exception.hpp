@@ -1,7 +1,5 @@
 #pragma once
 
-#include <backward.hpp>
-
 #include <exception>
 #include <memory>
 #include <string>
@@ -25,7 +23,6 @@ private:
     std::string message_;
     std::string stack_trace_;
     mutable std::string full_message_;
-    backward::StackTrace stack_trace_obj_;
 };
 
 class DatabaseError : public TracedException {

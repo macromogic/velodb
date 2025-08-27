@@ -1,7 +1,7 @@
 #include "catalog/mock_catalog_builder.hpp"
 
 #include "catalog/column.hpp"
-#include "types/data_type.hpp"
+#include "data/data_type.hpp"
 
 #include <SQLParser.h>
 #include <fmt/core.h>
@@ -380,22 +380,22 @@ std::unique_ptr<Schema> MockCatalogBuilder::createGenericSchema(const std::strin
             break;
         }
 
-        auto data_type = DataType::createType(type);
+        auto data_type = DataType::createType(type, type == DataTypeId::VARCHAR ? 256 : 0);
         schema->addColumnInfo({ column_name, std::move(data_type), true });
     }
 
     // Add some common columns based on table name
     if (table_name.find("user") != std::string::npos) {
         schema->addColumnInfo({ "id", DataType::createType(DataTypeId::INTEGER), false });
-        schema->addColumnInfo({ "name", DataType::createType(DataTypeId::VARCHAR), false });
-        schema->addColumnInfo({ "email", DataType::createType(DataTypeId::VARCHAR), true });
+        schema->addColumnInfo({ "name", DataType::createType(DataTypeId::VARCHAR, 100), false });
+        schema->addColumnInfo({ "email", DataType::createType(DataTypeId::VARCHAR, 255), true });
     } else if (table_name.find("order") != std::string::npos) {
         schema->addColumnInfo({ "order_id", DataType::createType(DataTypeId::INTEGER), false });
         schema->addColumnInfo({ "user_id", DataType::createType(DataTypeId::INTEGER), false });
         schema->addColumnInfo({ "total", DataType::createType(DataTypeId::DOUBLE), false });
     } else if (table_name.find("product") != std::string::npos) {
         schema->addColumnInfo({ "product_id", DataType::createType(DataTypeId::INTEGER), false });
-        schema->addColumnInfo({ "name", DataType::createType(DataTypeId::VARCHAR), false });
+        schema->addColumnInfo({ "name", DataType::createType(DataTypeId::VARCHAR, 200), false });
         schema->addColumnInfo({ "price", DataType::createType(DataTypeId::DOUBLE), false });
     }
 
@@ -421,7 +421,7 @@ std::unique_ptr<Schema> MockCatalogBuilder::createDynamicSchema(const std::strin
             type = inferred_types.at(column_name);
         }
 
-        auto data_type = DataType::createType(type);
+        auto data_type = DataType::createType(type, type == DataTypeId::VARCHAR ? 256 : 0);
         schema->addColumnInfo({ column_name, std::move(data_type), true });
     }
 
@@ -510,7 +510,7 @@ void MockCatalogBuilder::createTableFromCommonSchema(Catalog& catalog, const std
 
     auto schema = std::make_unique<Schema>();
     for (const auto& [column_name, type_id] : common_schemas[table_name]) {
-        auto data_type = DataType::createType(type_id);
+        auto data_type = DataType::createType(type_id, type_id == DataTypeId::VARCHAR ? 256 : 0);
         bool nullable = (column_name.find("id") == std::string::npos); // IDs are typically not nullable
         schema->addColumnInfo({ column_name, std::move(data_type), nullable });
     }

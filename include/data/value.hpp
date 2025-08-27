@@ -1,8 +1,10 @@
 #pragma once
 
-#include "data_type.hpp"
+#include "common/result.hpp"
+#include "data/data_type.hpp"
+#include "data/fixed_string.hpp"
+#include "data/type_traits.hpp"
 
-#include <memory>
 #include <string>
 #include <variant>
 
@@ -21,7 +23,7 @@ using ValueData = std::variant<
     int64_t,
     float,
     double,
-    std::string>;
+    FixedString>;
 // clang-format on
 
 class Value {
@@ -63,6 +65,13 @@ public:
     bool operator>(const Value& other) const;
     bool operator>=(const Value& other) const;
 
+    // Universal get method (template-based)
+    template <typename T>
+    T get() const;
+
+    // Get raw variant data (for advanced use cases)
+    const ValueData& getData() const;
+
     // String representation
     std::string toString() const;
 
@@ -84,6 +93,6 @@ private:
 };
 
 // Vector of values for columnar storage
-using ValueVector = std::vector<Value>;
+// using ValueVector = std::vector<Value>;
 
 } // namespace velodb

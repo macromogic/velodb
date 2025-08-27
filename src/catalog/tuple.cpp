@@ -27,7 +27,7 @@ ValueTuple::ValueTuple(const Schema& schema, std::vector<Value> values)
     }
 }
 
-const Value& ValueTuple::getValue(size_t column_index) const
+const Value ValueTuple::getValue(size_t column_index) const
 {
     if (column_index >= values_.size()) {
         VELODB_THROW(CatalogError, "Column index out of range");
@@ -35,7 +35,7 @@ const Value& ValueTuple::getValue(size_t column_index) const
     return values_[column_index];
 }
 
-const Value& ValueTuple::getValue(const std::string& column_name) const
+const Value ValueTuple::getValue(const std::string& column_name) const
 {
     size_t const index = schema_.get().getColumnIndex(column_name);
     return values_[index];
@@ -57,7 +57,7 @@ bool ViewTuple::operator==(const ViewTuple& other) const
     return &table_.get() == &other.table_.get() && row_id_ == other.row_id_;
 }
 
-const Value& ViewTuple::getValue(size_t column_index) const
+const Value ViewTuple::getValue(size_t column_index) const
 {
     if (column_index >= table_.get().getSchema().getColumnCount()) {
         VELODB_THROW(CatalogError, "Column index out of range");
@@ -65,7 +65,7 @@ const Value& ViewTuple::getValue(size_t column_index) const
     return table_.get().getValue(row_id_, column_index);
 }
 
-const Value& ViewTuple::getValue(const std::string& column_name) const
+const Value ViewTuple::getValue(const std::string& column_name) const
 {
     size_t const index = table_.get().getSchema().getColumnIndex(column_name);
     return getValue(index);

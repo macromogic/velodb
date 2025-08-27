@@ -1,5 +1,5 @@
-#include "types/data_type.hpp"
-#include "types/value.hpp"
+#include "data/data_type.hpp"
+#include "data/value.hpp"
 
 #include <gtest/gtest.h>
 

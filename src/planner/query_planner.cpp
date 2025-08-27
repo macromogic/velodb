@@ -4,9 +4,9 @@
 #include "catalog/column.hpp"
 #include "catalog/schema.hpp"
 #include "common/exception.hpp"
+#include "data/data_type.hpp"
 #include "expression/expression.hpp"
 #include "planner/planner.hpp"
-#include "types/data_type.hpp"
 
 #include <SQLParser.h>
 #include <fmt/format.h>

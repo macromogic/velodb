@@ -1,10 +1,17 @@
 #include "common/exception.hpp"
 
+#include <backward.hpp>
 #include <fmt/format.h>
 
 #include <sstream>
 
 namespace velodb {
+
+namespace {
+
+    backward::StackTrace stack_trace_obj_;
+
+}
 
 TracedException::TracedException(const std::string& message)
     : message_(message)

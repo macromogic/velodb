@@ -1,8 +1,8 @@
 #include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
+#include "data/data_type.hpp"
 #include "execution/execution_engine.hpp"
-#include "types/data_type.hpp"
 
 #include <SQLParser.h>
 

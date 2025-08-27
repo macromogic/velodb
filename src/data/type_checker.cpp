@@ -1,4 +1,4 @@
-#include "types/type_checker.hpp"
+#include "data/type_checker.hpp"
 
 #include "common/fmt.hpp"
 #include "expression/expression.hpp"

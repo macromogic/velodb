@@ -2,7 +2,7 @@
 
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
-#include "types/type_checker.hpp"
+#include "data/type_checker.hpp"
 
 #include <algorithm>
 #include <cctype>
