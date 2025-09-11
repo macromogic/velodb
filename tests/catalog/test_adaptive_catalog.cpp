@@ -13,13 +13,14 @@
 using namespace velodb;
 
 class AdaptiveCatalogTest : public test::VeloDBTest {
-protected:
-    void SetUp() override
+public:
+    AdaptiveCatalogTest()
+        : catalog_(MockCatalogBuilder::createAdaptiveCatalog())
     {
-        test::VeloDBTest::SetUp();
-        // Create adaptive catalog that can handle any query
-        catalog_ = MockCatalogBuilder::createAdaptiveCatalog();
     }
+
+protected:
+    void SetUp() override { test::VeloDBTest::SetUp(); }
 
     void TearDown() override
     {
@@ -32,11 +33,11 @@ protected:
         std::cout << "\n=== Testing Query: " << query << " ===\n";
 
         // Ensure tables exist for this query
-        bool success = MockCatalogBuilder::ensureTablesForQuery(*catalog_, query);
+        bool success = MockCatalogBuilder::ensureTablesForQuery(catalog_, query);
         ASSERT_TRUE(success) << "Failed to create tables for query: " << query;
 
         // Create planner and plan the query
-        QueryPlanner planner(*catalog_);
+        QueryPlanner planner(catalog_);
 
         hsql::SQLParserResult result;
         hsql::SQLParser::parse(query, &result);
@@ -68,7 +69,7 @@ protected:
         }
     }
 
-    std::unique_ptr<Catalog> catalog_;
+    Catalog catalog_;
 };
 
 TEST_F(AdaptiveCatalogTest, BasicSelectQueries)
@@ -141,11 +142,11 @@ TEST_F(AdaptiveCatalogTest, MultipleTablesInSameQuery)
         std::cout << "\n=== Testing Multi-Table Query: " << query << " ===\n";
 
         // Just test table creation, not full planning
-        bool success = MockCatalogBuilder::ensureTablesForQuery(*catalog_, query);
+        bool success = MockCatalogBuilder::ensureTablesForQuery(catalog_, query);
         EXPECT_TRUE(success) << "Failed to create tables for query: " << query;
 
         // Check that tables were created
-        std::cout << "Catalog now has " << catalog_->getTableCount() << " tables\n";
+        std::cout << "Catalog now has " << catalog_.getTableCount() << " tables\n";
     }
 }
 
@@ -167,11 +168,11 @@ TEST_F(AdaptiveCatalogTest, GraphvizOutput)
     std::string query = "SELECT name, email FROM users WHERE age > 25";
 
     // Ensure tables exist
-    bool success = MockCatalogBuilder::ensureTablesForQuery(*catalog_, query);
+    bool success = MockCatalogBuilder::ensureTablesForQuery(catalog_, query);
     ASSERT_TRUE(success);
 
     // Create planner and plan the query
-    QueryPlanner planner(*catalog_);
+    QueryPlanner planner(catalog_);
 
     hsql::SQLParserResult result;
     hsql::SQLParser::parse(query, &result);
@@ -199,30 +200,26 @@ TEST_F(AdaptiveCatalogTest, CatalogPersistence)
                                          "SELECT id, name FROM persistent_table",
                                          "SELECT * FROM persistent_table WHERE id = 1" };
 
-    size_t initial_table_count = catalog_->getTableCount();
+    size_t initial_table_count = catalog_.getTableCount();
 
     for (const auto& query : queries) {
-        MockCatalogBuilder::ensureTablesForQuery(*catalog_, query);
+        MockCatalogBuilder::ensureTablesForQuery(catalog_, query);
 
         // Table count should only increase on first query
         if (query == queries[0]) {
-            EXPECT_GT(catalog_->getTableCount(), initial_table_count);
+            EXPECT_GT(catalog_.getTableCount(), initial_table_count);
         }
     }
 
     // Verify table exists and can be retrieved
-    EXPECT_TRUE(catalog_->hasTable("persistent_table"));
-    auto table_result = catalog_->getTable("persistent_table");
+    EXPECT_TRUE(catalog_.hasTable("persistent_table"));
+    auto table_result = catalog_.getTable("persistent_table");
     ASSERT_TRUE(table_result.has_value());
     auto& table = table_result.value().get();
     EXPECT_EQ(table.getName(), "persistent_table");
 
     std::cout << "\nPersistent table schema:\n";
-    const auto& schema = table.getSchema();
-    for (size_t i = 0; i < schema.getColumnCount(); ++i) {
-        const auto& column = schema.getColumnInfo(i);
-        std::cout << "  " << column.getName() << " (" << column.getType().toString() << ")\n";
-    }
+    std::cout << table.toString();
 }
 
 // TODO: Add tests for JOIN queries when JOIN support is implemented

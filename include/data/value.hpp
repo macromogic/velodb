@@ -2,7 +2,7 @@
 
 #include "common/result.hpp"
 #include "data/data_type.hpp"
-#include "data/fixed_string.hpp"
+#include "data/ordinal_string.hpp"
 #include "data/type_traits.hpp"
 
 #include <string>
@@ -23,7 +23,7 @@ using ValueData = std::variant<
     int64_t,
     float,
     double,
-    FixedString>;
+    OrdinalString>;
 // clang-format on
 
 class Value {
@@ -70,7 +70,7 @@ public:
     T get() const;
 
     // Get raw variant data (for advanced use cases)
-    const ValueData& getData() const;
+    ValueData& getData();
 
     // String representation
     std::string toString() const;
@@ -91,8 +91,5 @@ private:
     ValueData data_;
     bool is_null_;
 };
-
-// Vector of values for columnar storage
-// using ValueVector = std::vector<Value>;
 
 } // namespace velodb

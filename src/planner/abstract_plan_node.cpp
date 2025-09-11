@@ -3,7 +3,7 @@
 namespace velodb {
 
 // AbstractPlanNode implementation
-AbstractPlanNode::AbstractPlanNode(PlanType type, std::unique_ptr<Schema> output_schema)
+AbstractPlanNode::AbstractPlanNode(PlanType type, Schema output_schema)
     : type_(type)
     , output_schema_(std::move(output_schema))
 {

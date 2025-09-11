@@ -7,14 +7,11 @@
 #include <algorithm>
 #include <cctype>
 #include <climits>
-#include <regex>
-#include <stdexcept>
 
 namespace velodb {
 
 CastExpression::CastExpression(std::unique_ptr<AbstractExpression> operand, std::unique_ptr<DataType> target_type)
-    : AbstractExpression(ExpressionType::CAST, std::move(target_type))
-    , operand_(std::move(operand))
+    : UnaryExpression(ExpressionType::CAST, std::move(target_type), std::move(operand))
     , target_type_(DataType::createType(return_type_->getTypeId(), return_type_->size()))
 {
     // Validate the cast operation at construction time
@@ -23,15 +20,10 @@ CastExpression::CastExpression(std::unique_ptr<AbstractExpression> operand, std:
     }
 }
 
-Value CastExpression::evaluate(const Tuple& tuple, const Schema& schema) const
+const Value CastExpression::evaluate(const Tuple& tuple, const Schema& schema) const
 {
     Value operand_val = operand_->evaluate(tuple, schema);
     return performCast(operand_val, *target_type_);
-}
-
-std::vector<size_t> CastExpression::getRequiredColumns(const Schema& schema) const
-{
-    return operand_->getRequiredColumns(schema);
 }
 
 std::string CastExpression::toString() const
@@ -60,10 +52,6 @@ Value CastExpression::performCast(const Value& value, const DataType& target_typ
             return castToDouble(value);
         case DataTypeId::VARCHAR:
             return castToString(value);
-        case DataTypeId::DATE:
-            return castToDate(value);
-        case DataTypeId::TIMESTAMP:
-            return castToTimestamp(value);
         default:
             VELODB_THROW(TypeError, fmt::format("Unsupported cast target type: {}", target_type));
         }
@@ -204,47 +192,9 @@ Value CastExpression::castToString(const Value& value)
     }
 }
 
-Value CastExpression::castToDate(const Value& value)
+std::unique_ptr<AbstractExpression> CastExpression::cloneUniqueImpl() const
 {
-    switch (value.getTypeId()) {
-    case DataTypeId::VARCHAR: {
-        // Basic date parsing - in a real implementation, you'd use a proper
-        // date library
-        std::string date_str = value.getString();
-        std::regex date_pattern(R"(\d{4}-\d{2}-\d{2})");
-        if (std::regex_match(date_str, date_pattern)) {
-            return Value::createString(date_str); // Simplified - store as string for now
-        } else {
-            VELODB_THROW(TypeError, "Invalid date format: " + date_str);
-        }
-    }
-    case DataTypeId::TIMESTAMP:
-        // Extract date part from timestamp
-        return Value::createString(value.getString().substr(0, 10)); // Simplified
-    default:
-        VELODB_THROW(TypeError, fmt::format("Cannot cast {} to date", value));
-    }
-}
-
-Value CastExpression::castToTimestamp(const Value& value)
-{
-    switch (value.getTypeId()) {
-    case DataTypeId::VARCHAR: {
-        // Basic timestamp parsing
-        std::string timestamp_str = value.getString();
-        std::regex timestamp_pattern(R"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})");
-        if (std::regex_match(timestamp_str, timestamp_pattern)) {
-            return Value::createString(timestamp_str); // Simplified - store as string for now
-        } else {
-            VELODB_THROW(TypeError, "Invalid timestamp format: " + timestamp_str);
-        }
-    }
-    case DataTypeId::DATE:
-        // Add default time to date
-        return Value::createString(value.getString() + " 00:00:00"); // Simplified
-    default:
-        VELODB_THROW(TypeError, fmt::format("Cannot cast {} to timestamp", value));
-    }
+    return std::make_unique<CastExpression>(operand_->cloneUnique(), target_type_->cloneUnique());
 }
 
 } // namespace velodb

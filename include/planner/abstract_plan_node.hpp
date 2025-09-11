@@ -31,11 +31,11 @@ enum class PlanType {
 // Abstract base class for plan nodes
 class AbstractPlanNode : private NonCopyable {
 public:
-    AbstractPlanNode(PlanType type, std::unique_ptr<Schema> output_schema);
+    AbstractPlanNode(PlanType type, Schema output_schema);
     virtual ~AbstractPlanNode() = default;
 
     PlanType getPlanType() const { return type_; }
-    const Schema& getOutputSchema() const { return *output_schema_; }
+    const Schema& getOutputSchema() const { return output_schema_; }
 
     const std::vector<std::unique_ptr<AbstractPlanNode>>& getChildren() const { return children_; }
     void addChild(std::unique_ptr<AbstractPlanNode> child);
@@ -47,7 +47,7 @@ public:
 
 protected:
     PlanType type_;
-    std::unique_ptr<Schema> output_schema_;
+    Schema output_schema_;
     std::vector<std::unique_ptr<AbstractPlanNode>> children_;
 };
 

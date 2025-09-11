@@ -6,19 +6,14 @@
 
 namespace velodb {
 
-// Forward declarations
-class View;
-
 class FilterCompactionOperator : public UnaryOperator {
 public:
-    FilterCompactionOperator(ExecutionContext& context,
-                             std::unique_ptr<Schema> output_schema,
-                             std::unique_ptr<AbstractOperator> child);
-    ~FilterCompactionOperator();
-    Result<View> next() override;
+    FilterCompactionOperator(ExecutionContext& context, Schema output_schema, std::unique_ptr<AbstractOperator> child);
+    ~FilterCompactionOperator() = default;
+    Result<RowBatch> next() override;
 
 private:
-    std::vector<void*> device_buffers_;
+    std::vector<Column> device_buffers_;
     size_t num_buffered_rows_;
 };
 

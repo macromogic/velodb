@@ -10,13 +10,13 @@ namespace velodb {
 class LimitOperator : public UnaryOperator {
 public:
     LimitOperator(ExecutionContext& context,
-                  std::unique_ptr<Schema> output_schema,
+                  Schema output_schema,
                   std::unique_ptr<AbstractOperator> child,
                   size_t limit,
                   size_t offset = 0);
     ~LimitOperator() override = default;
 
-    Result<View> next() override;
+    Result<RowBatch> next() override;
 
 private:
     size_t limit_;

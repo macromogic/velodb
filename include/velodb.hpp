@@ -15,7 +15,7 @@
 #include "operator/operator.hpp"
 
 // Query planning
-#include "planner/planner.hpp"
+#include "planner/query_planner.hpp"
 
 // Version information (generated from CMakeLists.txt)
 #include "velodb_version.hpp"
@@ -41,14 +41,9 @@ public:
     void shutdown();
 
     // Table management
-    bool createTable(const std::string& table_name, std::unique_ptr<Schema> schema);
-    bool dropTable(const std::string& table_name);
+    bool createTable(const std::string& table_name, Schema schema);
     bool hasTable(const std::string& table_name) const;
-    std::optional<std::reference_wrapper<Table>> getTable(const std::string& table_name) const;
-
-    // Data manipulation
-    bool insertTuple(const std::string& table_name, const Tuple& tuple);
-    bool insertTuple(const std::string& table_name, Tuple&& tuple);
+    std::optional<std::reference_wrapper<const Table>> getTable(const std::string& table_name) const;
 
     // Query execution
     Result<QueryResult> executeQuery(const std::string& sql);
@@ -59,9 +54,9 @@ public:
     std::string getDatabaseInfo() const;
 
 private:
-    std::unique_ptr<Catalog> catalog_;
-    std::unique_ptr<ExecutionEngine> execution_engine_;
-    bool initialized_ { false };
+    Catalog catalog_;
+    ExecutionEngine execution_engine_;
+    bool initialized_ = false;
 };
 
 } // namespace velodb

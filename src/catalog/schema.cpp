@@ -1,5 +1,6 @@
 #include "catalog/schema.hpp"
 
+#include "catalog/column.hpp"
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
 
@@ -13,6 +14,9 @@ namespace velodb {
 Schema::Schema(std::vector<ColumnInfo> columns)
     : columns_(std::move(columns))
 {
+    for (size_t i = 0; i < columns_.size(); ++i) {
+        column_name_to_index_[columns_[i].getName()] = i;
+    }
 }
 
 void Schema::addColumnInfo(ColumnInfo column)
@@ -52,14 +56,14 @@ bool Schema::hasColumn(const std::string& name) const
     return column_name_to_index_.find(name) != column_name_to_index_.end();
 }
 
-std::unique_ptr<Schema> Schema::cloneUniqueImpl() const
+Schema Schema::cloneImpl() const
 {
     std::vector<ColumnInfo> cloned_columns;
     cloned_columns.reserve(columns_.size());
     for (const auto& column : columns_) {
         cloned_columns.push_back(column.clone());
     }
-    return std::make_unique<Schema>(std::move(cloned_columns));
+    return Schema(std::move(cloned_columns));
 }
 
 std::string Schema::toString() const

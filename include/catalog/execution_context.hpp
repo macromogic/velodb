@@ -16,11 +16,11 @@ public:
 
     Catalog& getCatalog() const { return catalog_; }
 
-    ValueColumn& createTemporaryColumn(const std::string& column_name, std::unique_ptr<DataType> type);
+    Column& createTemporaryColumn(const std::string& column_name, std::unique_ptr<DataType> type);
 
 private:
     Catalog& catalog_;
-    std::vector<std::unique_ptr<ValueColumn>> temporary_columns_;
+    std::vector<std::unique_ptr<Column>> temporary_columns_;
 };
 
 } // namespace velodb

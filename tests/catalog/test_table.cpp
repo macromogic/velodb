@@ -1,6 +1,8 @@
 #include "../common/test_warmup_utility.hpp"
+#include "catalog/column.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
+#include "catalog/table_builder.hpp"
 #include "data/data_type.hpp"
 
 #include <gtest/gtest.h>
@@ -13,9 +15,9 @@ protected:
     {
         test::VeloDBTest::SetUp();
         // Create a simple schema for testing
-        test_schema_ = std::make_unique<Schema>();
-        test_schema_->addColumnInfo({ "id", std::make_unique<IntegerType>() });
-        test_schema_->addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
+        test_schema_ = Schema();
+        test_schema_.addColumnInfo({ "id", std::make_unique<IntegerType>() });
+        test_schema_.addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
     }
 
     void TearDown() override
@@ -24,41 +26,29 @@ protected:
         // Cleanup code if needed
     }
 
-    std::unique_ptr<Schema> test_schema_;
+    Schema test_schema_;
 };
 
 TEST_F(TableTest, CreateTable)
 {
-    auto table_info = std::make_unique<TableInfo>("test_table", std::move(test_schema_));
-    Table table(std::move(table_info));
+    TableBuilder builder("test_table", std::move(test_schema_));
+    Table table = std::move(builder).build();
 
     EXPECT_EQ(table.getName(), "test_table");
-    EXPECT_EQ(table.getSchema().getColumnCount(), 2);
-    EXPECT_EQ(table.getSchema().getColumnInfo(0).getName(), "id");
-    EXPECT_EQ(table.getSchema().getColumnInfo(1).getName(), "name");
-    EXPECT_FALSE(table.isView());
+    EXPECT_EQ(table.getColumnCount(), 2);
+    EXPECT_EQ(table.getColumnName(0), "id");
+    EXPECT_EQ(table.getColumnName(1), "name");
     EXPECT_EQ(table.getRowCount(), 0);
-}
-
-TEST_F(TableTest, TableInfo)
-{
-    auto table_info = std::make_unique<TableInfo>("users", std::move(test_schema_));
-
-    EXPECT_EQ(table_info->getName(), "users");
-    EXPECT_EQ(table_info->getColumnCount(), 2);
-    EXPECT_EQ(table_info->getSchema().getColumnInfo(0).getName(), "id");
-    EXPECT_EQ(table_info->getSchema().getColumnInfo(1).getName(), "name");
 }
 
 TEST_F(TableTest, InsertAndRetrieveTuple)
 {
     // Create a fresh schema for this test
-    auto schema = std::make_unique<Schema>();
-    schema->addColumnInfo({ "id", std::make_unique<IntegerType>() });
-    schema->addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
+    auto schema = Schema();
+    schema.addColumnInfo({ "id", std::make_unique<IntegerType>() });
+    schema.addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
 
-    auto table_info = std::make_unique<TableInfo>("test_table", std::move(schema));
-    Table table(std::move(table_info));
+    TableBuilder builder("test_table", std::move(schema));
 
     // Create values for insertion
     std::vector<Value> values;
@@ -66,7 +56,8 @@ TEST_F(TableTest, InsertAndRetrieveTuple)
     values.push_back(Value::createString("Alice"));
 
     // Insert the row using column-based API
-    table.insertRow(std::move(values));
+    builder.insertRow(std::move(values));
+    Table table = std::move(builder).build();
 
     EXPECT_EQ(table.getRowCount(), 1);
 

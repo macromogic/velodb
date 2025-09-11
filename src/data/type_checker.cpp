@@ -86,7 +86,7 @@ bool TypeChecker::validateExpression(const AbstractExpression* expr) const
         return false;
     }
 
-    // TODO: Implement comprehensive expression validation
+    // TODO(unused): Implement comprehensive expression validation
     // This would involve traversing the expression tree and validating each
     // node
     return true;

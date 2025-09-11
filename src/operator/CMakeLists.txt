@@ -2,10 +2,8 @@ add_library(
   velodb_operator OBJECT
   abstract_operator.cpp
   filter_compaction_operator.cpp
-  hash_join_operator.cpp
   limit_operator.cpp
   merge_sort_join_operator.cpp
-  nested_loop_join_operator.cpp
   projection_operator.cpp
   seq_scan_operator.cpp
   sort_operator.cpp)

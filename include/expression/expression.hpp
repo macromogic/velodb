@@ -1,7 +1,5 @@
 #pragma once
 
-#include "catalog/schema.hpp"
-#include "catalog/table.hpp"
 #include "common/copy_traits.hpp"
 #include "data/value.hpp"
 
@@ -13,6 +11,8 @@ namespace velodb {
 
 // Forward declarations
 class ExecutionContext;
+class Tuple;
+class Schema;
 
 // Expression types
 enum class ExpressionType {
@@ -60,26 +60,72 @@ enum class ArithmeticType {
 };
 
 // Abstract base class for all expressions
-class AbstractExpression : private NonCopyable {
+class AbstractExpression : private NonCopyable, public UniqueCloneable<AbstractExpression> {
 public:
     AbstractExpression(ExpressionType type, std::unique_ptr<DataType> return_type);
+    AbstractExpression(AbstractExpression&&) noexcept = default;
+    AbstractExpression& operator=(AbstractExpression&&) noexcept = default;
     virtual ~AbstractExpression() = default;
 
     ExpressionType getExpressionType() const { return type_; }
     const DataType& getReturnType() const { return *return_type_; }
 
-    // Core evaluation interface
-    virtual Value evaluate(const Tuple& tuple, const Schema& schema) const = 0;
+    virtual bool isLeaf() const { return false; }
+    virtual bool isUnary() const { return false; }
+    virtual bool isBinary() const { return false; }
 
-    // Late materialization support
-    virtual bool requiresMaterialization() const { return true; }
-    virtual std::vector<size_t> getRequiredColumns(const Schema& schema) const = 0;
+    // Core evaluation interface
+    virtual const Value evaluate(const Tuple& tuple, const Schema& schema) const = 0;
 
     virtual std::string toString() const = 0;
 
 protected:
+    // Implementation required by UniqueCloneable
+    virtual std::unique_ptr<AbstractExpression> cloneUniqueImpl() const = 0;
+    friend class UniqueCloneable<AbstractExpression>;
+
+protected:
     ExpressionType type_;
     std::unique_ptr<DataType> return_type_;
+};
+
+class LeafExpression : public AbstractExpression {
+public:
+    LeafExpression(ExpressionType type, std::unique_ptr<DataType> return_type);
+    LeafExpression(LeafExpression&&) noexcept = default;
+    LeafExpression& operator=(LeafExpression&&) noexcept = default;
+
+    bool isLeaf() const override { return true; }
+};
+
+class UnaryExpression : public AbstractExpression {
+public:
+    UnaryExpression(ExpressionType type,
+                    std::unique_ptr<DataType> return_type,
+                    std::unique_ptr<AbstractExpression> operand);
+    UnaryExpression(UnaryExpression&&) noexcept = default;
+    UnaryExpression& operator=(UnaryExpression&&) noexcept = default;
+
+    bool isUnary() const override { return true; }
+
+protected:
+    std::unique_ptr<AbstractExpression> operand_;
+};
+
+class BinaryExpression : public AbstractExpression {
+public:
+    BinaryExpression(ExpressionType type,
+                     std::unique_ptr<DataType> return_type,
+                     std::unique_ptr<AbstractExpression> left,
+                     std::unique_ptr<AbstractExpression> right);
+    BinaryExpression(BinaryExpression&&) noexcept = default;
+    BinaryExpression& operator=(BinaryExpression&&) noexcept = default;
+
+    bool isBinary() const override { return true; }
+
+protected:
+    std::unique_ptr<AbstractExpression> left_;
+    std::unique_ptr<AbstractExpression> right_;
 };
 
 // Forward declarations for concrete expressions
@@ -92,12 +138,3 @@ class CastExpression;
 class FunctionCallExpression;
 
 } // namespace velodb
-
-// Include concrete expression implementations
-#include "arithmetic_expression.hpp"
-#include "cast_expression.hpp"
-#include "column_ref_expression.hpp"
-#include "comparison_expression.hpp"
-#include "constant_expression.hpp"
-#include "function_call_expression.hpp"
-#include "logical_expression.hpp"

@@ -1,10 +1,10 @@
 add_library(
   velodb_catalog OBJECT
-  column/column_info.cpp
-  column/value_column.cpp
-  column/view_column.cpp
+  column.cpp
   schema.cpp
   table.cpp
+  table_builder.cpp
+  row_batch.cpp
   catalog.cpp
   tuple.cpp
   mock_catalog_builder.cpp

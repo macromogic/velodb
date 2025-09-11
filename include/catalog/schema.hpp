@@ -11,7 +11,10 @@
 
 namespace velodb {
 
-class Schema : private NonCopyable, public UniqueCloneable<Schema> {
+// Forward declaration
+class ColumnInfo;
+
+class Schema : private NonCopyable, public Cloneable<Schema> {
 public:
     Schema() = default;
     explicit Schema(std::vector<ColumnInfo> columns);
@@ -36,11 +39,14 @@ public:
     auto end() const { return columns_.end(); }
 
 private:
-    friend class UniqueCloneable<Schema>;
-    std::unique_ptr<Schema> cloneUniqueImpl() const;
+    friend class Cloneable<Schema>;
+    friend class Table;
+    Schema cloneImpl() const;
 
     std::vector<ColumnInfo> columns_;
     std::unordered_map<std::string, size_t> column_name_to_index_;
+
+    std::unordered_map<std::string, size_t> getColumnNameToIndexMap() && { return std::move(column_name_to_index_); }
 };
 
 } // namespace velodb

@@ -3,24 +3,29 @@
 namespace velodb {
 
 ConstantExpression::ConstantExpression(const Value& value)
-    : AbstractExpression(ExpressionType::CONSTANT, DataType::createType(value.getTypeId()))
+    : LeafExpression(ExpressionType::CONSTANT, DataType::createType(value.getTypeId()))
     , value_(value)
 {
 }
 
-Value ConstantExpression::evaluate(const Tuple& /* tuple */, const Schema& /* schema */) const
+const Value ConstantExpression::evaluate(const Tuple& /* tuple */, const Schema& /* schema */) const
 {
     return value_;
 }
 
-std::vector<size_t> ConstantExpression::getRequiredColumns(const Schema& /* schema */) const
+const Value ConstantExpression::getValue() const
 {
-    return {}; // Constants don't require any columns
+    return value_;
 }
 
 std::string ConstantExpression::toString() const
 {
     return value_.toString();
+}
+
+std::unique_ptr<AbstractExpression> ConstantExpression::cloneUniqueImpl() const
+{
+    return std::make_unique<ConstantExpression>(value_);
 }
 
 } // namespace velodb

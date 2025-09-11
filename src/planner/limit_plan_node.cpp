@@ -7,7 +7,7 @@
 namespace velodb {
 
 // LimitPlanNode implementation
-LimitPlanNode::LimitPlanNode(std::unique_ptr<Schema> output_schema, size_t limit, size_t offset)
+LimitPlanNode::LimitPlanNode(Schema output_schema, size_t limit, size_t offset)
     : AbstractPlanNode(PlanType::LIMIT, std::move(output_schema))
     , limit_(limit)
     , offset_(offset)
@@ -16,8 +16,10 @@ LimitPlanNode::LimitPlanNode(std::unique_ptr<Schema> output_schema, size_t limit
 
 std::unique_ptr<AbstractOperator> LimitPlanNode::createOperator([[maybe_unused]] ExecutionContext& context) const
 {
-    // TODO: Implement limit operator creation
-    VELODB_THROW(ExecutionError, "LimitPlanNode::createOperator not implemented");
+    VELODB_ASSERT_MSG(children_.size() == 1, "LimitPlanNode must have exactly one child");
+
+    auto child_operator = children_[0]->createOperator(context);
+    return std::make_unique<LimitOperator>(context, output_schema_.clone(), std::move(child_operator), limit_, offset_);
 }
 
 std::string LimitPlanNode::toString() const

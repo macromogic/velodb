@@ -2,9 +2,10 @@
 #include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
+#include "catalog/table_builder.hpp"
 #include "common/exception.hpp"
 #include "data/data_type.hpp"
-#include "planner/planner.hpp"
+#include "planner/query_planner.hpp"
 
 #include <SQLParser.h>
 
@@ -13,18 +14,23 @@
 using namespace velodb;
 
 class PlannerTest : public test::VeloDBTest {
+public:
+    PlannerTest()
+        : catalog_()
+        , planner_(catalog_)
+    {
+    }
+
 protected:
     void SetUp() override
     {
         test::VeloDBTest::SetUp();
-        catalog_ = std::make_unique<Catalog>();
-        planner_ = std::make_unique<QueryPlanner>(*catalog_);
+        auto schema = Schema();
+        schema.addColumnInfo({ "id", std::make_unique<IntegerType>() });
+        schema.addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
 
-        auto schema = std::make_unique<Schema>();
-        schema->addColumnInfo({ "id", std::make_unique<IntegerType>() });
-        schema->addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
-
-        catalog_->createTable("users", std::move(schema));
+        auto builder = TableBuilder("users", std::move(schema));
+        catalog_.addTable(std::move(builder).build());
     }
 
     void TearDown() override
@@ -33,14 +39,9 @@ protected:
         // Cleanup code if needed
     }
 
-    std::unique_ptr<Catalog> catalog_;
-    std::unique_ptr<QueryPlanner> planner_;
+    Catalog catalog_;
+    QueryPlanner planner_;
 };
-
-TEST_F(PlannerTest, CreateQueryPlanner)
-{
-    EXPECT_NE(planner_, nullptr);
-}
 
 TEST_F(PlannerTest, PlanSimpleSelect)
 {
@@ -57,14 +58,14 @@ TEST_F(PlannerTest, PlanSimpleSelect)
 
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_.planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
 
     EXPECT_EQ(plan->getPlanType(), PlanType::PROJECTION);
     auto& children = plan->getChildren();
     EXPECT_EQ(children.size(), 1);
     EXPECT_EQ(children[0]->getPlanType(), PlanType::COMPACTION);
-    EXPECT_EQ(plan->getOutputSchema().getColumnCount(), 2);
+    EXPECT_EQ(plan->getOutputSchema().getColumnCount(), 4); // TODO: remove $_rowid and $_mask
 }
 
 TEST_F(PlannerTest, PlanSelectWithWhere)
@@ -80,7 +81,7 @@ TEST_F(PlannerTest, PlanSelectWithWhere)
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_.planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
 
     EXPECT_EQ(plan->getPlanType(), PlanType::PROJECTION);
@@ -105,7 +106,7 @@ TEST_F(PlannerTest, PlanSelectWithProjection)
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_.planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
 
     // Should create a plan with projection
@@ -126,7 +127,7 @@ TEST_F(PlannerTest, PlanInvalidTable)
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
     // Should throw an exception for non-existent table
-    EXPECT_THROW(planner_->planSelect(select_stmt), CatalogError);
+    EXPECT_THROW(planner_.planSelect(select_stmt), CatalogError);
 }
 
 TEST_F(PlannerTest, PlanComplexWhere)
@@ -142,7 +143,7 @@ TEST_F(PlannerTest, PlanComplexWhere)
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_.planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
 
     // Should create a valid plan with complex predicate

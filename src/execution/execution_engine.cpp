@@ -1,6 +1,7 @@
 #include "execution/execution_engine.hpp"
 
 #include "common/exception.hpp"
+#include "common/profiler.hpp"
 #include "operator/projection_operator.hpp"
 
 #include <SQLParser.h>
@@ -13,15 +14,19 @@ namespace velodb {
 // ExecutionEngine implementation
 ExecutionEngine::ExecutionEngine(Catalog& catalog)
     : catalog_(catalog)
+    , planner_(catalog)
+    , context_(catalog)
 {
-    planner_ = std::make_unique<QueryPlanner>(catalog);
-    context_ = std::make_unique<ExecutionContext>(catalog);
 }
 
 Result<QueryResult> ExecutionEngine::executeQuery(const std::string& sql)
 {
+    PROFILE_SCOPE("Execute Query (full)");
     hsql::SQLParserResult result;
-    hsql::SQLParser::parse(sql, &result);
+    {
+        PROFILE_SCOPE("SQL Parsing");
+        hsql::SQLParser::parse(sql, &result);
+    }
 
     if (!result.isValid()) {
         return Result<QueryResult>::failure("SQL parsing error: " + std::string(result.errorMsg()));
@@ -34,22 +39,23 @@ Result<QueryResult> ExecutionEngine::executeQuery(const std::string& sql)
     if (statement->type() != hsql::kStmtSelect) {
         return Result<QueryResult>::failure("Non-select statements not supported");
     }
-    auto plan = planner_->planSelect(static_cast<const hsql::SelectStatement*>(statement));
+    auto plan = planner_.planSelect(static_cast<const hsql::SelectStatement*>(statement));
     return executePlan(std::move(plan));
 }
 
 Result<QueryResult> ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNode> plan)
 {
+    PROFILE_SCOPE("Query Execution");
     if (!plan) {
         return Result<QueryResult>::failure("Cannot execute null plan");
     }
 
-    auto operator_tree = plan->createOperator(*context_);
+    auto operator_tree = plan->createOperator(context_);
     if (!operator_tree) {
         return Result<QueryResult>::failure("Failed to create operator tree from plan");
     }
 
-    QueryResult result(operator_tree->getOutputSchema().cloneUnique());
+    QueryResult result(operator_tree->getOutputSchema().clone());
     while (true) {
         auto batch_result = operator_tree->next();
         if (!batch_result) {

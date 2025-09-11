@@ -1,0 +1,9 @@
+CompileFlags:
+  Remove: [
+    "--generate-code=*",
+    "--use_fast_math",
+    "-forward-unknown-to-host-compiler",
+    "-G"
+  ]
+Diagnostics:
+  Suppress: ["-Wunused-function"]

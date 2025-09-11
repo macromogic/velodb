@@ -1,4 +1,5 @@
 #include "../common/test_warmup_utility.hpp"
+#include "catalog/column.hpp"
 #include "catalog/schema.hpp"
 #include "data/data_type.hpp"
 
@@ -114,13 +115,13 @@ TEST_F(SchemaTest, SchemaClone)
     original.addColumnInfo({ "id", std::make_unique<IntegerType>() });
     original.addColumnInfo({ "description", std::make_unique<VarcharType>(200) });
 
-    auto cloned = original.cloneUnique();
+    auto cloned = original.clone();
 
-    EXPECT_EQ(cloned->getColumnCount(), original.getColumnCount());
-    EXPECT_EQ(cloned->getColumnInfo(0).getName(), original.getColumnInfo(0).getName());
-    EXPECT_EQ(cloned->getColumnInfo(1).getName(), original.getColumnInfo(1).getName());
-    EXPECT_EQ(cloned->getColumnInfo(0).getType().getTypeId(), original.getColumnInfo(0).getType().getTypeId());
-    EXPECT_EQ(cloned->getColumnInfo(1).getType().getTypeId(), original.getColumnInfo(1).getType().getTypeId());
+    EXPECT_EQ(cloned.getColumnCount(), original.getColumnCount());
+    EXPECT_EQ(cloned.getColumnInfo(0).getName(), original.getColumnInfo(0).getName());
+    EXPECT_EQ(cloned.getColumnInfo(1).getName(), original.getColumnInfo(1).getName());
+    EXPECT_EQ(cloned.getColumnInfo(0).getType().getTypeId(), original.getColumnInfo(0).getType().getTypeId());
+    EXPECT_EQ(cloned.getColumnInfo(1).getType().getTypeId(), original.getColumnInfo(1).getType().getTypeId());
 }
 
 TEST_F(SchemaTest, SchemaToString)

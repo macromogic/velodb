@@ -5,20 +5,21 @@
 namespace velodb {
 
 // Cast expression for explicit type conversions
-class CastExpression : public AbstractExpression {
+class CastExpression : public UnaryExpression {
 public:
     CastExpression(std::unique_ptr<AbstractExpression> operand, std::unique_ptr<DataType> target_type);
     ~CastExpression() override = default;
 
-    Value evaluate(const Tuple& tuple, const Schema& schema) const override;
-    std::vector<size_t> getRequiredColumns(const Schema& schema) const override;
+    const Value evaluate(const Tuple& tuple, const Schema& schema) const override;
     std::string toString() const override;
 
     const DataType& getTargetType() const { return *target_type_; }
     const AbstractExpression& getOperand() const { return *operand_; }
 
+protected:
+    std::unique_ptr<AbstractExpression> cloneUniqueImpl() const override;
+
 private:
-    std::unique_ptr<AbstractExpression> operand_;
     std::unique_ptr<DataType> target_type_;
 
     // Cast implementation methods
@@ -30,8 +31,6 @@ private:
     static Value castToBigInt(const Value& value);
     static Value castToDouble(const Value& value);
     static Value castToString(const Value& value);
-    static Value castToDate(const Value& value);
-    static Value castToTimestamp(const Value& value);
 };
 
 } // namespace velodb

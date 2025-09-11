@@ -38,7 +38,7 @@ StreamPool::StreamHandle& StreamPool::StreamHandle::operator=(StreamHandle&& oth
 void StreamPool::StreamHandle::release()
 {
     if (pool_ && stream_) {
-        pool_->return_stream(std::move(stream_));
+        pool_->returnStream(std::move(stream_));
         pool_ = nullptr;
     }
 }
@@ -53,7 +53,7 @@ StreamPool::StreamPool(size_t initial_size, size_t max_size)
 
     // Pre-create initial streams
     for (size_t i = 0; i < initial_size; ++i) {
-        auto stream_result = create_stream();
+        auto stream_result = createStream();
         if (stream_result) {
             available_streams_.push(std::move(stream_result.value()));
             ++total_count_;
@@ -68,7 +68,7 @@ StreamPool::~StreamPool()
     clear();
 }
 
-Result<StreamPool::StreamHandle> StreamPool::acquire_stream()
+Result<StreamPool::StreamHandle> StreamPool::acquire()
 {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -84,7 +84,7 @@ Result<StreamPool::StreamHandle> StreamPool::acquire_stream()
         available_streams_.pop();
     } else if (max_size_ == 0 || total_count_ < max_size_) {
         // Create new stream
-        auto stream_result = create_stream();
+        auto stream_result = createStream();
         if (!stream_result) {
             return Result<StreamHandle>::failure(stream_result.error());
         }
@@ -97,11 +97,11 @@ Result<StreamPool::StreamHandle> StreamPool::acquire_stream()
     return Result<StreamHandle>::success(StreamHandle(this, std::move(stream)));
 }
 
-void StreamPool::return_stream(std::unique_ptr<CudaStream> stream)
+void StreamPool::returnStream(std::unique_ptr<CudaStream> stream)
 {
     std::lock_guard<std::mutex> lock(mutex_);
 
-    if (!destroyed_ && stream && stream->is_valid()) {
+    if (!destroyed_ && stream && stream->isValid()) {
         available_streams_.push(std::move(stream));
     } else {
         // Stream is invalid or pool is destroyed, decrease total count
@@ -111,19 +111,19 @@ void StreamPool::return_stream(std::unique_ptr<CudaStream> stream)
     }
 }
 
-size_t StreamPool::available_count() const
+size_t StreamPool::availableCount() const
 {
     std::lock_guard<std::mutex> lock(mutex_);
     return available_streams_.size();
 }
 
-size_t StreamPool::total_count() const
+size_t StreamPool::totalCount() const
 {
     std::lock_guard<std::mutex> lock(mutex_);
     return total_count_;
 }
 
-Result<void> StreamPool::synchronize_all()
+Result<void> StreamPool::synchronizeAll()
 {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -174,10 +174,10 @@ StreamPool& StreamPool::instance()
     return global_pool;
 }
 
-Result<std::unique_ptr<CudaStream>> StreamPool::create_stream()
+Result<std::unique_ptr<CudaStream>> StreamPool::createStream()
 {
     auto stream = std::make_unique<CudaStream>(cudaStreamNonBlocking);
-    if (!stream->is_valid()) {
+    if (!stream->isValid()) {
         return Result<std::unique_ptr<CudaStream>>::failure("Failed to create CUDA stream");
     }
     return Result<std::unique_ptr<CudaStream>>::success(std::move(stream));
@@ -187,7 +187,7 @@ Result<std::unique_ptr<CudaStream>> StreamPool::create_stream()
 
 StreamGuard::StreamGuard(StreamPool& pool)
 {
-    auto handle_result = pool.acquire_stream();
+    auto handle_result = pool.acquire();
     if (handle_result) {
         handle_ = std::move(handle_result.value());
     }
@@ -227,9 +227,9 @@ CudaStream& StreamGuard::operator*() const
     return *handle_;
 }
 
-bool StreamGuard::is_valid() const
+bool StreamGuard::isValid() const
 {
-    return handle_.is_valid();
+    return handle_.isValid();
 }
 
 void StreamGuard::release()

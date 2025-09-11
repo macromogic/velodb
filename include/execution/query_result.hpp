@@ -13,17 +13,17 @@ class QueryResultIterator; // Forward declaration
 
 class QueryResult : public NonCopyable {
 public:
-    explicit QueryResult(std::unique_ptr<Schema> schema);
+    explicit QueryResult(Schema schema);
     QueryResult(QueryResult&&) noexcept = default;
     QueryResult& operator=(QueryResult&&) noexcept = default;
     ~QueryResult() = default;
 
-    void append(View view);
+    void append(RowBatch batch);
 
     Value getValue(size_t row, size_t column) const;
 
     // Schema and basic info
-    const Schema& getSchema() const { return *schema_; }
+    const Schema& getSchema() const { return schema_; }
     size_t getRowCount() const { return row_count_; }
     bool isEmpty() const { return row_count_ == 0; }
 
@@ -34,8 +34,8 @@ public:
     QueryResultIterator end() const;
 
 private:
-    std::unique_ptr<Schema> schema_;
-    std::vector<View> views_;
+    Schema schema_;
+    std::vector<RowBatch> batches_;
     std::vector<size_t> row_offsets_;
 
     size_t row_count_; // Current number of rows

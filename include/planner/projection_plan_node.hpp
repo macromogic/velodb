@@ -12,7 +12,8 @@ namespace velodb {
 // Projection plan node
 class ProjectionPlanNode : public AbstractPlanNode {
 public:
-    ProjectionPlanNode(std::unique_ptr<Schema> output_schema,
+    ProjectionPlanNode(Schema input_schema,
+                       Schema output_schema,
                        std::vector<std::unique_ptr<AbstractExpression>> expressions);
     ~ProjectionPlanNode() override = default;
 
@@ -22,6 +23,7 @@ public:
     const std::vector<std::unique_ptr<AbstractExpression>>& getExpressions() const { return expressions_; }
 
 private:
+    Schema input_schema_;
     mutable std::vector<std::unique_ptr<AbstractExpression>> expressions_;
 };
 

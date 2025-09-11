@@ -1,20 +1,19 @@
 #pragma once
 
-#include "schema.hpp"
-
+#include "catalog/schema.hpp"
 #include "data/value.hpp"
 
 namespace velodb {
 
 // forward declarations
-class TableBase;
+class RowBatch;
 
 class Tuple {
 public:
     virtual ~Tuple() = default;
 
     virtual const Value getValue(size_t column_index) const = 0;
-    virtual const Value getValue(const std::string& column_name) const = 0;
+    // virtual const Value getValue(const std::string& column_name) const = 0;
     virtual size_t getColumnCount() const = 0;
     virtual std::string toString() const = 0;
 };
@@ -32,7 +31,7 @@ public:
     ValueTuple& operator=(ValueTuple&& other) noexcept = default;
 
     const Value getValue(size_t column_index) const;
-    const Value getValue(const std::string& column_name) const;
+    // const Value getValue(const std::string& column_name) const;
 
     const Schema& getSchema() const { return schema_.get(); }
     size_t getColumnCount() const override { return values_.size(); }
@@ -46,23 +45,23 @@ private:
 
 class ViewTuple : public Tuple {
 public:
-    ViewTuple(const TableBase& table, size_t row_id);
+    ViewTuple(const RowBatch& batch, size_t row_id);
     ~ViewTuple() = default;
 
     bool operator==(const ViewTuple& other) const;
 
     const Value getValue(size_t column_index) const override;
-    const Value getValue(const std::string& column_name) const override;
+    // const Value getValue(const std::string& column_name) const override;
     size_t getColumnCount() const override;
     std::string toString() const override;
 
 private:
-    void setTable(const TableBase& table, size_t row_id = 0);
+    void setBatch(const RowBatch& batch, size_t row_id = 0);
 
-    std::reference_wrapper<const TableBase> table_;
+    const RowBatch* batch_;
     size_t row_id_;
 
-    friend class TableIterator;
+    friend class BatchIterator;
     friend class QueryResultIterator;
 };
 

@@ -8,8 +8,8 @@
 namespace velodb {
 
 // SeqScanPlanNode implementation
-SeqScanPlanNode::SeqScanPlanNode(const TableBase& table,
-                                 std::unique_ptr<Schema> output_schema,
+SeqScanPlanNode::SeqScanPlanNode(const Table& table,
+                                 Schema output_schema,
                                  std::unique_ptr<AbstractExpression> predicate)
     : AbstractPlanNode(PlanType::SEQ_SCAN, std::move(output_schema))
     , table_(table)
@@ -19,7 +19,7 @@ SeqScanPlanNode::SeqScanPlanNode(const TableBase& table,
 
 std::unique_ptr<AbstractOperator> SeqScanPlanNode::createOperator(ExecutionContext& context) const
 {
-    return std::make_unique<SeqScanOperator>(context, table_, predicate_);
+    return std::make_unique<SeqScanOperator>(context, table_, output_schema_.clone(), predicate_);
 }
 
 std::string SeqScanPlanNode::toString() const

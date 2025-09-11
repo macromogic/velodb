@@ -8,7 +8,7 @@ namespace velodb {
 
 // SortOperator implementation
 SortOperator::SortOperator(ExecutionContext& context,
-                           std::unique_ptr<Schema> output_schema,
+                           Schema output_schema,
                            std::unique_ptr<AbstractOperator> child,
                            std::vector<std::unique_ptr<AbstractExpression>> sort_expressions,
                            std::vector<bool> ascending_flags)
@@ -18,10 +18,10 @@ SortOperator::SortOperator(ExecutionContext& context,
 {
 }
 
-Result<View> SortOperator::next()
+Result<RowBatch> SortOperator::next()
 {
     // TODO: Implement sorting logic
-    return Result<View>::failure("SortOperator::execute not implemented yet");
+    return Result<RowBatch>::failure("SortOperator::execute not implemented yet");
 }
 
 } // namespace velodb

@@ -1,7 +1,12 @@
 #include "../common/test_warmup_utility.hpp"
 #include "data/data_type.hpp"
+#include "data/type_checker.hpp"
 #include "data/value.hpp"
-#include "expression/expression.hpp"
+#include "expression/arithmetic_expression.hpp"
+#include "expression/column_ref_expression.hpp"
+#include "expression/comparison_expression.hpp"
+#include "expression/constant_expression.hpp"
+#include "expression/logical_expression.hpp"
 
 #include <gtest/gtest.h>
 
@@ -36,7 +41,7 @@ TEST_F(ExpressionTest, ConstantExpression)
 TEST_F(ExpressionTest, ColumnRefExpression)
 {
     auto int_type = std::make_unique<IntegerType>();
-    ColumnRefExpression col_expr("user_id", std::move(int_type));
+    ColumnRefExpression col_expr("test_table", "user_id", std::move(int_type));
 
     EXPECT_EQ(col_expr.getReturnType().getTypeId(), DataTypeId::INTEGER);
     EXPECT_EQ(col_expr.getColumnName(), "user_id");
@@ -68,8 +73,14 @@ TEST_F(ExpressionTest, ArithmeticExpression)
 
     auto left_expr = std::make_unique<ConstantExpression>(left_val);
     auto right_expr = std::make_unique<ConstantExpression>(right_val);
+    auto return_type = g_type_checker.deduceArithmeticType(left_expr->getReturnType(),
+                                                           right_expr->getReturnType(),
+                                                           ArithmeticType::PLUS);
 
-    ArithmeticExpression arith_expr(ArithmeticType::PLUS, std::move(left_expr), std::move(right_expr));
+    ArithmeticExpression arith_expr(ArithmeticType::PLUS,
+                                    std::move(return_type),
+                                    std::move(left_expr),
+                                    std::move(right_expr));
 
     EXPECT_EQ(arith_expr.getReturnType().getTypeId(), DataTypeId::INTEGER);
     EXPECT_EQ(arith_expr.getArithmeticType(), ArithmeticType::PLUS);
@@ -108,7 +119,13 @@ TEST_F(ExpressionTest, NestedExpressions)
     auto expr3 = std::make_unique<ConstantExpression>(val3);
     auto expr7 = std::make_unique<ConstantExpression>(val7);
 
-    auto add_expr = std::make_unique<ArithmeticExpression>(ArithmeticType::PLUS, std::move(expr5), std::move(expr3));
+    auto return_type = g_type_checker.deduceArithmeticType(expr5->getReturnType(),
+                                                           expr3->getReturnType(),
+                                                           ArithmeticType::PLUS);
+    auto add_expr = std::make_unique<ArithmeticExpression>(ArithmeticType::PLUS,
+                                                           std::move(return_type),
+                                                           std::move(expr5),
+                                                           std::move(expr3));
 
     ComparisonExpression comp_expr(ComparisonType::GREATER_THAN, std::move(add_expr), std::move(expr7));
 

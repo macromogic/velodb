@@ -1,48 +1,36 @@
 #include "expression/column_ref_expression.hpp"
 
+#include "catalog/tuple.hpp"
+
 #include <fmt/format.h>
 
 #include <utility>
 
 namespace velodb {
 
-ColumnRefExpression::ColumnRefExpression(std::string column_name, std::unique_ptr<DataType> return_type)
-    : AbstractExpression(ExpressionType::COLUMN_REF, std::move(return_type))
+ColumnRefExpression::ColumnRefExpression(std::string table_name,
+                                         std::string column_name,
+                                         std::unique_ptr<DataType> return_type)
+    : LeafExpression(ExpressionType::COLUMN_REF, std::move(return_type))
+    , table_name_(std::move(table_name))
     , column_name_(std::move(column_name))
-    , column_index_(0)
-    , has_column_index_(false)
 {
 }
 
-ColumnRefExpression::ColumnRefExpression(size_t column_index, std::unique_ptr<DataType> return_type)
-    : AbstractExpression(ExpressionType::COLUMN_REF, std::move(return_type))
-    , column_index_(column_index)
-    , has_column_index_(true)
+const Value ColumnRefExpression::evaluate(const Tuple& tuple, const Schema& schema) const
 {
-}
-
-Value ColumnRefExpression::evaluate(const Tuple& tuple, const Schema& /* schema */) const
-{
-    if (has_column_index_) {
-        return tuple.getValue(column_index_);
-    }
-    return tuple.getValue(column_name_);
-}
-
-std::vector<size_t> ColumnRefExpression::getRequiredColumns(const Schema& schema) const
-{
-    if (has_column_index_) {
-        return { column_index_ };
-    }
-    return { schema.getColumnIndex(column_name_) };
+    auto column_index = schema.getColumnIndex(column_name_);
+    return tuple.getValue(column_index);
 }
 
 std::string ColumnRefExpression::toString() const
 {
-    if (has_column_index_) {
-        return fmt::format("col_{}", column_index_);
-    }
     return column_name_;
+}
+
+std::unique_ptr<AbstractExpression> ColumnRefExpression::cloneUniqueImpl() const
+{
+    return std::make_unique<ColumnRefExpression>(table_name_, column_name_, return_type_->cloneUnique());
 }
 
 } // namespace velodb

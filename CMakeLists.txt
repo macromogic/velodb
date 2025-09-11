@@ -39,10 +39,8 @@ endif()
 set(CMAKE_CXX_FLAGS_DEBUG "-g3 -Wall -Wextra -Werror")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 set(CMAKE_CUDA_FLAGS_DEBUG
-    "-g3 -G -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -Werror --diag-suppress 128 --diag-suppress 2417"
-)
-set(CMAKE_CUDA_FLAGS_RELEASE
-    "-O3 --use_fast_math --diag-suppress 128 --diag-suppress 2417")
+    "-g3 -G -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -Werror")
+set(CMAKE_CUDA_FLAGS_RELEASE "-O3 --use_fast_math")
 
 # Generate version header from template
 configure_file("${CMAKE_SOURCE_DIR}/include/velodb_version.hpp.in"
@@ -79,6 +77,9 @@ add_library(sqlparser STATIC IMPORTED)
 set_target_properties(
   sqlparser PROPERTIES IMPORTED_LOCATION
                        ${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/libsqlparser.a)
+set(FMT_SYSTEM_HEADERS
+    ON
+    CACHE BOOL "" FORCE)
 add_dependencies(sqlparser sql-parser)
 add_subdirectory(thirdparty/argparse)
 add_subdirectory(thirdparty/backward-cpp)

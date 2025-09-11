@@ -10,7 +10,7 @@ namespace velodb {
 // Limit plan node
 class LimitPlanNode : public AbstractPlanNode {
 public:
-    LimitPlanNode(std::unique_ptr<Schema> output_schema, size_t limit, size_t offset = 0);
+    LimitPlanNode(Schema output_schema, size_t limit, size_t offset = 0);
     ~LimitPlanNode() override = default;
 
     std::unique_ptr<AbstractOperator> createOperator(ExecutionContext& context) const override;

@@ -12,7 +12,7 @@ namespace velodb {
 // Merge sort join plan node
 class MergeSortJoinPlanNode : public AbstractPlanNode {
 public:
-    MergeSortJoinPlanNode(std::unique_ptr<Schema> output_schema,
+    MergeSortJoinPlanNode(Schema output_schema,
                           std::unique_ptr<AbstractExpression> left_key_expr,
                           std::unique_ptr<AbstractExpression> right_key_expr,
                           JoinType join_type = JoinType::INNER);

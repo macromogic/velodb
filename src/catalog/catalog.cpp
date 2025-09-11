@@ -1,5 +1,6 @@
 #include "catalog/catalog.hpp"
 
+#include "catalog/column.hpp"
 #include "common/fmt.hpp"
 
 #include <fmt/core.h>
@@ -8,25 +9,13 @@
 
 namespace velodb {
 
-bool Catalog::createTable(const std::string& table_name, std::unique_ptr<Schema> schema)
+bool Catalog::addTable(Table&& table)
 {
+    const std::string& table_name = table.getName();
     if (hasTable(table_name)) {
-        return false;
+        return false; // Table already exists
     }
-
-    auto table_info = std::make_unique<TableInfo>(table_name, std::move(schema));
-    auto table = std::make_unique<Table>(std::move(table_info));
-    tables_[table_name] = std::move(table);
-    return true;
-}
-
-bool Catalog::dropTable(const std::string& table_name)
-{
-    auto it = tables_.find(table_name);
-    if (it == tables_.end()) {
-        return false;
-    }
-    tables_.erase(it);
+    tables_.emplace(table_name, std::move(table));
     return true;
 }
 
@@ -35,16 +24,16 @@ bool Catalog::hasTable(const std::string& table_name) const
     return tables_.find(table_name) != tables_.end();
 }
 
-std::optional<std::reference_wrapper<Table>> Catalog::getTable(const std::string& table_name) const
+std::optional<std::reference_wrapper<const Table>> Catalog::getTable(const std::string& table_name) const
 {
     auto it = tables_.find(table_name);
     if (it == tables_.end()) {
         return std::nullopt;
     }
-    return *it->second;
+    return std::ref(it->second);
 }
 
-std::optional<std::reference_wrapper<Table>> Catalog::getTable(const char* table_name) const
+std::optional<std::reference_wrapper<const Table>> Catalog::getTable(const char* table_name) const
 {
     if (table_name == nullptr) {
         return std::nullopt;
@@ -80,58 +69,11 @@ std::string Catalog::toString() const
 {
     std::string result = fmt::format("Catalog: {} tables\n", tables_.size());
 
-    for (const auto& pair : tables_) {
-        result += fmt::format("  Table: {} {}\n", pair.first, pair.second->getSchema());
+    for (const auto& [_, table] : tables_) {
+        result += fmt::format("  Table: {}\n", table);
     }
 
     return result;
-}
-
-CatalogBuilder& CatalogBuilder::addTable(const std::string& table_name, std::unique_ptr<Schema> schema)
-{
-    catalog_->createTable(table_name, std::move(schema));
-    return *this;
-}
-
-CatalogBuilder& CatalogBuilder::addIntegerColumn(const std::string& column_name, bool nullable)
-{
-    auto type = std::make_unique<IntegerType>();
-    current_columns_.emplace_back(column_name, std::move(type), nullable);
-    return *this;
-}
-
-CatalogBuilder& CatalogBuilder::addStringColumn(const std::string& column_name, size_t max_length, bool nullable)
-{
-    auto type = std::make_unique<VarcharType>(max_length);
-    current_columns_.emplace_back(column_name, std::move(type), nullable);
-    return *this;
-}
-
-CatalogBuilder& CatalogBuilder::addDoubleColumn(const std::string& column_name, bool nullable)
-{
-    auto type = std::make_unique<DoubleType>();
-    current_columns_.emplace_back(column_name, std::move(type), nullable);
-    return *this;
-}
-
-CatalogBuilder& CatalogBuilder::addBooleanColumn(const std::string& column_name, bool nullable)
-{
-    auto type = std::make_unique<BooleanType>();
-    current_columns_.emplace_back(column_name, std::move(type), nullable);
-    return *this;
-}
-
-CatalogBuilder& CatalogBuilder::finishTable(const std::string& table_name)
-{
-    auto schema = std::make_unique<Schema>(std::move(current_columns_));
-    catalog_->createTable(table_name, std::move(schema));
-    current_columns_.clear();
-    return *this;
-}
-
-std::unique_ptr<Catalog> CatalogBuilder::build()
-{
-    return std::move(catalog_);
 }
 
 } // namespace velodb

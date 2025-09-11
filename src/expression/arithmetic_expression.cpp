@@ -5,7 +5,6 @@
 #include "data/type_checker.hpp"
 
 #include <algorithm>
-#include <stdexcept>
 
 namespace velodb {
 
@@ -28,13 +27,11 @@ static auto format_as(ArithmeticType arith_type)
 }
 
 ArithmeticExpression::ArithmeticExpression(ArithmeticType arith_type,
+                                           std::unique_ptr<DataType> return_type,
                                            std::unique_ptr<AbstractExpression> left,
                                            std::unique_ptr<AbstractExpression> right)
-    : AbstractExpression(ExpressionType::ARITHMETIC,
-                         g_type_checker.deduceArithmeticType(left->getReturnType(), right->getReturnType(), arith_type))
+    : BinaryExpression(ExpressionType::ARITHMETIC, std::move(return_type), std::move(left), std::move(right))
     , arith_type_(arith_type)
-    , left_(std::move(left))
-    , right_(std::move(right))
 {
     // Validate the arithmetic operation at construction time
     if (!return_type_) {
@@ -42,31 +39,12 @@ ArithmeticExpression::ArithmeticExpression(ArithmeticType arith_type,
     }
 }
 
-Value ArithmeticExpression::evaluate(const Tuple& tuple, const Schema& schema) const
+const Value ArithmeticExpression::evaluate(const Tuple& tuple, const Schema& schema) const
 {
     Value left_val = left_->evaluate(tuple, schema);
     Value right_val = right_->evaluate(tuple, schema);
 
     return computeArithmetic(left_val, right_val, arith_type_);
-}
-
-std::vector<size_t> ArithmeticExpression::getRequiredColumns(const Schema& schema) const
-{
-    std::vector<size_t> required_columns;
-
-    // Get required columns from left operand
-    auto left_columns = left_->getRequiredColumns(schema);
-    required_columns.insert(required_columns.end(), left_columns.begin(), left_columns.end());
-
-    // Get required columns from right operand
-    auto right_columns = right_->getRequiredColumns(schema);
-    required_columns.insert(required_columns.end(), right_columns.begin(), right_columns.end());
-
-    // Remove duplicates
-    std::sort(required_columns.begin(), required_columns.end());
-    required_columns.erase(std::unique(required_columns.begin(), required_columns.end()), required_columns.end());
-
-    return required_columns;
 }
 
 std::string ArithmeticExpression::toString() const
@@ -177,14 +155,10 @@ int32_t ArithmeticExpression::performIntegerArithmetic(int32_t left, int32_t rig
     case ArithmeticType::MULTIPLY:
         return left * right;
     case ArithmeticType::DIVIDE:
-        if (right == 0) {
-            VELODB_THROW(ExecutionError, "Division by zero");
-        }
+        VELODB_ASSERT_MSG(right != 0, "Division by zero");
         return left / right;
     case ArithmeticType::MODULO:
-        if (right == 0) {
-            VELODB_THROW(ExecutionError, "Modulo by zero");
-        }
+        VELODB_ASSERT_MSG(right != 0, "Modulo by zero");
         return left % right;
     default:
         VELODB_THROW(ExecutionError, "Unknown arithmetic operation");
@@ -201,14 +175,10 @@ int64_t ArithmeticExpression::performBigIntArithmetic(int64_t left, int64_t righ
     case ArithmeticType::MULTIPLY:
         return left * right;
     case ArithmeticType::DIVIDE:
-        if (right == 0) {
-            VELODB_THROW(ExecutionError, "Division by zero");
-        }
+        VELODB_ASSERT_MSG(right != 0, "Division by zero");
         return left / right;
     case ArithmeticType::MODULO:
-        if (right == 0) {
-            VELODB_THROW(ExecutionError, "Modulo by zero");
-        }
+        VELODB_ASSERT_MSG(right != 0, "Modulo by zero");
         return left % right;
     default:
         VELODB_THROW(ExecutionError, "Unknown arithmetic operation");
@@ -225,15 +195,21 @@ double ArithmeticExpression::performDoubleArithmetic(double left, double right, 
     case ArithmeticType::MULTIPLY:
         return left * right;
     case ArithmeticType::DIVIDE:
-        if (right == 0.0) {
-            VELODB_THROW(ExecutionError, "Division by zero");
-        }
+        VELODB_ASSERT_MSG(right != 0.0, "Division by zero");
         return left / right;
     case ArithmeticType::MODULO:
         VELODB_THROW(ExecutionError, "Modulo operation not supported for floating-point numbers");
     default:
         VELODB_THROW(ExecutionError, "Unknown arithmetic operation");
     }
+}
+
+std::unique_ptr<AbstractExpression> ArithmeticExpression::cloneUniqueImpl() const
+{
+    return std::make_unique<ArithmeticExpression>(arith_type_,
+                                                  return_type_->cloneUnique(),
+                                                  left_->cloneUnique(),
+                                                  right_->cloneUnique());
 }
 
 } // namespace velodb

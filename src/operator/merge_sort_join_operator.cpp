@@ -8,7 +8,7 @@ namespace velodb {
 
 // MergeSortJoinOperator implementation
 MergeSortJoinOperator::MergeSortJoinOperator(ExecutionContext& context,
-                                             std::unique_ptr<Schema> output_schema,
+                                             Schema output_schema,
                                              std::unique_ptr<AbstractOperator> left_child,
                                              std::unique_ptr<AbstractOperator> right_child,
                                              std::unique_ptr<AbstractExpression> left_key_expr,
@@ -21,10 +21,10 @@ MergeSortJoinOperator::MergeSortJoinOperator(ExecutionContext& context,
 {
 }
 
-Result<View> MergeSortJoinOperator::next()
+Result<RowBatch> MergeSortJoinOperator::next()
 {
     // TODO: Implement merge sort join logic
-    return Result<View>::failure("MergeSortJoinOperator::execute not implemented yet");
+    return Result<RowBatch>::failure("MergeSortJoinOperator::execute not implemented yet");
 }
 
 } // namespace velodb

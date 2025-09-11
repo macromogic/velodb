@@ -9,14 +9,12 @@ namespace velodb {
 BinaryLogicalExpression::BinaryLogicalExpression(ConnectiveType connective_type,
                                                  std::unique_ptr<AbstractExpression> left,
                                                  std::unique_ptr<AbstractExpression> right)
-    : AbstractExpression(ExpressionType::LOGICAL, std::make_unique<BooleanType>())
+    : BinaryExpression(ExpressionType::LOGICAL, std::make_unique<BooleanType>(), std::move(left), std::move(right))
     , connective_type_(connective_type)
-    , left_(std::move(left))
-    , right_(std::move(right))
 {
 }
 
-Value BinaryLogicalExpression::evaluate(const Tuple& tuple, const Schema& schema) const
+const Value BinaryLogicalExpression::evaluate(const Tuple& tuple, const Schema& schema) const
 {
     Value left_value = left_->evaluate(tuple, schema);
     Value right_value = right_->evaluate(tuple, schema);
@@ -35,34 +33,25 @@ Value BinaryLogicalExpression::evaluate(const Tuple& tuple, const Schema& schema
     }
 }
 
-std::vector<size_t> BinaryLogicalExpression::getRequiredColumns(const Schema& schema) const
-{
-    std::vector<size_t> required_columns;
-    auto left_columns = left_->getRequiredColumns(schema);
-    required_columns.insert(required_columns.end(), left_columns.begin(), left_columns.end());
-
-    auto right_columns = right_->getRequiredColumns(schema);
-    required_columns.insert(required_columns.end(), right_columns.begin(), right_columns.end());
-
-    // Remove duplicates
-    std::sort(required_columns.begin(), required_columns.end());
-    required_columns.erase(std::unique(required_columns.begin(), required_columns.end()), required_columns.end());
-
-    return required_columns;
-}
-
 std::string BinaryLogicalExpression::toString() const
 {
-    return fmt::format("({} {} {})", *left_, connective_type_ == ConnectiveType::AND ? "AND" : "OR", *right_);
+    std::string op_str = (connective_type_ == ConnectiveType::AND) ? " AND " : " OR ";
+    return fmt::format("({} {} {})", left_->toString(), op_str, right_->toString());
 }
 
+std::unique_ptr<AbstractExpression> BinaryLogicalExpression::cloneUniqueImpl() const
+{
+    return std::make_unique<BinaryLogicalExpression>(connective_type_, left_->cloneUnique(), right_->cloneUnique());
+}
+
+// LogicalNotExpression implementation
+
 LogicalNotExpression::LogicalNotExpression(std::unique_ptr<AbstractExpression> operand)
-    : AbstractExpression(ExpressionType::LOGICAL, std::make_unique<BooleanType>())
-    , operand_(std::move(operand))
+    : UnaryExpression(ExpressionType::LOGICAL, std::make_unique<BooleanType>(), std::move(operand))
 {
 }
 
-Value LogicalNotExpression::evaluate(const Tuple& tuple, const Schema& schema) const
+const Value LogicalNotExpression::evaluate(const Tuple& tuple, const Schema& schema) const
 {
     Value operand_value = operand_->evaluate(tuple, schema);
     if (operand_value.isNull()) {
@@ -71,14 +60,14 @@ Value LogicalNotExpression::evaluate(const Tuple& tuple, const Schema& schema) c
     return Value::createBoolean(!operand_value.getBoolean());
 }
 
-std::vector<size_t> LogicalNotExpression::getRequiredColumns(const Schema& schema) const
-{
-    return operand_->getRequiredColumns(schema);
-}
-
 std::string LogicalNotExpression::toString() const
 {
     return fmt::format("NOT ({})", *operand_);
+}
+
+std::unique_ptr<AbstractExpression> LogicalNotExpression::cloneUniqueImpl() const
+{
+    return std::make_unique<LogicalNotExpression>(operand_->cloneUnique());
 }
 
 } // namespace velodb

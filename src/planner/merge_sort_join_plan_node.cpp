@@ -7,7 +7,7 @@
 namespace velodb {
 
 // MergeSortJoinPlanNode implementation
-MergeSortJoinPlanNode::MergeSortJoinPlanNode(std::unique_ptr<Schema> output_schema,
+MergeSortJoinPlanNode::MergeSortJoinPlanNode(Schema output_schema,
                                              std::unique_ptr<AbstractExpression> left_key_expr,
                                              std::unique_ptr<AbstractExpression> right_key_expr,
                                              JoinType join_type)
@@ -18,11 +18,20 @@ MergeSortJoinPlanNode::MergeSortJoinPlanNode(std::unique_ptr<Schema> output_sche
 {
 }
 
-std::unique_ptr<AbstractOperator> MergeSortJoinPlanNode::createOperator(
-    [[maybe_unused]] ExecutionContext& context) const
+std::unique_ptr<AbstractOperator> MergeSortJoinPlanNode::createOperator(ExecutionContext& context) const
 {
-    // TODO: Implement merge sort join operator creation
-    VELODB_THROW(ExecutionError, "MergeSortJoinPlanNode::createOperator not implemented");
+    VELODB_ASSERT_MSG(children_.size() == 2, "MergeSortJoinPlanNode must have exactly two children");
+
+    auto left_operator = children_[0]->createOperator(context);
+    auto right_operator = children_[1]->createOperator(context);
+
+    return std::make_unique<MergeSortJoinOperator>(context,
+                                                   output_schema_.clone(),
+                                                   std::move(left_operator),
+                                                   std::move(right_operator),
+                                                   left_key_expr_->cloneUnique(),
+                                                   right_key_expr_->cloneUnique(),
+                                                   join_type_);
 }
 
 std::string MergeSortJoinPlanNode::toString() const

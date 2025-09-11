@@ -1,5 +1,6 @@
 #include "execution/query_result.hpp"
 
+#include "catalog/row_batch.hpp"
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
 
@@ -7,38 +8,40 @@
 
 namespace velodb {
 
-QueryResult::QueryResult(std::unique_ptr<Schema> schema)
+QueryResult::QueryResult(Schema schema)
     : schema_(std::move(schema))
     , row_count_(0)
 {
-    views_.emplace_back(""); // dummy view to simplify iterator logic
+    batches_.push_back(RowBatch()); // dummy view to simplify iterator logic
 }
 
-void QueryResult::append(View view)
+void QueryResult::append(RowBatch batch)
 {
-    views_.push_back(std::move(view));
+    batch.to(DataLocation::HOST);
+    auto batch_row_count = batch.getRowCount();
+    batches_.push_back(std::move(batch));
     row_offsets_.push_back(row_count_);
-    row_count_ += views_.back().getRowCount();
+    row_count_ += batch_row_count;
 }
 
 Value QueryResult::getValue(size_t row, size_t column) const
 {
     // position 0 reserved for end iterator
     auto index = std::upper_bound(row_offsets_.begin(), row_offsets_.end(), row) - row_offsets_.begin();
-    const auto& view = views_[index];
+    const auto& batch = batches_[index];
     size_t local_row = row - row_offsets_[index];
-    if (local_row >= view.getRowCount()) {
+    if (local_row >= batch.getRowCount()) {
         VELODB_THROW(CatalogError, "Row index out of range");
     }
-    if (column >= view.getSchema().getColumnCount()) {
+    if (column >= batch.getColumnCount()) {
         VELODB_THROW(CatalogError, "Column index out of range");
     }
-    return view.getValue(local_row, column);
+    return batch.getValue(local_row, column);
 }
 
 std::string QueryResult::toString() const
 {
-    return fmt::format("QueryResult: {} rows\nSchema: {}", row_count_, *schema_);
+    return fmt::format("QueryResult: {} rows\nSchema: {}", row_count_, schema_);
 }
 
 QueryResultIterator QueryResult::begin() const
@@ -58,7 +61,7 @@ QueryResultIterator QueryResult::end() const
 QueryResultIterator::QueryResultIterator(const QueryResult& result, size_t view_idx, size_t row_id)
     : result_(result)
     , view_idx_(view_idx)
-    , current_tuple_(result_.views_[view_idx_], row_id)
+    , current_tuple_(result_.batches_[view_idx_], row_id)
 {
 }
 
@@ -78,13 +81,13 @@ QueryResultIterator& QueryResultIterator::operator++()
         return *this; // Already at end
     }
     ++current_tuple_.row_id_;
-    if (current_tuple_.row_id_ >= result_.views_[view_idx_].getRowCount()) {
+    if (current_tuple_.row_id_ >= result_.batches_[view_idx_].getRowCount()) {
         // Move to next view
         ++view_idx_;
-        if (view_idx_ >= result_.views_.size()) {
+        if (view_idx_ >= result_.batches_.size()) {
             view_idx_ = 0; // point to dummy view
         }
-        current_tuple_.setTable(result_.views_[view_idx_]);
+        current_tuple_.setBatch(result_.batches_[view_idx_]);
     }
     return *this;
 }

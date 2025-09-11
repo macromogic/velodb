@@ -23,8 +23,8 @@ namespace velodb {
 
 class MockCatalogBuilder {
 public:
-    static std::unique_ptr<Catalog> createSampleCatalog();
-    static std::unique_ptr<Catalog> createAdaptiveCatalog();
+    static Catalog createSampleCatalog();
+    static Catalog createAdaptiveCatalog();
 
     static bool ensureTablesForQuery(Catalog& catalog, const std::string& sql);
     static void createDynamicTable(Catalog& catalog,
@@ -50,14 +50,14 @@ private:
     static void createTableFromCommonSchema(Catalog& catalog, const std::string& table_name);
 
     // Helper methods for schema creation
-    static std::unique_ptr<Schema> createUsersSchema();
-    static std::unique_ptr<Schema> createOrdersSchema();
-    static std::unique_ptr<Schema> createProductsSchema();
-    static std::unique_ptr<Schema> createComplexSchema();
-    static std::unique_ptr<Schema> createGenericSchema(const std::string& table_name, size_t column_count);
-    static std::unique_ptr<Schema> createDynamicSchema(const std::string& table_name,
-                                                       const std::vector<std::string>& column_names,
-                                                       const std::map<std::string, DataTypeId>& inferred_types);
+    static Schema createUsersSchema();
+    static Schema createOrdersSchema();
+    static Schema createProductsSchema();
+    static Schema createComplexSchema();
+    static Schema createGenericSchema(const std::string& table_name, size_t column_count);
+    static Schema createDynamicSchema(const std::string& table_name,
+                                      const std::vector<std::string>& column_names,
+                                      const std::map<std::string, DataTypeId>& inferred_types);
 
     // Default column types for common column names
     static std::map<std::string, DataTypeId> getDefaultColumnTypes();

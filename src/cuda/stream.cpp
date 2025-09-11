@@ -1,5 +1,6 @@
 #include "cuda/stream.hpp"
 
+#include "cuda/event.hpp"
 #include "cuda/helper.hpp"
 
 namespace velodb {
@@ -44,7 +45,7 @@ CudaStream& CudaStream::operator=(CudaStream&& other) noexcept
 
 Result<void> CudaStream::synchronize()
 {
-    if (!is_valid()) {
+    if (!isValid()) {
         return Result<void>::failure("Invalid CUDA stream");
     }
 
@@ -55,7 +56,7 @@ Result<void> CudaStream::synchronize()
 
 Result<void> CudaStream::recordEvent(cudaEvent_t event)
 {
-    if (!is_valid()) {
+    if (!isValid()) {
         return Result<void>::failure("Invalid CUDA stream");
     }
 
@@ -64,13 +65,43 @@ Result<void> CudaStream::recordEvent(cudaEvent_t event)
     return Result<void>::success();
 }
 
+Result<void> CudaStream::recordEvent(CudaEvent& event)
+{
+    if (!isValid()) {
+        return Result<void>::failure("Invalid CUDA stream");
+    }
+
+    if (!event.isValid()) {
+        return Result<void>::failure("Invalid CUDA event");
+    }
+
+    CHECKED_CALL(cudaEventRecord(event.get(), stream_));
+
+    return Result<void>::success();
+}
+
 Result<void> CudaStream::waitEvent(cudaEvent_t event)
 {
-    if (!is_valid()) {
+    if (!isValid()) {
         return Result<void>::failure("Invalid CUDA stream");
     }
 
     CHECKED_CALL(cudaStreamWaitEvent(stream_, event, 0));
+
+    return Result<void>::success();
+}
+
+Result<void> CudaStream::waitEvent(const CudaEvent& event)
+{
+    if (!isValid()) {
+        return Result<void>::failure("Invalid CUDA stream");
+    }
+
+    if (!event.isValid()) {
+        return Result<void>::failure("Invalid CUDA event");
+    }
+
+    CHECKED_CALL(cudaStreamWaitEvent(stream_, event.get(), 0));
 
     return Result<void>::success();
 }
@@ -85,6 +116,12 @@ CudaStream& CudaStream::getD2HStream()
 {
     static CudaStream d2h_stream(cudaStreamNonBlocking);
     return d2h_stream;
+}
+
+CudaStream& CudaStream::getDummyStream()
+{
+    static CudaStream dummy_stream(cudaStreamNonBlocking);
+    return dummy_stream;
 }
 
 } // namespace velodb

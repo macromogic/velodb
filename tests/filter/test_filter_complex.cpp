@@ -2,6 +2,7 @@
 #include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
+#include "catalog/table_builder.hpp"
 #include "data/data_type.hpp"
 #include "execution/execution_engine.hpp"
 
@@ -12,111 +13,106 @@
 using namespace velodb;
 
 class FilterComplexTest : public test::VeloDBTest {
+public:
+    FilterComplexTest()
+        : catalog_()
+        , engine_(catalog_)
+    {
+    }
+
 protected:
     void SetUp() override
     {
         test::VeloDBTest::SetUp();
-        catalog_ = std::make_unique<Catalog>();
-        engine_ = std::make_unique<ExecutionEngine>(*catalog_);
 
         createTestTable();
-        loadTestData();
     }
 
-    void TearDown() override
-    {
-        catalog_.reset();
-        engine_.reset();
-    }
+    void TearDown() override { }
 
     void createTestTable()
     {
         // Complex table with various data types and potential edge cases
-        auto schema = std::make_unique<Schema>();
-        schema->addColumnInfo({ "id", std::make_unique<IntegerType>() });
-        schema->addColumnInfo({ "score", std::make_unique<DoubleType>() });
-        schema->addColumnInfo({ "category", std::make_unique<VarcharType>(50) });
-        schema->addColumnInfo({ "tag", std::make_unique<VarcharType>(20) });
-        schema->addColumnInfo({ "active", std::make_unique<BooleanType>() });
-        schema->addColumnInfo({ "priority", std::make_unique<IntegerType>() });
+        auto schema = Schema();
+        schema.addColumnInfo({ "id", std::make_unique<IntegerType>() });
+        schema.addColumnInfo({ "score", std::make_unique<DoubleType>() });
+        schema.addColumnInfo({ "category", std::make_unique<VarcharType>(50) });
+        schema.addColumnInfo({ "tag", std::make_unique<VarcharType>(20) });
+        schema.addColumnInfo({ "active", std::make_unique<BooleanType>() });
+        schema.addColumnInfo({ "priority", std::make_unique<IntegerType>() });
 
-        catalog_->createTable("test_data", std::move(schema));
+        auto builder = TableBuilder("test_data", std::move(schema));
 
-        TableBase& table = catalog_->getTable("test_data").value();
-        test_table_ = static_cast<Table*>(&table);
-    }
-
-    void loadTestData()
-    {
         // Record 1: High priority, active
-        test_table_->insertRow({ Value::createInteger(1),
-                                 Value::createDouble(95.5),
-                                 Value::createString("Premium"),
-                                 Value::createString("VIP"),
-                                 Value::createBoolean(true),
-                                 Value::createInteger(1) });
+        builder.insertRow({ Value::createInteger(1),
+                            Value::createDouble(95.5),
+                            Value::createString("Premium"),
+                            Value::createString("VIP"),
+                            Value::createBoolean(true),
+                            Value::createInteger(1) });
 
         // Record 2: Medium score, standard category
-        test_table_->insertRow({ Value::createInteger(2),
-                                 Value::createDouble(75.0),
-                                 Value::createString("Standard"),
-                                 Value::createString("Regular"),
-                                 Value::createBoolean(true),
-                                 Value::createInteger(2) });
+        builder.insertRow({ Value::createInteger(2),
+                            Value::createDouble(75.0),
+                            Value::createString("Standard"),
+                            Value::createString("Regular"),
+                            Value::createBoolean(true),
+                            Value::createInteger(2) });
 
         // Record 3: Low score, inactive
-        test_table_->insertRow({ Value::createInteger(3),
-                                 Value::createDouble(45.2),
-                                 Value::createString("Basic"),
-                                 Value::createString("Regular"),
-                                 Value::createBoolean(false),
-                                 Value::createInteger(3) });
+        builder.insertRow({ Value::createInteger(3),
+                            Value::createDouble(45.2),
+                            Value::createString("Basic"),
+                            Value::createString("Regular"),
+                            Value::createBoolean(false),
+                            Value::createInteger(3) });
 
         // Record 4: Edge case - exact boundary values
-        test_table_->insertRow({ Value::createInteger(4),
-                                 Value::createDouble(80.0),
-                                 Value::createString("Premium"),
-                                 Value::createString("Special"),
-                                 Value::createBoolean(true),
-                                 Value::createInteger(1) });
+        builder.insertRow({ Value::createInteger(4),
+                            Value::createDouble(80.0),
+                            Value::createString("Premium"),
+                            Value::createString("Special"),
+                            Value::createBoolean(true),
+                            Value::createInteger(1) });
 
         // Record 5: Another boundary case
-        test_table_->insertRow({ Value::createInteger(5),
-                                 Value::createDouble(80.0),
-                                 Value::createString("Standard"),
-                                 Value::createString("VIP"),
-                                 Value::createBoolean(false),
-                                 Value::createInteger(2) });
+        builder.insertRow({ Value::createInteger(5),
+                            Value::createDouble(80.0),
+                            Value::createString("Standard"),
+                            Value::createString("VIP"),
+                            Value::createBoolean(false),
+                            Value::createInteger(2) });
 
         // Record 6: High score, low priority
-        test_table_->insertRow({ Value::createInteger(6),
-                                 Value::createDouble(92.7),
-                                 Value::createString("Basic"),
-                                 Value::createString("Regular"),
-                                 Value::createBoolean(true),
-                                 Value::createInteger(3) });
+        builder.insertRow({ Value::createInteger(6),
+                            Value::createDouble(92.7),
+                            Value::createString("Basic"),
+                            Value::createString("Regular"),
+                            Value::createBoolean(true),
+                            Value::createInteger(3) });
 
         // Record 7: Minimum values
-        test_table_->insertRow({ Value::createInteger(7),
-                                 Value::createDouble(0.0),
-                                 Value::createString("Basic"),
-                                 Value::createString("Regular"),
-                                 Value::createBoolean(false),
-                                 Value::createInteger(3) });
+        builder.insertRow({ Value::createInteger(7),
+                            Value::createDouble(0.0),
+                            Value::createString("Basic"),
+                            Value::createString("Regular"),
+                            Value::createBoolean(false),
+                            Value::createInteger(3) });
 
         // Record 8: Maximum-like values
-        test_table_->insertRow({ Value::createInteger(8),
-                                 Value::createDouble(100.0),
-                                 Value::createString("Premium"),
-                                 Value::createString("VIP"),
-                                 Value::createBoolean(true),
-                                 Value::createInteger(1) });
+        builder.insertRow({ Value::createInteger(8),
+                            Value::createDouble(100.0),
+                            Value::createString("Premium"),
+                            Value::createString("VIP"),
+                            Value::createBoolean(true),
+                            Value::createInteger(1) });
+
+        catalog_.addTable(std::move(builder).build());
     }
 
 protected:
-    std::unique_ptr<Catalog> catalog_;
-    std::unique_ptr<ExecutionEngine> engine_;
-    Table* test_table_;
+    Catalog catalog_;
+    ExecutionEngine engine_;
 };
 
 // === BOUNDARY VALUE TESTS ===
@@ -124,7 +120,7 @@ protected:
 TEST_F(FilterComplexTest, BoundaryValueEquals)
 {
     std::string sql = "SELECT * FROM test_data WHERE score = 80.0";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -138,7 +134,7 @@ TEST_F(FilterComplexTest, BoundaryValueEquals)
 TEST_F(FilterComplexTest, BoundaryValueRange)
 {
     std::string sql = "SELECT * FROM test_data WHERE score >= 80.0 AND score <= 95.0";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -154,7 +150,7 @@ TEST_F(FilterComplexTest, BoundaryValueRange)
 TEST_F(FilterComplexTest, MinMaxValues)
 {
     std::string sql = "SELECT * FROM test_data WHERE score = 0.0 OR score = 100.0";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -173,7 +169,7 @@ TEST_F(FilterComplexTest, MultiColumnComplexFilter)
     std::string sql = "SELECT * FROM test_data WHERE (category = 'Premium' AND "
                       "score > 90.0) OR (category = 'Standard' "
                       "AND active = true AND priority <= 2)";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -196,7 +192,7 @@ TEST_F(FilterComplexTest, ThreeWayLogicalCombination)
     std::string sql = "SELECT * FROM test_data WHERE (priority = 1 AND active "
                       "= true) OR (category = 'Standard' AND "
                       "score >= 75.0) OR (tag = 'Special' AND score >= 80.0)";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -224,7 +220,7 @@ TEST_F(FilterComplexTest, NotEqualsWithMultipleValues)
 {
     std::string sql = "SELECT * FROM test_data WHERE category != 'Basic' AND "
                       "tag != 'Regular'";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -240,7 +236,7 @@ TEST_F(FilterComplexTest, ComplexNegationLogic)
 {
     std::string sql = "SELECT * FROM test_data WHERE NOT (category = 'Basic' "
                       "OR priority = 3) AND active = true";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -262,14 +258,14 @@ TEST_F(FilterComplexTest, MultipleRangeConditions)
 {
     std::string sql = "SELECT * FROM test_data WHERE score BETWEEN 75.0 AND "
                       "95.0 AND priority BETWEEN 1 AND 2";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     // This would work if BETWEEN is implemented, otherwise we test the
     // equivalent Let's use the equivalent for now
     std::string equivalent_sql = "SELECT * FROM test_data WHERE score >= 75.0 AND score <= 95.0 AND "
                                  "priority >= 1 AND priority <= 2";
-    result = engine_->executeQuery(equivalent_sql);
+    result = engine_.executeQuery(equivalent_sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -290,7 +286,7 @@ TEST_F(FilterComplexTest, StringPatternCombinations)
     std::string sql = "SELECT * FROM test_data WHERE (category = 'Premium' OR "
                       "category = 'Standard') AND (tag = 'VIP' "
                       "OR tag = 'Special')";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -311,7 +307,7 @@ TEST_F(FilterComplexTest, StringPatternCombinations)
 TEST_F(FilterComplexTest, EmptyResultSet)
 {
     std::string sql = "SELECT * FROM test_data WHERE category = 'NonExistent'";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -321,7 +317,7 @@ TEST_F(FilterComplexTest, EmptyResultSet)
 TEST_F(FilterComplexTest, AllRecordsMatch)
 {
     std::string sql = "SELECT * FROM test_data WHERE id > 0";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -331,7 +327,7 @@ TEST_F(FilterComplexTest, AllRecordsMatch)
 TEST_F(FilterComplexTest, ContradictoryConditions)
 {
     std::string sql = "SELECT * FROM test_data WHERE score > 100.0 AND score < 50.0";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -344,7 +340,7 @@ TEST_F(FilterComplexTest, ComplexProjectionWithFilter)
 {
     std::string sql = "SELECT id, category, score FROM test_data WHERE (score "
                       "> 90.0 OR priority = 1) AND active = true";
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -365,12 +361,12 @@ TEST_F(FilterComplexTest, SelectiveProjectionComplexFilter)
                       "'Premium' AND score >= 95.0) OR (category "
                       "= 'Basic' AND score <= 50.0)) AND priority IN (1, 3)";
 
-    // FIXME: Since IN might not be implemented, use equivalent
+    // TODO: Since IN might not be implemented, use equivalent
     std::string equivalent_sql = "SELECT tag, active FROM test_data WHERE "
                                  "((category = 'Premium' AND score >= 95.0) OR "
                                  "(category = 'Basic' AND score <= 50.0)) AND "
                                  "(priority = 1 OR priority = 3)";
-    auto result = engine_->executeQuery(equivalent_sql);
+    auto result = engine_.executeQuery(equivalent_sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();
@@ -398,7 +394,7 @@ TEST_F(FilterComplexTest, VeryComplexCondition)
         AND (priority = 1 OR priority = 2 OR (priority = 3 AND active = true))
     )";
 
-    auto result = engine_->executeQuery(sql);
+    auto result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(result));
     auto& view = result.value();

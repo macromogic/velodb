@@ -4,7 +4,7 @@
 #include "common/fmt.hpp"
 #include "common/result.hpp"
 #include "execution/execution_engine.hpp"
-#include "expression/expression.hpp"
+#include "expression/column_ref_expression.hpp"
 #include "operator/seq_scan_operator.hpp"
 
 #include <fmt/format.h>
@@ -13,52 +13,50 @@ namespace velodb {
 
 // ProjectionOperator implementation
 ProjectionOperator::ProjectionOperator(ExecutionContext& context,
-                                       std::unique_ptr<Schema> output_schema,
+                                       Schema input_schema,
+                                       Schema output_schema,
                                        std::unique_ptr<AbstractOperator> child,
                                        std::vector<std::unique_ptr<AbstractExpression>> expressions)
     : UnaryOperator(context, std::move(output_schema), std::move(child))
+    , input_schema_(std::move(input_schema))
     , expressions_(std::move(expressions))
 {
 }
 
-Result<View> ProjectionOperator::next()
+Result<RowBatch> ProjectionOperator::next()
 {
     auto* child = getChild();
     if (!child) {
-        return Result<View>::failure("ProjectionOperator requires a child operator");
+        return Result<RowBatch>::failure("ProjectionOperator requires a child operator");
     }
     auto child_result = child->next();
     if (!child_result) {
         return child_result; // Propagate error from child
     }
-    auto& child_view = child_result.value();
-    if (child_view.getRowCount() == 0) {
+    auto& child_batch = child_result.value();
+    if (child_batch.getRowCount() == 0) {
         return child_result; // No rows to process
     }
 
-    View view("projection_result");
-    ViewTuple dummy_tuple(child_view, 0);
-    size_t output_columns = output_schema_->getColumnCount();
     if (expressions_.empty()) {
-        for (size_t i = 0; i < output_columns; ++i) {
-            const auto& column_info = output_schema_->getColumnInfo(i);
-            view.addColumn(child_view.getColumn(column_info.getName()).viewAs(column_info.getName()));
-        }
+        // TODO: exclude $_rowid and $_mask
+        return child_result;
     } else {
-        for (size_t i = 0; i < output_columns; ++i) {
-            const auto& expr = expressions_[i];
-            const auto& column_info = output_schema_->getColumnInfo(i);
+        RowBatch batch;
+        ViewTuple dummy_tuple(child_batch, 0);
+        size_t batch_size = child_batch.getRowCount();
+        for (const auto& expr : expressions_) {
             switch (expr->getExpressionType()) {
             case ExpressionType::COLUMN_REF: {
                 const auto* column_ref = static_cast<ColumnRefExpression*>(expr.get());
-                view.addColumn(child_view.getColumn(column_ref->getColumnName()).viewAs(column_info.getName()));
+                auto column_index = input_schema_.getColumnIndex(column_ref->getColumnName());
+                batch.addColumn(child_batch.getColumn(column_index).tryOwn());
                 break;
             }
             case ExpressionType::CONSTANT: {
-                ValueColumn& constant_col = context_.createTemporaryColumn(column_info.getName(),
-                                                                           expr->getReturnType().cloneUnique());
-                constant_col.fill(expr->evaluate(dummy_tuple, child_view.getSchema()), child_view.getRowCount());
-                view.addColumn(constant_col.view());
+                // TODO: faster way to create constant column
+                auto values = std::vector<Value>(batch_size, expr->evaluate(dummy_tuple, getOutputSchema()));
+                batch.addColumn(Column::buildFrom(expr->getReturnType().cloneUnique(), std::move(values)));
                 break;
             }
             default:
@@ -66,9 +64,8 @@ Result<View> ProjectionOperator::next()
                 break;
             }
         }
+        return Result<RowBatch>::success(std::move(batch));
     }
-
-    return Result<View>::success(std::move(view));
 }
 
 } // namespace velodb

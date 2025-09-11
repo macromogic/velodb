@@ -1,21 +1,11 @@
 #pragma once
 
 #include "data/data_type.hpp"
-#include "data/fixed_string.hpp"
+#include "data/ordinal_string.hpp"
 
 namespace velodb {
 
-#define LIST_DTYPES(X)                                                                                                 \
-    X(BOOLEAN, uint8_t)                                                                                                \
-    X(TINYINT, int8_t)                                                                                                 \
-    X(SMALLINT, int16_t)                                                                                               \
-    X(INTEGER, int32_t)                                                                                                \
-    X(BIGINT, int64_t)                                                                                                 \
-    X(FLOAT, float)                                                                                                    \
-    X(DOUBLE, double)                                                                                                  \
-    X(VARCHAR, FixedString)
-
-#define LIST_DVTYPES(X)                                                                                                \
+#define LIST_TYPES(X)                                                                                                  \
     X(BOOLEAN, uint8_t, bool)                                                                                          \
     X(TINYINT, int8_t, int8_t)                                                                                         \
     X(SMALLINT, int16_t, int16_t)                                                                                      \
@@ -23,7 +13,7 @@ namespace velodb {
     X(BIGINT, int64_t, int64_t)                                                                                        \
     X(FLOAT, float, float)                                                                                             \
     X(DOUBLE, double, double)                                                                                          \
-    X(VARCHAR, FixedString, FixedString)
+    X(VARCHAR, size_t, OrdinalString)
 
 // Trait template for data type id
 
@@ -35,7 +25,7 @@ struct TypeIdTraits;
         using DeviceType = DT;                                                                                         \
         using ValueType = VT;                                                                                          \
     };
-LIST_DVTYPES(X)
+LIST_TYPES(X)
 #undef X
 
 template <DataTypeId Id>
@@ -54,7 +44,7 @@ struct DataTypeTraits;
         static inline constexpr DataTypeId id = DataTypeId::name;                                                      \
         using ValueType = VT;                                                                                          \
     };
-LIST_DVTYPES(X)
+LIST_TYPES(X)
 #undef X
 
 template <typename DT>
@@ -73,7 +63,7 @@ struct ValueTypeTraits;
         static inline constexpr DataTypeId id = DataTypeId::name;                                                      \
         using DeviceType = DT;                                                                                         \
     };
-LIST_DVTYPES(X)
+LIST_TYPES(X)
 #undef X
 
 template <typename VT>

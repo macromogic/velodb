@@ -5,23 +5,24 @@
 namespace velodb {
 
 // Arithmetic expression
-class ArithmeticExpression : public AbstractExpression {
+class ArithmeticExpression : public BinaryExpression {
 public:
     ArithmeticExpression(ArithmeticType arith_type,
+                         std::unique_ptr<DataType> return_type,
                          std::unique_ptr<AbstractExpression> left,
                          std::unique_ptr<AbstractExpression> right);
     ~ArithmeticExpression() override = default;
 
-    Value evaluate(const Tuple& tuple, const Schema& schema) const override;
-    std::vector<size_t> getRequiredColumns(const Schema& schema) const override;
+    const Value evaluate(const Tuple& tuple, const Schema& schema) const override;
     std::string toString() const override;
 
     ArithmeticType getArithmeticType() const { return arith_type_; }
 
+protected:
+    std::unique_ptr<AbstractExpression> cloneUniqueImpl() const override;
+
 private:
     ArithmeticType arith_type_;
-    std::unique_ptr<AbstractExpression> left_;
-    std::unique_ptr<AbstractExpression> right_;
 
     static Value computeArithmetic(const Value& left_val, const Value& right_val, ArithmeticType op_type);
 

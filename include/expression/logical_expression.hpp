@@ -6,37 +6,35 @@
 
 namespace velodb {
 
-// Logical expression (AND/OR)
-class BinaryLogicalExpression : public AbstractExpression {
+class BinaryLogicalExpression : public BinaryExpression {
 public:
     BinaryLogicalExpression(ConnectiveType connective_type,
                             std::unique_ptr<AbstractExpression> left,
                             std::unique_ptr<AbstractExpression> right);
     ~BinaryLogicalExpression() override = default;
 
-    Value evaluate(const Tuple& tuple, const Schema& schema) const override;
-    std::vector<size_t> getRequiredColumns(const Schema& schema) const override;
+    const Value evaluate(const Tuple& tuple, const Schema& schema) const override;
     std::string toString() const override;
 
     ConnectiveType getConjunctionType() const { return connective_type_; }
 
+protected:
+    std::unique_ptr<AbstractExpression> cloneUniqueImpl() const override;
+
 private:
     ConnectiveType connective_type_;
-    std::unique_ptr<AbstractExpression> left_;
-    std::unique_ptr<AbstractExpression> right_;
 };
 
-class LogicalNotExpression : public AbstractExpression {
+class LogicalNotExpression : public UnaryExpression {
 public:
     explicit LogicalNotExpression(std::unique_ptr<AbstractExpression> operand);
     ~LogicalNotExpression() override = default;
 
-    Value evaluate(const Tuple& tuple, const Schema& schema) const override;
-    std::vector<size_t> getRequiredColumns(const Schema& schema) const override;
+    const Value evaluate(const Tuple& tuple, const Schema& schema) const override;
     std::string toString() const override;
 
-private:
-    std::unique_ptr<AbstractExpression> operand_;
+protected:
+    std::unique_ptr<AbstractExpression> cloneUniqueImpl() const override;
 };
 
 } // namespace velodb

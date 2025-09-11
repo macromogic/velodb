@@ -2,10 +2,10 @@
 #include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
+#include "catalog/table_builder.hpp"
 #include "catalog/tuple.hpp"
 #include "data/data_type.hpp"
 #include "execution/execution_engine.hpp"
-#include "planner/planner.hpp"
 
 #include <SQLParser.h>
 
@@ -14,13 +14,18 @@
 using namespace velodb;
 
 class WhereClauseTest : public test::VeloDBTest {
+public:
+    WhereClauseTest()
+        : catalog_()
+        , planner_(catalog_)
+        , engine_(catalog_)
+    {
+    }
+
 protected:
     void SetUp() override
     {
         test::VeloDBTest::SetUp();
-        catalog_ = std::make_unique<Catalog>();
-        planner_ = std::make_unique<QueryPlanner>(*catalog_);
-        engine_ = std::make_unique<ExecutionEngine>(*catalog_);
 
         setupTestTables();
     }
@@ -28,46 +33,44 @@ protected:
     void setupTestTables()
     {
         // Create products table with various data types
-        auto products_schema = std::make_unique<Schema>();
-        products_schema->addColumnInfo({ "id", std::make_unique<IntegerType>() });
-        products_schema->addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
-        products_schema->addColumnInfo({ "price", std::make_unique<DoubleType>() });
-        products_schema->addColumnInfo({ "quantity", std::make_unique<IntegerType>() });
-        products_schema->addColumnInfo({ "category", std::make_unique<VarcharType>(50) });
-        products_schema->addColumnInfo({ "in_stock", std::make_unique<BooleanType>() });
+        auto products_schema = Schema();
+        products_schema.addColumnInfo({ "id", std::make_unique<IntegerType>() });
+        products_schema.addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
+        products_schema.addColumnInfo({ "price", std::make_unique<DoubleType>() });
+        products_schema.addColumnInfo({ "quantity", std::make_unique<IntegerType>() });
+        products_schema.addColumnInfo({ "category", std::make_unique<VarcharType>(50) });
+        products_schema.addColumnInfo({ "in_stock", std::make_unique<BooleanType>() });
 
-        catalog_->createTable("products", std::move(products_schema));
-
-        // Insert test data
-        TableBase& table = catalog_->getTable("products").value();
-        Table* concrete_table = static_cast<Table*>(&table);
+        auto builder = TableBuilder("products", std::move(products_schema));
 
         // Product 1: Laptop, 999.99, 10, Electronics, in_stock=1
-        insertProduct(concrete_table, 1, "Laptop", 999.99, 10, "Electronics", true);
+        insertProduct(builder, 1, "Laptop", 999.99, 10, "Electronics", true);
 
         // Product 2: Mouse, 25.50, 50, Electronics, in_stock=1
-        insertProduct(concrete_table, 2, "Mouse", 25.50, 50, "Electronics", true);
+        insertProduct(builder, 2, "Mouse", 25.50, 50, "Electronics", true);
 
         // Product 3: Desk, 199.99, 5, Furniture, in_stock=1
-        insertProduct(concrete_table, 3, "Desk", 199.99, 5, "Furniture", true);
+        insertProduct(builder, 3, "Desk", 199.99, 5, "Furniture", true);
 
         // Product 4: Chair, 89.99, 0, Furniture, in_stock=0
-        insertProduct(concrete_table, 4, "Chair", 89.99, 0, "Furniture", false);
+        insertProduct(builder, 4, "Chair", 89.99, 0, "Furniture", false);
 
         // Product 5: Keyboard, 75.00, 25, Electronics, in_stock=1
-        insertProduct(concrete_table, 5, "Keyboard", 75.00, 25, "Electronics", true);
+        insertProduct(builder, 5, "Keyboard", 75.00, 25, "Electronics", true);
 
         // Product 6: Book, 15.99, 100, Books, in_stock=1
-        insertProduct(concrete_table, 6, "Book", 15.99, 100, "Books", true);
+        insertProduct(builder, 6, "Book", 15.99, 100, "Books", true);
 
         // Product 7: Pen, 2.50, 200, Stationery, in_stock=1
-        insertProduct(concrete_table, 7, "Pen", 2.50, 200, "Stationery", true);
+        insertProduct(builder, 7, "Pen", 2.50, 200, "Stationery", true);
 
         // Product 8: Monitor, 299.99, 0, Electronics, in_stock=0
-        insertProduct(concrete_table, 8, "Monitor", 299.99, 0, "Electronics", false);
+        insertProduct(builder, 8, "Monitor", 299.99, 0, "Electronics", false);
+
+        catalog_.addTable(std::move(builder).build());
     }
 
-    void insertProduct(Table* table,
+    void insertProduct(TableBuilder& builder,
                        int id,
                        const std::string& name,
                        double price,
@@ -83,12 +86,12 @@ protected:
         values.push_back(Value::createString(category));
         values.push_back(Value::createBoolean(in_stock));
 
-        table->insertRow(values);
+        builder.insertRow(values);
     }
 
-    std::unique_ptr<Catalog> catalog_;
-    std::unique_ptr<QueryPlanner> planner_;
-    std::unique_ptr<ExecutionEngine> engine_;
+    Catalog catalog_;
+    QueryPlanner planner_;
+    ExecutionEngine engine_;
 };
 
 // === NUMERIC RANGE TESTS ===
@@ -97,7 +100,7 @@ TEST_F(WhereClauseTest, PriceRangeQueries)
 {
     // Test expensive items
     std::string sql = "SELECT * FROM products WHERE price > 100.0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -112,7 +115,7 @@ TEST_F(WhereClauseTest, PriceBetweenRange)
 {
     // Test products in medium price range
     std::string sql = "SELECT * FROM products WHERE price >= 20.0 AND price <= 100.0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -129,7 +132,7 @@ TEST_F(WhereClauseTest, QuantityBasedFiltering)
 {
     // Test low stock items
     std::string sql = "SELECT * FROM products WHERE quantity <= 10";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -147,7 +150,7 @@ TEST_F(WhereClauseTest, CategoryFiltering)
 {
     // Test electronics category
     std::string sql = "SELECT * FROM products WHERE category = 'Electronics'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -163,7 +166,7 @@ TEST_F(WhereClauseTest, MultiCategoryFiltering)
     // Test multiple categories using OR
     std::string sql = "SELECT * FROM products WHERE category = 'Furniture' OR "
                       "category = 'Books'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -181,7 +184,7 @@ TEST_F(WhereClauseTest, InStockFiltering)
 {
     // Test in-stock items
     std::string sql = "SELECT * FROM products WHERE in_stock = true";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -196,7 +199,7 @@ TEST_F(WhereClauseTest, OutOfStockFiltering)
 {
     // Test out-of-stock items
     std::string sql = "SELECT * FROM products WHERE in_stock = false";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -214,7 +217,7 @@ TEST_F(WhereClauseTest, AvailableElectronicsQuery)
     // Test available electronics (in_stock = true AND category = 'Electronics')
     std::string sql = "SELECT * FROM products WHERE in_stock = true AND "
                       "category = 'Electronics'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -230,7 +233,7 @@ TEST_F(WhereClauseTest, LowStockHighValueQuery)
 {
     // Test low stock but high value items
     std::string sql = "SELECT * FROM products WHERE quantity <= 10 AND price > 50.0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -246,7 +249,7 @@ TEST_F(WhereClauseTest, ReorderCandidatesQuery)
 {
     // Test items that need reordering (quantity <= 5 OR in_stock = false)
     std::string sql = "SELECT * FROM products WHERE quantity <= 5 OR in_stock = false";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -265,7 +268,7 @@ TEST_F(WhereClauseTest, NameStartsWith)
 {
     // Test products whose names start with specific letters
     std::string sql = "SELECT * FROM products WHERE name = 'Laptop' OR name = 'Mouse'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -283,7 +286,7 @@ TEST_F(WhereClauseTest, NotElectronicsQuery)
 {
     // Test non-electronics items
     std::string sql = "SELECT * FROM products WHERE category != 'Electronics'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -298,7 +301,7 @@ TEST_F(WhereClauseTest, NotLowPriceQuery)
 {
     // Test items that are not cheap (price > 20)
     std::string sql = "SELECT * FROM products WHERE price > 20.0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -315,7 +318,7 @@ TEST_F(WhereClauseTest, ProjectedExpensiveItems)
 {
     // Test selecting specific columns for expensive items
     std::string sql = "SELECT name, price, category FROM products WHERE price > 100.0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -333,7 +336,7 @@ TEST_F(WhereClauseTest, ProjectedStockStatus)
 {
     // Test selecting name and stock status for electronics
     std::string sql = "SELECT name, in_stock FROM products WHERE category = 'Electronics'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -351,7 +354,7 @@ TEST_F(WhereClauseTest, ExactPriceMatch)
 {
     // Test exact price matching
     std::string sql = "SELECT * FROM products WHERE price = 25.50";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -365,7 +368,7 @@ TEST_F(WhereClauseTest, ZeroQuantityItems)
 {
     // Test items with zero quantity
     std::string sql = "SELECT * FROM products WHERE quantity = 0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -380,7 +383,7 @@ TEST_F(WhereClauseTest, EmptyResultSet)
 {
     // Test query that returns no results
     std::string sql = "SELECT * FROM products WHERE price > 10000.0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -394,7 +397,7 @@ TEST_F(WhereClauseTest, ComplexLogicalAndConditions)
     // Test multiple AND conditions
     std::string sql = "SELECT * FROM products WHERE category = 'Electronics' "
                       "AND price > 50.0 AND in_stock = true";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -412,7 +415,7 @@ TEST_F(WhereClauseTest, ComplexLogicalOrConditions)
     // Test multiple OR conditions
     std::string sql = "SELECT * FROM products WHERE price < 20.0 OR quantity > "
                       "100 OR category = 'Furniture'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -430,7 +433,7 @@ TEST_F(WhereClauseTest, MixedAndOrConditions)
     // Test mixed AND/OR conditions with precedence
     std::string sql = "SELECT * FROM products WHERE (category = 'Electronics' "
                       "OR category = 'Books') AND price < 100.0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -449,7 +452,7 @@ TEST_F(WhereClauseTest, EqualityComparisons)
 {
     // Test exact equality matches
     std::string sql = "SELECT * FROM products WHERE price = 25.50";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -463,7 +466,7 @@ TEST_F(WhereClauseTest, InequalityComparisons)
 {
     // Test not equal operator
     std::string sql = "SELECT * FROM products WHERE category != 'Electronics'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -478,7 +481,7 @@ TEST_F(WhereClauseTest, BoundaryValueTests)
 {
     // Test boundary conditions
     std::string sql = "SELECT * FROM products WHERE quantity = 0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -496,7 +499,7 @@ TEST_F(WhereClauseTest, StringLengthBasedFiltering)
     // Test filtering by string characteristics
     // Note: This uses a workaround since LIKE is not implemented
     std::string sql = "SELECT * FROM products WHERE name = 'Pen'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -511,7 +514,7 @@ TEST_F(WhereClauseTest, MultiColumnComparisons)
 {
     // Test filtering on multiple different column types
     std::string sql = "SELECT * FROM products WHERE id >= 5 AND category = 'Electronics'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -529,7 +532,7 @@ TEST_F(WhereClauseTest, AllRowsMatchFilter)
 {
     // Test query where all rows match the condition
     std::string sql = "SELECT * FROM products WHERE id > 0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -540,7 +543,7 @@ TEST_F(WhereClauseTest, NoRowsMatchFilter)
 {
     // Test query where no rows match the condition
     std::string sql = "SELECT * FROM products WHERE id < 0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -555,7 +558,7 @@ TEST_F(WhereClauseTest, ComplexNestedConditions)
     std::string sql = "SELECT * FROM products WHERE ((category = 'Electronics' "
                       "AND price > 50.0) OR (category = "
                       "'Furniture' AND in_stock = true)) AND quantity > 5";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     // Should match: Laptop (Electronics, price>50, qty=10), Keyboard
@@ -582,7 +585,7 @@ TEST_F(WhereClauseTest, ExactBoundaryValues)
 {
     // Test exact match on boundary values
     std::string sql = "SELECT * FROM products WHERE price = 999.99";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -595,7 +598,7 @@ TEST_F(WhereClauseTest, ZeroQuantityFilter)
 {
     // Test filtering for zero quantity items
     std::string sql = "SELECT * FROM products WHERE quantity = 0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -614,7 +617,7 @@ TEST_F(WhereClauseTest, StringEqualityTests)
 {
     // Test exact string matching
     std::string sql = "SELECT * FROM products WHERE name = 'Laptop'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -626,7 +629,7 @@ TEST_F(WhereClauseTest, StringInequalityTests)
 {
     // Test string inequality
     std::string sql = "SELECT * FROM products WHERE name != 'Laptop'";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -644,7 +647,7 @@ TEST_F(WhereClauseTest, ThreeConditionAND)
     // Test three conditions with AND
     std::string sql = "SELECT * FROM products WHERE category = 'Electronics' "
                       "AND price < 100.0 AND in_stock = true";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -662,7 +665,7 @@ TEST_F(WhereClauseTest, ThreeConditionOR)
     // Test three conditions with OR
     std::string sql = "SELECT * FROM products WHERE category = 'Books' OR "
                       "category = 'Stationery' OR price > 500.0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -681,24 +684,22 @@ TEST_F(WhereClauseTest, ThreeConditionOR)
 TEST_F(WhereClauseTest, SingleRowTable)
 {
     // Create a table with single row and test filtering
-    auto single_schema = std::make_unique<Schema>();
-    single_schema->addColumnInfo({ "id", std::make_unique<IntegerType>() });
-    single_schema->addColumnInfo({ "name", std::make_unique<VarcharType>(50) });
+    auto single_schema = Schema();
+    single_schema.addColumnInfo({ "id", std::make_unique<IntegerType>() });
+    single_schema.addColumnInfo({ "name", std::make_unique<VarcharType>(50) });
 
-    catalog_->createTable("single_item", std::move(single_schema));
-
-    TableBase& table = catalog_->getTable("single_item").value();
-    Table* concrete_table = static_cast<Table*>(&table);
+    auto builder = TableBuilder("single_item", std::move(single_schema));
 
     std::vector<Value> values;
     values.push_back(Value::createInteger(1));
     values.push_back(Value::createString("OnlyItem"));
 
-    concrete_table->insertRow(values);
+    builder.insertRow(values);
+    catalog_.addTable(std::move(builder).build());
 
     // Test matching condition
     std::string sql = "SELECT * FROM single_item WHERE id = 1";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -709,7 +710,7 @@ TEST_F(WhereClauseTest, AllRowsFiltered)
 {
     // Test condition that filters out all rows
     std::string sql = "SELECT * FROM products WHERE price < 0.0";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -722,7 +723,7 @@ TEST_F(WhereClauseTest, FloatingPointPrecision)
 {
     // Test floating point comparisons with precise values
     std::string sql = "SELECT * FROM products WHERE price = 25.50";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -734,7 +735,7 @@ TEST_F(WhereClauseTest, LargeIntegerComparison)
 {
     // Test with large quantity values
     std::string sql = "SELECT * FROM products WHERE quantity >= 100";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     auto& view = query_result.value();
@@ -753,7 +754,7 @@ TEST_F(WhereClauseTest, ComplexBooleanExpression)
     std::string sql = "SELECT * FROM products WHERE (category = 'Electronics' "
                       "OR category = 'Furniture') AND (price > "
                       "20.0 AND price < 1000.0) AND in_stock = true";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     // Should match: Laptop, Mouse, Keyboard, Desk
@@ -776,7 +777,7 @@ TEST_F(WhereClauseTest, NegationWithComplexConditions)
     // Test NOT with complex nested conditions
     std::string sql = "SELECT * FROM products WHERE NOT (category = "
                       "'Electronics' AND price > 100.0)";
-    auto query_result = engine_->executeQuery(sql);
+    auto query_result = engine_.executeQuery(sql);
 
     ASSERT_TRUE(static_cast<bool>(query_result));
     // Should exclude: Laptop (Electronics, price=999.99), Monitor (Electronics,

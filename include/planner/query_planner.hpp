@@ -36,18 +36,24 @@ private:
     // Helper methods for planning
     std::unique_ptr<AbstractPlanNode> planTableRef(const hsql::TableRef* table_ref,
                                                    std::unique_ptr<AbstractExpression> predicate = nullptr);
+    std::unique_ptr<AbstractPlanNode> planJoin(const hsql::TableRef* left_ref,
+                                               const hsql::TableRef* right_ref,
+                                               const hsql::Expr* join_expr);
     std::unique_ptr<AbstractExpression> planExpression(const hsql::TableRef* table_ref, const hsql::Expr* expr);
 
-    // SELECT list planning
     std::vector<std::unique_ptr<AbstractExpression>> planSelectList(const hsql::TableRef* table_ref,
                                                                     const std::vector<hsql::Expr*>* select_list);
-    std::unique_ptr<Schema> inferSeqScanSchema(const Schema& input_schema);
-    std::unique_ptr<Schema> inferProjectionSchema(const std::vector<std::unique_ptr<AbstractExpression>>& expressions,
-                                                  const Schema& input_schema);
+    Schema inferSeqScanSchema(const Table& table);
+    Schema inferProjectionSchema(const std::vector<std::unique_ptr<AbstractExpression>>& expressions,
+                                 const Schema& input_schema);
+    Schema inferJoinSchema(const Table& left_table, const Table& right_table);
 
     // Expression planning helpers
     std::unique_ptr<AbstractExpression> planColumnRef(const hsql::TableRef* table_ref, const hsql::Expr* expr);
     std::unique_ptr<AbstractExpression> planOperator(const hsql::TableRef* table_ref, const hsql::Expr* expr);
+    std::unique_ptr<AbstractExpression> planComparisonOperator(ComparisonType type,
+                                                               std::unique_ptr<AbstractExpression> left,
+                                                               std::unique_ptr<AbstractExpression> right);
 
     Catalog& catalog_;
 };

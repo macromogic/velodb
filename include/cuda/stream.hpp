@@ -6,6 +6,8 @@
 
 namespace velodb {
 
+class CudaEvent; // Forward declaration
+
 class CudaStream {
 public:
     CudaStream();
@@ -19,15 +21,18 @@ public:
     CudaStream& operator=(CudaStream&& other) noexcept;
 
     cudaStream_t get() const { return stream_; }
-    bool is_valid() const { return stream_ != nullptr; }
+    bool isValid() const { return stream_ != nullptr; }
 
     // Stream operations
     Result<void> synchronize();
     Result<void> recordEvent(cudaEvent_t event);
+    Result<void> recordEvent(CudaEvent& event);
     Result<void> waitEvent(cudaEvent_t event);
+    Result<void> waitEvent(const CudaEvent& event);
 
     static CudaStream& getH2DStream();
     static CudaStream& getD2HStream();
+    static CudaStream& getDummyStream();
 
 private:
     cudaStream_t stream_;

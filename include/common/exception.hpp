@@ -94,3 +94,15 @@ public:
 
 #define VELODB_THROW(ExceptionType, message) throw ExceptionType(message)
 #define VELODB_THROW_DEPTH(ExceptionType, message, depth) throw ExceptionType(message, depth)
+#define VELODB_ASSERT(condition)                                                                                       \
+    do {                                                                                                               \
+        if (!(condition)) {                                                                                            \
+            VELODB_THROW(ExecutionError, "Assertion failed: " #condition);                                             \
+        }                                                                                                              \
+    } while (0)
+#define VELODB_ASSERT_MSG(condition, message)                                                                          \
+    do {                                                                                                               \
+        if (!(condition)) {                                                                                            \
+            VELODB_THROW(ExecutionError, "Assertion failed: " #condition ". " message);                                \
+        }                                                                                                              \
+    } while (0)

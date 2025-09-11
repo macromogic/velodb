@@ -1,5 +1,6 @@
 #include "velodb.hpp"
 
+#include "catalog/table_builder.hpp"
 #include "common/fmt.hpp"
 #include "cuda/warmup.hpp"
 
@@ -11,14 +12,13 @@ namespace velodb {
 
 // Database implementation
 Database::Database()
+    : catalog_()
+    , execution_engine_(catalog_)
 {
-    catalog_ = std::make_unique<Catalog>();
-    execution_engine_ = std::make_unique<ExecutionEngine>(*catalog_);
 }
 
 void Database::initialize()
 {
-    // TODO: Implement database initialization
     auto result = runtime_warmup();
     if (!result) {
         throw std::runtime_error(fmt::format("Failed to initialize database: {}", result.error()));
@@ -28,72 +28,29 @@ void Database::initialize()
 
 void Database::shutdown()
 {
-    // TODO: Implement database shutdown
     initialized_ = false;
 }
 
-bool Database::createTable(const std::string& table_name, std::unique_ptr<Schema> schema)
+bool Database::createTable(const std::string& table_name, Schema schema)
 {
     if (!initialized_)
         return false;
-    return catalog_->createTable(table_name, std::move(schema));
-}
-
-bool Database::dropTable(const std::string& table_name)
-{
-    if (!initialized_)
-        return false;
-    return catalog_->dropTable(table_name);
+    auto builder = TableBuilder(table_name, std::move(schema));
+    return catalog_.addTable(std::move(builder).build());
 }
 
 bool Database::hasTable(const std::string& table_name) const
 {
     if (!initialized_)
         return false;
-    return catalog_->hasTable(table_name);
+    return catalog_.hasTable(table_name);
 }
 
-std::optional<std::reference_wrapper<Table>> Database::getTable(const std::string& table_name) const
+std::optional<std::reference_wrapper<const Table>> Database::getTable(const std::string& table_name) const
 {
     if (!initialized_)
         return std::nullopt;
-    return catalog_->getTable(table_name);
-}
-
-bool Database::insertTuple(const std::string& table_name, const Tuple& tuple)
-{
-    if (!initialized_)
-        return false;
-    auto table = catalog_->getTable(table_name);
-    if (!table)
-        return false;
-
-    // Convert tuple to values vector
-    std::vector<Value> values;
-    values.reserve(tuple.getColumnCount());
-    for (size_t i = 0; i < tuple.getColumnCount(); ++i) {
-        values.push_back(tuple.getValue(i));
-    }
-    table->get().insertRow(values);
-    return true;
-}
-
-bool Database::insertTuple(const std::string& table_name, Tuple&& tuple)
-{
-    if (!initialized_)
-        return false;
-    auto table = catalog_->getTable(table_name);
-    if (!table)
-        return false;
-
-    // Convert tuple to values vector
-    std::vector<Value> values;
-    values.reserve(tuple.getColumnCount());
-    for (size_t i = 0; i < tuple.getColumnCount(); ++i) {
-        values.push_back(std::move(const_cast<Tuple&>(tuple).getValue(i)));
-    }
-    table->get().insertRow(std::move(values));
-    return true;
+    return catalog_.getTable(table_name);
 }
 
 Result<QueryResult> Database::executeQuery(const std::string& sql)
@@ -101,21 +58,21 @@ Result<QueryResult> Database::executeQuery(const std::string& sql)
     if (!initialized_) {
         return Result<QueryResult>::failure("Database not initialized");
     }
-    return execution_engine_->executeQuery(sql);
+    return execution_engine_.executeQuery(sql);
 }
 
 size_t Database::getTableCount() const
 {
     if (!initialized_)
         return 0;
-    return catalog_->getTableNames().size();
+    return catalog_.getTableNames().size();
 }
 
 std::vector<std::string> Database::getTableNames() const
 {
     if (!initialized_)
         return {};
-    return catalog_->getTableNames();
+    return catalog_.getTableNames();
 }
 
 std::string Database::getDatabaseInfo() const
@@ -128,7 +85,7 @@ std::string Database::getDatabaseInfo() const
                        "\nCatalog Details:\n"
                        "{}",
                        getTableCount(),
-                       *catalog_);
+                       catalog_);
 }
 
 } // namespace velodb

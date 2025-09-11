@@ -1,5 +1,6 @@
 #include "catalog/tuple.hpp"
 
+#include "catalog/row_batch.hpp"
 #include "catalog/table.hpp"
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
@@ -35,51 +36,54 @@ const Value ValueTuple::getValue(size_t column_index) const
     return values_[column_index];
 }
 
-const Value ValueTuple::getValue(const std::string& column_name) const
-{
-    size_t const index = schema_.get().getColumnIndex(column_name);
-    return values_[index];
-}
+// const Value ValueTuple::getValue(const std::string& column_name) const
+// {
+//     size_t const index = schema_.get().getColumnIndex(column_name);
+//     return values_[index];
+// }
 
 std::string ValueTuple::toString() const
 {
     return fmt::format("({})", fmt::join(values_, ", "));
 }
 
-ViewTuple::ViewTuple(const TableBase& table, size_t row_id)
-    : table_(table)
+ViewTuple::ViewTuple(const RowBatch& batch, size_t row_id)
+    : batch_(&batch)
     , row_id_(row_id)
 {
+    if (batch_ == nullptr) {
+        VELODB_THROW(CatalogError, "Batch pointer is null");
+    }
 }
 
 bool ViewTuple::operator==(const ViewTuple& other) const
 {
-    return &table_.get() == &other.table_.get() && row_id_ == other.row_id_;
+    return batch_ == other.batch_ && row_id_ == other.row_id_;
 }
 
 const Value ViewTuple::getValue(size_t column_index) const
 {
-    if (column_index >= table_.get().getSchema().getColumnCount()) {
+    if (column_index >= batch_->getColumnCount()) {
         VELODB_THROW(CatalogError, "Column index out of range");
     }
-    return table_.get().getValue(row_id_, column_index);
+    return batch_->getValue(row_id_, column_index);
 }
 
-const Value ViewTuple::getValue(const std::string& column_name) const
-{
-    size_t const index = table_.get().getSchema().getColumnIndex(column_name);
-    return getValue(index);
-}
+// const Value ViewTuple::getValue(const std::string& column_name) const
+// {
+//     size_t const index = batch_.get().getSchema().getColumnIndex(column_name);
+//     return getValue(index);
+// }
 
 size_t ViewTuple::getColumnCount() const
 {
-    return table_.get().getSchema().getColumnCount();
+    return batch_->getColumnCount();
 }
 
 std::string ViewTuple::toString() const
 {
     std::string result = "(";
-    for (size_t i = 0; i < table_.get().getSchema().getColumnCount(); ++i) {
+    for (size_t i = 0; i < getColumnCount(); ++i) {
         if (i > 0)
             result += ", ";
         result += getValue(i).toString();
@@ -88,9 +92,9 @@ std::string ViewTuple::toString() const
     return result;
 }
 
-void ViewTuple::setTable(const TableBase& table, size_t row_id)
+void ViewTuple::setBatch(const RowBatch& batch, size_t row_id)
 {
-    table_ = table;
+    batch_ = &batch;
     row_id_ = row_id;
 }
 

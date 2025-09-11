@@ -2,8 +2,16 @@
 #include "catalog/execution_context.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
+#include "catalog/table_builder.hpp"
 #include "data/data_type.hpp"
+#include "expression/arithmetic_expression.hpp"
+#include "expression/cast_expression.hpp"
+#include "expression/column_ref_expression.hpp"
+#include "expression/comparison_expression.hpp"
+#include "expression/constant_expression.hpp"
 #include "expression/expression.hpp"
+#include "expression/function_call_expression.hpp"
+#include "expression/logical_expression.hpp"
 #include "operator/filter_compaction_operator.hpp"
 #include "operator/seq_scan_operator.hpp"
 
@@ -17,24 +25,24 @@ protected:
     {
         test::VeloDBTest::SetUp();
         // Create a test table with sample data
-        auto schema = std::make_unique<Schema>();
-        schema->addColumnInfo({ "id", std::make_unique<IntegerType>() });
-        schema->addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
+        auto schema = Schema();
+        schema.addColumnInfo({ "id", std::make_unique<IntegerType>() });
+        schema.addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
 
-        catalog_ = std::make_unique<Catalog>();
-        catalog_->createTable("test_table", std::move(schema));
-        auto& test_table = catalog_->getTable("test_table").value().get();
+        auto builder = TableBuilder("test_table", std::move(schema));
 
         // Insert some test data using column-based API
         std::vector<Value> values1;
         values1.push_back(Value::createInteger(1));
         values1.push_back(Value::createString("Alice"));
-        test_table.insertRow(values1);
+        builder.insertRow(values1);
 
         std::vector<Value> values2;
         values2.push_back(Value::createInteger(2));
         values2.push_back(Value::createString("Bob"));
-        test_table.insertRow(values2);
+        builder.insertRow(values2);
+
+        catalog_.addTable(std::move(builder).build());
     }
 
     void TearDown() override
@@ -43,18 +51,24 @@ protected:
         // Cleanup code if needed
     }
 
-    std::unique_ptr<Catalog> catalog_; // Mock catalog for operator creation
+    Catalog catalog_; // Mock catalog for operator creation
 };
 
 TEST_F(OperatorTest, SeqScanOperatorCreation)
 {
-    auto& test_table = catalog_->getTable("test_table").value().get();
-    auto context = ExecutionContext(*catalog_);
-    SeqScanOperator scan_op(context, test_table, nullptr);
+    auto table_opt = catalog_.getTable("test_table");
+    auto& test_table = table_opt.value().get();
+    auto schema = test_table.getSchema().clone();
+    schema.addColumnInfo({ "$_rowid", std::make_unique<BigIntType>(), false });
+    schema.addColumnInfo({ "$_mask", std::make_unique<BooleanType>(), false });
+    auto context = ExecutionContext(catalog_);
+    SeqScanOperator scan_op(context, test_table, std::move(schema), nullptr);
 
-    EXPECT_EQ(scan_op.getOutputSchema().getColumnCount(), 2);
+    EXPECT_EQ(scan_op.getOutputSchema().getColumnCount(), 4);
     EXPECT_EQ(scan_op.getOutputSchema().getColumnInfo(0).getName(), "id");
     EXPECT_EQ(scan_op.getOutputSchema().getColumnInfo(1).getName(), "name");
+    EXPECT_EQ(scan_op.getOutputSchema().getColumnInfo(2).getName(), "$_rowid");
+    EXPECT_EQ(scan_op.getOutputSchema().getColumnInfo(3).getName(), "$_mask");
 }
 
 TEST_F(OperatorTest, SeqScanOperatorWithPredicate)
@@ -64,22 +78,27 @@ TEST_F(OperatorTest, SeqScanOperatorWithPredicate)
     auto const_expr = std::make_unique<ConstantExpression>(target_val);
 
     auto int_type = std::make_unique<IntegerType>();
-    auto col_expr = std::make_unique<ColumnRefExpression>("id", std::move(int_type));
+    auto col_expr = std::make_unique<ColumnRefExpression>("test_table", "id", std::move(int_type));
 
     std::unique_ptr<AbstractExpression> predicate = std::make_unique<ComparisonExpression>(ComparisonType::EQUAL,
                                                                                            std::move(col_expr),
                                                                                            std::move(const_expr));
 
-    auto& test_table = catalog_->getTable("test_table").value().get();
-    auto context = ExecutionContext(*catalog_);
-    auto scan_op = std::make_unique<SeqScanOperator>(context, test_table, std::move(predicate));
+    auto table_opt = catalog_.getTable("test_table");
+    auto& test_table = table_opt.value().get();
+    auto context = ExecutionContext(catalog_);
+    auto schema = test_table.getSchema().clone();
+    schema.addColumnInfo({ "$_rowid", std::make_unique<BigIntType>(), false });
+    schema.addColumnInfo({ "$_mask", std::make_unique<BooleanType>(), false });
+    auto scan_op = std::make_unique<SeqScanOperator>(context, test_table, std::move(schema), std::move(predicate));
     auto filter_compaction_op = std::make_unique<FilterCompactionOperator>(context,
-                                                                           scan_op->getOutputSchema().cloneUnique(),
+                                                                           scan_op->getOutputSchema().clone(),
                                                                            std::move(scan_op));
 
     auto view_result = filter_compaction_op->next();
     EXPECT_TRUE(static_cast<bool>(view_result));
     auto view = std::move(view_result.value());
+    view.to(DataLocation::HOST);
 
     // Should only get one tuple (id = 1)
     EXPECT_EQ(view.getRowCount(), 1);

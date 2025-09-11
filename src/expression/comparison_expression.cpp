@@ -3,10 +3,6 @@
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
 
-#include <fmt/format.h>
-
-#include <stdexcept>
-
 namespace velodb {
 
 static auto format_as(ComparisonType comp_type)
@@ -32,26 +28,16 @@ static auto format_as(ComparisonType comp_type)
 ComparisonExpression::ComparisonExpression(ComparisonType comp_type,
                                            std::unique_ptr<AbstractExpression> left,
                                            std::unique_ptr<AbstractExpression> right)
-    : AbstractExpression(ExpressionType::COMPARISON, std::make_unique<BooleanType>())
+    : BinaryExpression(ExpressionType::COMPARISON, std::make_unique<BooleanType>(), std::move(left), std::move(right))
     , comp_type_(comp_type)
-    , left_(std::move(left))
-    , right_(std::move(right))
 {
 }
 
-Value ComparisonExpression::evaluate(const Tuple& tuple, const Schema& schema) const
+const Value ComparisonExpression::evaluate(const Tuple& tuple, const Schema& schema) const
 {
     Value const left_val = left_->evaluate(tuple, schema);
     Value const right_val = right_->evaluate(tuple, schema);
     return compareValues(left_val, right_val);
-}
-
-std::vector<size_t> ComparisonExpression::getRequiredColumns(const Schema& schema) const
-{
-    auto left_cols = left_->getRequiredColumns(schema);
-    auto right_cols = right_->getRequiredColumns(schema);
-    left_cols.insert(left_cols.end(), right_cols.begin(), right_cols.end());
-    return left_cols;
 }
 
 std::string ComparisonExpression::toString() const
@@ -90,6 +76,11 @@ Value ComparisonExpression::compareValues(const Value& left_val, const Value& ri
     }
 
     return Value::createBoolean(result);
+}
+
+std::unique_ptr<AbstractExpression> ComparisonExpression::cloneUniqueImpl() const
+{
+    return std::make_unique<ComparisonExpression>(comp_type_, left_->cloneUnique(), right_->cloneUnique());
 }
 
 } // namespace velodb

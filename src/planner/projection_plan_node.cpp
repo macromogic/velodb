@@ -12,9 +12,11 @@
 namespace velodb {
 
 // ProjectionPlanNode implementation
-ProjectionPlanNode::ProjectionPlanNode(std::unique_ptr<Schema> output_schema,
+ProjectionPlanNode::ProjectionPlanNode(Schema input_schema,
+                                       Schema output_schema,
                                        std::vector<std::unique_ptr<AbstractExpression>> expressions)
     : AbstractPlanNode(PlanType::PROJECTION, std::move(output_schema))
+    , input_schema_(std::move(input_schema))
     , expressions_(std::move(expressions))
 {
 }
@@ -22,14 +24,13 @@ ProjectionPlanNode::ProjectionPlanNode(std::unique_ptr<Schema> output_schema,
 std::unique_ptr<AbstractOperator> ProjectionPlanNode::createOperator(ExecutionContext& context) const
 {
     // Create child operator
-    if (children_.size() != 1) {
-        VELODB_THROW(ExecutionError, "ProjectionPlanNode must have exactly one child");
-    }
+    VELODB_ASSERT_MSG(children_.size() == 1, "ProjectionPlanNode must have exactly one child");
 
     auto child_operator = children_[0]->createOperator(context);
 
     return std::make_unique<ProjectionOperator>(context,
-                                                output_schema_->cloneUnique(),
+                                                input_schema_.clone(),
+                                                output_schema_.clone(),
                                                 std::move(child_operator),
                                                 std::move(expressions_));
 }

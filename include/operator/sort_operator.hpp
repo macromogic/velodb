@@ -14,13 +14,13 @@ class AbstractExpression;
 class SortOperator : public UnaryOperator {
 public:
     SortOperator(ExecutionContext& context,
-                 std::unique_ptr<Schema> output_schema,
+                 Schema output_schema,
                  std::unique_ptr<AbstractOperator> child,
                  std::vector<std::unique_ptr<AbstractExpression>> sort_expressions,
                  std::vector<bool> ascending_flags);
     ~SortOperator() override = default;
 
-    Result<View> next() override;
+    Result<RowBatch> next() override;
 
 private:
     std::vector<std::unique_ptr<AbstractExpression>> sort_expressions_;

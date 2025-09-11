@@ -15,9 +15,11 @@ public:
                            std::unique_ptr<DataType> return_type);
     ~FunctionCallExpression() override = default;
 
-    Value evaluate(const Tuple& tuple, const Schema& schema) const override;
-    std::vector<size_t> getRequiredColumns(const Schema& schema) const override;
+    const Value evaluate(const Tuple& tuple, const Schema& schema) const override;
     std::string toString() const override;
+
+protected:
+    std::unique_ptr<AbstractExpression> cloneUniqueImpl() const override;
 
 private:
     std::string function_name_;

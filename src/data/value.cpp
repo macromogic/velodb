@@ -1,7 +1,7 @@
 #include "data/value.hpp"
 
 #include "common/exception.hpp"
-#include "data/fixed_string.hpp"
+#include "data/ordinal_string.hpp"
 
 #include <fmt/core.h>
 
@@ -95,7 +95,7 @@ std::string Value::getString() const
         VELODB_THROW(TypeError, "Cannot get value from NULL");
     if (type_id_ != DataTypeId::VARCHAR)
         VELODB_THROW(TypeError, "Type mismatch");
-    return std::get<FixedString>(data_).toString();
+    return std::get<OrdinalString>(data_);
 }
 
 bool Value::operator==(const Value& other) const
@@ -170,6 +170,10 @@ std::string Value::toString() const
         return fmt::format("{}", getDouble());
     case DataTypeId::VARCHAR:
         return fmt::format("'{}'", getString());
+        // {
+        //     auto ordinal_str = std::get<OrdinalString>(data_);
+        //     return ordinal_str.toString();
+        // }
     default:
         return "UNKNOWN";
     }
@@ -231,16 +235,26 @@ std::string Value::get<std::string>() const
 }
 
 template <>
-FixedString Value::get<FixedString>() const
+size_t Value::get<size_t>() const
 {
     if (is_null_)
         VELODB_THROW(TypeError, "Cannot get value from NULL");
     if (type_id_ != DataTypeId::VARCHAR)
         VELODB_THROW(TypeError, "Type mismatch");
-    return std::get<FixedString>(data_);
+    return std::get<OrdinalString>(data_).getOrdinal();
 }
 
-const ValueData& Value::getData() const
+template <>
+OrdinalString Value::get<OrdinalString>() const
+{
+    if (is_null_)
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
+    if (type_id_ != DataTypeId::VARCHAR)
+        VELODB_THROW(TypeError, "Type mismatch");
+    return std::get<OrdinalString>(data_);
+}
+
+ValueData& Value::getData()
 {
     if (is_null_)
         VELODB_THROW(TypeError, "Cannot get data from NULL value");
@@ -284,7 +298,7 @@ Value Value::createDouble(double value)
 
 Value Value::createString(const std::string& value)
 {
-    return { DataTypeId::VARCHAR, FixedString(value) };
+    return { DataTypeId::VARCHAR, OrdinalString(value) };
 }
 
 Value Value::createNull(DataTypeId type_id)

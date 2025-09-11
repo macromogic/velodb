@@ -3,11 +3,8 @@
 #include "catalog/catalog.hpp"
 #include "execution/query_result.hpp"
 #include "expression/expression.hpp"
-#include "operator/operator.hpp"
-#include "planner/planner.hpp"
-
-#include <memory>
-#include <vector>
+#include "planner/abstract_plan_node.hpp"
+#include "planner/query_planner.hpp"
 
 // Forward declarations for SQL parser
 namespace hsql {
@@ -37,8 +34,8 @@ private:
     Result<QueryResult> executePlan(std::unique_ptr<AbstractPlanNode> plan);
 
     Catalog& catalog_;
-    std::unique_ptr<QueryPlanner> planner_;
-    std::unique_ptr<ExecutionContext> context_;
+    QueryPlanner planner_;
+    ExecutionContext context_;
 
     size_t last_execution_row_count_ { 0 };
     double last_execution_time_ms_ { 0.0 };

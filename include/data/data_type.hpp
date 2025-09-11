@@ -6,7 +6,6 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
 namespace velodb {
 
@@ -37,6 +36,8 @@ public:
     virtual std::string toString() const = 0;
     virtual bool isFixedSize() const = 0;
     virtual bool isNumeric() const = 0;
+    virtual bool isBoolean() const = 0;
+    virtual bool isString() const = 0;
 
     static std::unique_ptr<DataType> createType(DataTypeId type_id, size_t size = 0);
 
@@ -60,6 +61,8 @@ public:
     std::string toString() const override { return "BOOLEAN"; }
     bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return false; }
+    bool isBoolean() const override { return true; }
+    bool isString() const override { return false; }
 };
 
 class TinyIntType : public DataType {
@@ -71,6 +74,8 @@ public:
     std::string toString() const override { return "TINYINT"; }
     bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
+    bool isBoolean() const override { return false; }
+    bool isString() const override { return false; }
 };
 
 class SmallIntType : public DataType {
@@ -82,6 +87,8 @@ public:
     std::string toString() const override { return "SMALLINT"; }
     bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
+    bool isBoolean() const override { return false; }
+    bool isString() const override { return false; }
 };
 
 class IntegerType : public DataType {
@@ -93,6 +100,8 @@ public:
     std::string toString() const override { return "INTEGER"; }
     bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
+    bool isBoolean() const override { return false; }
+    bool isString() const override { return false; }
 };
 
 class BigIntType : public DataType {
@@ -104,6 +113,8 @@ public:
     std::string toString() const override { return "BIGINT"; }
     bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
+    bool isBoolean() const override { return false; }
+    bool isString() const override { return false; }
 };
 
 class FloatType : public DataType {
@@ -115,6 +126,8 @@ public:
     std::string toString() const override { return "FLOAT"; }
     bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
+    bool isBoolean() const override { return false; }
+    bool isString() const override { return false; }
 };
 
 class DoubleType : public DataType {
@@ -126,6 +139,8 @@ public:
     std::string toString() const override { return "DOUBLE"; }
     bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
+    bool isBoolean() const override { return false; }
+    bool isString() const override { return false; }
 };
 
 class VarcharType : public DataType {
@@ -137,6 +152,8 @@ public:
     std::string toString() const override { return fmt::format("VARCHAR({})", size_); }
     bool isFixedSize() const override { return false; }
     bool isNumeric() const override { return false; }
+    bool isBoolean() const override { return false; }
+    bool isString() const override { return true; }
 };
 
 } // namespace velodb

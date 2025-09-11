@@ -18,6 +18,14 @@ namespace velodb {
         }                                                                                                              \
     } while (0)
 
+#define CHECKED_CALL_T(T, call)                                                                                        \
+    do {                                                                                                               \
+        cudaError_t err = (call);                                                                                      \
+        if (err != cudaSuccess) {                                                                                      \
+            return Result<T>::failure(cudaGetErrorString(err));                                                        \
+        }                                                                                                              \
+    } while (0)
+
 #define CHECKED_CALL_THROW(call)                                                                                       \
     do {                                                                                                               \
         cudaError_t err = (call);                                                                                      \

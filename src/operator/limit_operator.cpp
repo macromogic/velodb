@@ -4,7 +4,7 @@ namespace velodb {
 
 // LimitOperator implementation
 LimitOperator::LimitOperator(ExecutionContext& context,
-                             std::unique_ptr<Schema> output_schema,
+                             Schema output_schema,
                              std::unique_ptr<AbstractOperator> child,
                              size_t limit,
                              size_t offset)
@@ -14,10 +14,10 @@ LimitOperator::LimitOperator(ExecutionContext& context,
 {
 }
 
-Result<View> LimitOperator::next()
+Result<RowBatch> LimitOperator::next()
 {
     // TODO: Implement limit and offset logic
-    return Result<View>::failure("LimitOperator::execute not implemented yet");
+    return Result<RowBatch>::failure("LimitOperator::execute not implemented yet");
 }
 
 } // namespace velodb

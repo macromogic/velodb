@@ -7,7 +7,6 @@
 #include <argparse/argparse.hpp>
 
 #include <iostream>
-#include <memory>
 
 using namespace velodb;
 
@@ -53,14 +52,14 @@ int main(int argc, char* argv[])
         auto catalog = MockCatalogBuilder::createAdaptiveCatalog();
 
         // Ensure tables exist for this query
-        bool success = MockCatalogBuilder::ensureTablesForQuery(*catalog, query);
+        bool success = MockCatalogBuilder::ensureTablesForQuery(catalog, query);
         if (!success) {
             std::cerr << "Failed to create mock tables for query: " << query << std::endl;
             return -1;
         }
 
         if (verbose) {
-            std::cout << "Created " << catalog->getTableCount() << " mock tables for query" << std::endl;
+            std::cout << "Created " << catalog.getTableCount() << " mock tables for query" << std::endl;
         }
 
         // Plan and visualize
@@ -73,7 +72,7 @@ int main(int argc, char* argv[])
         }
 
         if (result.getStatement(0)->type() == hsql::kStmtSelect) {
-            QueryPlanner planner(*catalog);
+            QueryPlanner planner(catalog);
             const auto* select_stmt = static_cast<const hsql::SelectStatement*>(result.getStatement(0));
 
             try {

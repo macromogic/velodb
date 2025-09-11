@@ -13,22 +13,23 @@
 using namespace velodb;
 
 class PlanVisualizationTest : public test::VeloDBTest {
-protected:
-    void SetUp() override
+public:
+    PlanVisualizationTest()
+        : catalog_(MockCatalogBuilder::createSampleCatalog())
+        , planner_(catalog_)
     {
-        test::VeloDBTest::SetUp();
-        // Create mock catalog with sample data
-        catalog_ = MockCatalogBuilder::createSampleCatalog();
-        planner_ = std::make_unique<QueryPlanner>(*catalog_);
     }
+
+protected:
+    void SetUp() override { test::VeloDBTest::SetUp(); }
 
     void TearDown() override
     {
         // Cleanup
     }
 
-    std::unique_ptr<Catalog> catalog_;
-    std::unique_ptr<QueryPlanner> planner_;
+    Catalog catalog_;
+    QueryPlanner planner_;
 };
 
 TEST_F(PlanVisualizationTest, TextVisualizationSimpleSelect)
@@ -44,7 +45,7 @@ TEST_F(PlanVisualizationTest, TextVisualizationSimpleSelect)
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_.planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
 
     // Test text visualization
@@ -70,7 +71,7 @@ TEST_F(PlanVisualizationTest, TextVisualizationSelectWithWhere)
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_.planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
 
     // Test text visualization
@@ -95,7 +96,7 @@ TEST_F(PlanVisualizationTest, TextVisualizationSelectWithProjection)
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_.planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
 
     // Test text visualization
@@ -119,7 +120,7 @@ TEST_F(PlanVisualizationTest, GraphvizVisualizationSimpleSelect)
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_.planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
 
     // Test Graphviz visualization
@@ -146,7 +147,7 @@ TEST_F(PlanVisualizationTest, GraphvizVisualizationComplexQuery)
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_.planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
 
     // Test Graphviz visualization
@@ -181,7 +182,7 @@ TEST_F(PlanVisualizationTest, DetailedVisualizationSimpleSelect)
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_.planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
 
     // Test detailed visualization
@@ -208,7 +209,7 @@ TEST_F(PlanVisualizationTest, CompareAllVisualizationFormats)
     const hsql::SQLStatement* stmt = result.getStatement(0);
     const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
 
-    auto plan = planner_->planSelect(select_stmt);
+    auto plan = planner_.planSelect(select_stmt);
     ASSERT_NE(plan, nullptr);
 
     std::cout << "\n=== COMPARISON OF ALL FORMATS ===\n";
@@ -236,7 +237,7 @@ TEST_F(PlanVisualizationTest, VisualizeDifferentTables)
     hsql::SQLParser::parse(sql1, &result1);
     if (result1.isValid()) {
         const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result1.getStatement(0));
-        auto plan = planner_->planSelect(select_stmt);
+        auto plan = planner_.planSelect(select_stmt);
         std::cout << "\n--- USERS TABLE ---\n";
         std::cout << PlanVisualizer::visualizeAsText(plan);
     }
@@ -247,7 +248,7 @@ TEST_F(PlanVisualizationTest, VisualizeDifferentTables)
     hsql::SQLParser::parse(sql2, &result2);
     if (result2.isValid()) {
         const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result2.getStatement(0));
-        auto plan = planner_->planSelect(select_stmt);
+        auto plan = planner_.planSelect(select_stmt);
         std::cout << "\n--- ORDERS TABLE ---\n";
         std::cout << PlanVisualizer::visualizeAsText(plan);
     }
@@ -258,7 +259,7 @@ TEST_F(PlanVisualizationTest, VisualizeDifferentTables)
     hsql::SQLParser::parse(sql3, &result3);
     if (result3.isValid()) {
         const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(result3.getStatement(0));
-        auto plan = planner_->planSelect(select_stmt);
+        auto plan = planner_.planSelect(select_stmt);
         std::cout << "\n--- PRODUCTS TABLE ---\n";
         std::cout << PlanVisualizer::visualizeAsText(plan);
     }

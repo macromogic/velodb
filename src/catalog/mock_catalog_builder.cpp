@@ -1,6 +1,7 @@
 #include "catalog/mock_catalog_builder.hpp"
 
 #include "catalog/column.hpp"
+#include "catalog/table_builder.hpp"
 #include "data/data_type.hpp"
 
 #include <SQLParser.h>
@@ -12,120 +13,116 @@
 
 namespace velodb {
 
-std::unique_ptr<Catalog> MockCatalogBuilder::createSampleCatalog()
+Catalog MockCatalogBuilder::createSampleCatalog()
 {
-    auto catalog = std::make_unique<Catalog>();
-
-    // Add various sample tables
-    createUsersTable(*catalog);
-    createOrdersTable(*catalog);
-    createProductsTable(*catalog);
-    createComplexTable(*catalog);
-
-    // Populate with sample data (when implemented)
-    // populateSampleData(*catalog);
-
+    Catalog catalog;
+    // Populate with sample data
+    populateSampleData(catalog);
     return catalog;
 }
 
 void MockCatalogBuilder::createUsersTable(Catalog& catalog)
 {
     auto schema = createUsersSchema();
-    catalog.createTable("users", std::move(schema));
+    auto builder = TableBuilder("users", std::move(schema));
+    catalog.addTable(std::move(builder).build());
 }
 
 void MockCatalogBuilder::createOrdersTable(Catalog& catalog)
 {
     auto schema = createOrdersSchema();
-    catalog.createTable("orders", std::move(schema));
+    auto builder = TableBuilder("orders", std::move(schema));
+    catalog.addTable(std::move(builder).build());
 }
 
 void MockCatalogBuilder::createProductsTable(Catalog& catalog)
 {
     auto schema = createProductsSchema();
-    catalog.createTable("products", std::move(schema));
+    auto builder = TableBuilder("products", std::move(schema));
+    catalog.addTable(std::move(builder).build());
 }
 
 void MockCatalogBuilder::createComplexTable(Catalog& catalog)
 {
     auto schema = createComplexSchema();
-    catalog.createTable("complex_table", std::move(schema));
+    auto builder = TableBuilder("complex_table", std::move(schema));
+    catalog.addTable(std::move(builder).build());
 }
 
 void MockCatalogBuilder::populateSampleData(Catalog& catalog)
 {
-    // TODO: Implement sample data population
-    // This would add actual rows to the tables for testing
-    // For now, we just have schema definitions
-    (void)catalog; // Suppress unused parameter warning
+    // Add various sample tables
+    createUsersTable(catalog);
+    createOrdersTable(catalog);
+    createProductsTable(catalog);
+    createComplexTable(catalog);
 }
 
 // Private helper methods for schema creation
-std::unique_ptr<Schema> MockCatalogBuilder::createUsersSchema()
+Schema MockCatalogBuilder::createUsersSchema()
 {
-    auto schema = std::make_unique<Schema>();
+    Schema schema;
 
     // Add columns for users table
-    schema->addColumnInfo({ "id", std::make_unique<IntegerType>(), false }); // NOT NULL
-    schema->addColumnInfo({ "name", std::make_unique<VarcharType>(100), false });
-    schema->addColumnInfo({ "email", std::make_unique<VarcharType>(255), false });
-    schema->addColumnInfo({ "age", std::make_unique<IntegerType>(), true }); // Nullable
-    schema->addColumnInfo({ "salary", std::make_unique<DoubleType>(), true });
+    schema.addColumnInfo({ "id", std::make_unique<IntegerType>(), false }); // NOT NULL
+    schema.addColumnInfo({ "name", std::make_unique<VarcharType>(100), false });
+    schema.addColumnInfo({ "email", std::make_unique<VarcharType>(255), false });
+    schema.addColumnInfo({ "age", std::make_unique<IntegerType>(), true }); // Nullable
+    schema.addColumnInfo({ "salary", std::make_unique<DoubleType>(), true });
 
     return schema;
 }
 
-std::unique_ptr<Schema> MockCatalogBuilder::createOrdersSchema()
+Schema MockCatalogBuilder::createOrdersSchema()
 {
-    auto schema = std::make_unique<Schema>();
+    Schema schema;
 
     // Add columns for orders table
-    schema->addColumnInfo({ "order_id", std::make_unique<IntegerType>(), false });
-    schema->addColumnInfo({ "user_id", std::make_unique<IntegerType>(), false });
-    schema->addColumnInfo({ "product_id", std::make_unique<IntegerType>(), false });
-    schema->addColumnInfo({ "quantity", std::make_unique<IntegerType>(), false });
-    schema->addColumnInfo({ "price", std::make_unique<DoubleType>(), false });
-    schema->addColumnInfo({ "order_date", std::make_unique<VarcharType>(20), false }); // Simplified date as string
+    schema.addColumnInfo({ "order_id", std::make_unique<IntegerType>(), false });
+    schema.addColumnInfo({ "user_id", std::make_unique<IntegerType>(), false });
+    schema.addColumnInfo({ "product_id", std::make_unique<IntegerType>(), false });
+    schema.addColumnInfo({ "quantity", std::make_unique<IntegerType>(), false });
+    schema.addColumnInfo({ "price", std::make_unique<DoubleType>(), false });
+    schema.addColumnInfo({ "order_date", std::make_unique<VarcharType>(20), false }); // Simplified date as string
 
     return schema;
 }
 
-std::unique_ptr<Schema> MockCatalogBuilder::createProductsSchema()
+Schema MockCatalogBuilder::createProductsSchema()
 {
-    auto schema = std::make_unique<Schema>();
+    Schema schema;
 
     // Add columns for products table
-    schema->addColumnInfo({ "product_id", std::make_unique<IntegerType>(), false });
-    schema->addColumnInfo({ "name", std::make_unique<VarcharType>(200), false });
-    schema->addColumnInfo({ "description", std::make_unique<VarcharType>(1000), true });
-    schema->addColumnInfo({ "price", std::make_unique<DoubleType>(), false });
-    schema->addColumnInfo({ "stock_quantity", std::make_unique<IntegerType>(), false });
-    schema->addColumnInfo({ "category", std::make_unique<VarcharType>(50), true });
+    schema.addColumnInfo({ "product_id", std::make_unique<IntegerType>(), false });
+    schema.addColumnInfo({ "name", std::make_unique<VarcharType>(200), false });
+    schema.addColumnInfo({ "description", std::make_unique<VarcharType>(1000), true });
+    schema.addColumnInfo({ "price", std::make_unique<DoubleType>(), false });
+    schema.addColumnInfo({ "stock_quantity", std::make_unique<IntegerType>(), false });
+    schema.addColumnInfo({ "category", std::make_unique<VarcharType>(50), true });
 
     return schema;
 }
 
-std::unique_ptr<Schema> MockCatalogBuilder::createComplexSchema()
+Schema MockCatalogBuilder::createComplexSchema()
 {
-    auto schema = std::make_unique<Schema>();
+    Schema schema;
 
     // Add columns with various data types for comprehensive testing
-    schema->addColumnInfo({ "id", std::make_unique<IntegerType>(), false });
-    schema->addColumnInfo({ "int_col", std::make_unique<IntegerType>(), true });
-    schema->addColumnInfo({ "double_col", std::make_unique<DoubleType>(), true });
-    schema->addColumnInfo({ "varchar_small", std::make_unique<VarcharType>(50), true });
-    schema->addColumnInfo({ "varchar_large", std::make_unique<VarcharType>(1000), true });
-    schema->addColumnInfo({ "bool_col", std::make_unique<BooleanType>(), true });
-    schema->addColumnInfo({ "timestamp_col", std::make_unique<VarcharType>(30), true }); // Simplified timestamp
+    schema.addColumnInfo({ "id", std::make_unique<IntegerType>(), false });
+    schema.addColumnInfo({ "int_col", std::make_unique<IntegerType>(), true });
+    schema.addColumnInfo({ "double_col", std::make_unique<DoubleType>(), true });
+    schema.addColumnInfo({ "varchar_small", std::make_unique<VarcharType>(50), true });
+    schema.addColumnInfo({ "varchar_large", std::make_unique<VarcharType>(1000), true });
+    schema.addColumnInfo({ "bool_col", std::make_unique<BooleanType>(), true });
+    schema.addColumnInfo({ "timestamp_col", std::make_unique<VarcharType>(30), true }); // Simplified timestamp
 
     return schema;
 }
 
-std::unique_ptr<Catalog> MockCatalogBuilder::createAdaptiveCatalog()
+Catalog MockCatalogBuilder::createAdaptiveCatalog()
 {
-    auto catalog = std::make_unique<Catalog>();
     // Start with empty catalog - tables will be created on demand
-    return catalog;
+    return Catalog();
 }
 
 bool MockCatalogBuilder::ensureTablesForQuery(Catalog& catalog, const std::string& sql)
@@ -189,13 +186,15 @@ void MockCatalogBuilder::createDynamicTable(Catalog& catalog,
                                             const std::map<std::string, DataTypeId>& inferred_types)
 {
     auto schema = createDynamicSchema(table_name, column_names, inferred_types);
-    catalog.createTable(table_name, std::move(schema));
+    auto builder = TableBuilder(table_name, std::move(schema));
+    catalog.addTable(std::move(builder).build());
 }
 
 void MockCatalogBuilder::createGenericTable(Catalog& catalog, const std::string& table_name, size_t column_count)
 {
     auto schema = createGenericSchema(table_name, column_count);
-    catalog.createTable(table_name, std::move(schema));
+    auto builder = TableBuilder(table_name, std::move(schema));
+    catalog.addTable(std::move(builder).build());
 }
 
 // Private helper methods for dynamic table creation
@@ -352,9 +351,9 @@ DataTypeId MockCatalogBuilder::inferTypeFromLiteral(const hsql::Expr* literal)
 }
 
 // Helper methods for schema creation
-std::unique_ptr<Schema> MockCatalogBuilder::createGenericSchema(const std::string& table_name, size_t column_count)
+Schema MockCatalogBuilder::createGenericSchema(const std::string& table_name, size_t column_count)
 {
-    auto schema = std::make_unique<Schema>();
+    Schema schema;
 
     // Create generic columns with predictable names
     for (size_t i = 0; i < column_count; ++i) {
@@ -381,35 +380,35 @@ std::unique_ptr<Schema> MockCatalogBuilder::createGenericSchema(const std::strin
         }
 
         auto data_type = DataType::createType(type, type == DataTypeId::VARCHAR ? 256 : 0);
-        schema->addColumnInfo({ column_name, std::move(data_type), true });
+        schema.addColumnInfo({ column_name, std::move(data_type), true });
     }
 
     // Add some common columns based on table name
     if (table_name.find("user") != std::string::npos) {
-        schema->addColumnInfo({ "id", DataType::createType(DataTypeId::INTEGER), false });
-        schema->addColumnInfo({ "name", DataType::createType(DataTypeId::VARCHAR, 100), false });
-        schema->addColumnInfo({ "email", DataType::createType(DataTypeId::VARCHAR, 255), true });
+        schema.addColumnInfo({ "id", DataType::createType(DataTypeId::INTEGER), false });
+        schema.addColumnInfo({ "name", DataType::createType(DataTypeId::VARCHAR, 100), false });
+        schema.addColumnInfo({ "email", DataType::createType(DataTypeId::VARCHAR, 255), true });
     } else if (table_name.find("order") != std::string::npos) {
-        schema->addColumnInfo({ "order_id", DataType::createType(DataTypeId::INTEGER), false });
-        schema->addColumnInfo({ "user_id", DataType::createType(DataTypeId::INTEGER), false });
-        schema->addColumnInfo({ "total", DataType::createType(DataTypeId::DOUBLE), false });
+        schema.addColumnInfo({ "order_id", DataType::createType(DataTypeId::INTEGER), false });
+        schema.addColumnInfo({ "user_id", DataType::createType(DataTypeId::INTEGER), false });
+        schema.addColumnInfo({ "total", DataType::createType(DataTypeId::DOUBLE), false });
     } else if (table_name.find("product") != std::string::npos) {
-        schema->addColumnInfo({ "product_id", DataType::createType(DataTypeId::INTEGER), false });
-        schema->addColumnInfo({ "name", DataType::createType(DataTypeId::VARCHAR, 200), false });
-        schema->addColumnInfo({ "price", DataType::createType(DataTypeId::DOUBLE), false });
+        schema.addColumnInfo({ "product_id", DataType::createType(DataTypeId::INTEGER), false });
+        schema.addColumnInfo({ "name", DataType::createType(DataTypeId::VARCHAR, 200), false });
+        schema.addColumnInfo({ "price", DataType::createType(DataTypeId::DOUBLE), false });
     }
 
     return schema;
 }
 
-std::unique_ptr<Schema> MockCatalogBuilder::createDynamicSchema(const std::string& table_name,
-                                                                const std::vector<std::string>& column_names,
-                                                                const std::map<std::string, DataTypeId>& inferred_types)
+Schema MockCatalogBuilder::createDynamicSchema(const std::string& table_name,
+                                               const std::vector<std::string>& column_names,
+                                               const std::map<std::string, DataTypeId>& inferred_types)
 {
-    auto schema = std::make_unique<Schema>();
+    Schema schema;
 
     // Always add an ID column
-    schema->addColumnInfo({ "id", DataType::createType(DataTypeId::INTEGER), false });
+    schema.addColumnInfo({ "id", DataType::createType(DataTypeId::INTEGER), false });
 
     // Add columns based on the query
     for (const auto& column_name : column_names) {
@@ -422,7 +421,7 @@ std::unique_ptr<Schema> MockCatalogBuilder::createDynamicSchema(const std::strin
         }
 
         auto data_type = DataType::createType(type, type == DataTypeId::VARCHAR ? 256 : 0);
-        schema->addColumnInfo({ column_name, std::move(data_type), true });
+        schema.addColumnInfo({ column_name, std::move(data_type), true });
     }
 
     // If no columns were specified, create a generic schema
@@ -508,14 +507,15 @@ void MockCatalogBuilder::createTableFromCommonSchema(Catalog& catalog, const std
         return;
     }
 
-    auto schema = std::make_unique<Schema>();
+    Schema schema;
     for (const auto& [column_name, type_id] : common_schemas[table_name]) {
         auto data_type = DataType::createType(type_id, type_id == DataTypeId::VARCHAR ? 256 : 0);
         bool nullable = (column_name.find("id") == std::string::npos); // IDs are typically not nullable
-        schema->addColumnInfo({ column_name, std::move(data_type), nullable });
+        schema.addColumnInfo({ column_name, std::move(data_type), nullable });
     }
 
-    catalog.createTable(table_name, std::move(schema));
+    auto builder = TableBuilder(table_name, std::move(schema));
+    catalog.addTable(std::move(builder).build());
 }
 
 } // namespace velodb

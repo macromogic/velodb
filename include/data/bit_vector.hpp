@@ -12,16 +12,18 @@ public:
     static constexpr size_t ELEMENT_WIDTH = 8 * sizeof(Element);
 
     BitVector(size_t num_bits);
+    BitVector(const BitVector&) = default;
     ~BitVector() = default;
 
     void set(size_t index);
     void unset(size_t index);
     bool get(size_t index) const;
     void resize(size_t new_size);
-    void clear();
+    BitVector slice(size_t start, size_t end) const;
 
 private:
     std::vector<Element> data_;
+    size_t size_;
 };
 
 } // namespace velodb

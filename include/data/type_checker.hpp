@@ -1,7 +1,6 @@
 #pragma once
 
 #include "data/data_type.hpp"
-#include "data/value.hpp"
 
 #include <memory>
 #include <string>

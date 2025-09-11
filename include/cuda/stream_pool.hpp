@@ -2,11 +2,9 @@
 
 #include "common/result.hpp"
 
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <queue>
-#include <vector>
 
 #include <cuda_runtime.h>
 
@@ -14,21 +12,8 @@ namespace velodb {
 
 class CudaStream; // Forward declaration
 
-/**
- * @brief Thread-safe CUDA stream pool for managing reusable streams
- *
- * The StreamPool manages a pool of CUDA streams to avoid the overhead
- * of creating and destroying streams repeatedly. It provides thread-safe
- * access to streams and automatically handles stream lifecycle.
- */
 class StreamPool {
 public:
-    /**
-     * @brief RAII handle for a stream from the pool
-     *
-     * This handle automatically returns the stream to the pool when destroyed.
-     * Follows VeloDB's move-only semantics for clear ownership transfer.
-     */
     class StreamHandle {
     public:
         StreamHandle()
@@ -49,11 +34,8 @@ public:
         CudaStream* operator->() const { return stream_.get(); }
         CudaStream& operator*() const { return *stream_; }
 
-        bool is_valid() const { return stream_ != nullptr; }
+        bool isValid() const { return stream_ != nullptr; }
 
-        /**
-         * @brief Release the stream early (before destructor)
-         */
         void release();
 
     private:
@@ -61,11 +43,6 @@ public:
         std::unique_ptr<CudaStream> stream_;
     };
 
-    /**
-     * @brief Construct a new Stream Pool
-     * @param initial_size Initial number of streams to create
-     * @param max_size Maximum number of streams in the pool (0 = unlimited)
-     */
     explicit StreamPool(size_t initial_size = 4, size_t max_size = 16);
     ~StreamPool();
 
@@ -75,53 +52,19 @@ public:
     StreamPool(StreamPool&&) = delete;
     StreamPool& operator=(StreamPool&&) = delete;
 
-    /**
-     * @brief Get a stream from the pool
-     * @return Result containing a StreamHandle, or error
-     */
-    Result<StreamHandle> acquire_stream();
-
-    /**
-     * @brief Get the number of available streams in the pool
-     */
-    size_t available_count() const;
-
-    /**
-     * @brief Get the total number of streams (available + in-use)
-     */
-    size_t total_count() const;
-
-    /**
-     * @brief Synchronize all streams in the pool
-     * @return Result indicating success or failure
-     */
-    Result<void> synchronize_all();
-
-    /**
-     * @brief Clear the pool and destroy all streams
-     */
+    Result<StreamHandle> acquire();
+    size_t availableCount() const;
+    size_t totalCount() const;
+    Result<void> synchronizeAll();
     void clear();
 
-    /**
-     * @brief Get the global stream pool instance
-     * @return Reference to the singleton stream pool
-     */
     static StreamPool& instance();
 
 private:
     friend class StreamHandle;
 
-    /**
-     * @brief Return a stream to the pool for reuse (called by StreamHandle)
-     * @param stream The stream to return
-     */
-    void return_stream(std::unique_ptr<CudaStream> stream);
-
-    /**
-     * @brief Create a new stream
-     * @return Result containing a unique pointer to the new stream
-     */
-    Result<std::unique_ptr<CudaStream>> create_stream();
+    void returnStream(std::unique_ptr<CudaStream> stream);
+    Result<std::unique_ptr<CudaStream>> createStream();
 
     mutable std::mutex mutex_;
     std::queue<std::unique_ptr<CudaStream>> available_streams_;
@@ -130,12 +73,6 @@ private:
     bool destroyed_;
 };
 
-/**
- * @brief Convenience RAII guard for automatic stream management
- *
- * Alternative to using StreamHandle directly. Automatically acquires
- * a stream from the default pool and releases it on destruction.
- */
 class StreamGuard {
 public:
     explicit StreamGuard(StreamPool& pool = StreamPool::instance());
@@ -151,11 +88,8 @@ public:
     CudaStream* operator->() const;
     CudaStream& operator*() const;
 
-    bool is_valid() const;
+    bool isValid() const;
 
-    /**
-     * @brief Release the stream early (before destructor)
-     */
     void release();
 
 private:
