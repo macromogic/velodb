@@ -91,6 +91,15 @@ include_directories(${CMAKE_SOURCE_DIR}/thirdparty/sql-parser/src
 # Options
 option(BUILD_TESTS "Build test programs" ON)
 option(ENABLE_PROFILING "Enable performance profiling" ON)
+option(BUILD_BENCHMARKS "Build benchmark programs" OFF)
+
+if(BUILD_BENCHMARKS)
+  set(ENABLE_PROFILING OFF) # Disable profiling for benchmarks to avoid overhead
+  message(
+    STATUS "Building benchmarks: ENABLED (profiling disabled for benchmarks)")
+else()
+  message(STATUS "Building benchmarks: DISABLED")
+endif()
 
 # Profiling configuration (must be before add_subdirectory calls)
 if(ENABLE_PROFILING)
@@ -137,7 +146,10 @@ install(
   PATTERN "*.h"
   PATTERN "*.hpp")
 
-# add_subdirectory(benchmark)
+# Benchmarks
+if(BUILD_BENCHMARKS)
+  add_subdirectory(benchmark)
+endif()
 
 # Print configuration summary
 message(STATUS "")
