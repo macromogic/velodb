@@ -138,7 +138,7 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRe
     switch (table_ref->type) {
     case hsql::kTableName: {
         std::string const table_name = table_ref->name;
-        auto table = catalog_.getTable(table_name);
+        auto table = catalog_.get().getTable(table_name);
         if (!table) {
             VELODB_THROW(CatalogError, "Table not found: " + table_name);
         }
@@ -180,8 +180,8 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planJoin(const hsql::TableRef* l
     auto right_key_expr = planExpression(right_ref, join_expr->expr2);
 
     // Infer the output schema for the join
-    auto left_table = catalog_.getTable(left_ref->name);
-    auto right_table = catalog_.getTable(right_ref->name);
+    auto left_table = catalog_.get().getTable(left_ref->name);
+    auto right_table = catalog_.get().getTable(right_ref->name);
     if (!left_table || !right_table) {
         VELODB_THROW(CatalogError, "Cannot find tables for join");
     }
@@ -228,7 +228,7 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::Tab
 std::unique_ptr<AbstractExpression> QueryPlanner::planColumnRef(const hsql::TableRef* table_ref, const hsql::Expr* expr)
 {
     std::string const column_name = expr->name;
-    auto table_opt = catalog_.getTable(table_ref->name);
+    auto table_opt = catalog_.get().getTable(table_ref->name);
     if (!table_opt) {
         VELODB_THROW(CatalogError, "Table not found for column reference: " + column_name);
     }
@@ -381,7 +381,7 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planComparisonOperator(Compari
     if (left_expression_type == ExpressionType::COLUMN_REF && right_expression_type == ExpressionType::CONSTANT) {
         auto* left_expr = static_cast<ColumnRefExpression*>(left.get());
         auto value = static_cast<ConstantExpression*>(right.release())->getValue();
-        auto& table = catalog_.getTable(left_expr->getTableName())->get();
+        auto& table = catalog_.get().getTable(left_expr->getTableName())->get();
         auto& column = table.getColumn(left_expr->getColumnName());
         column.ensureOrdinal(value, type);
         right = std::make_unique<ConstantExpression>(value);
@@ -389,7 +389,7 @@ std::unique_ptr<AbstractExpression> QueryPlanner::planComparisonOperator(Compari
                && right_expression_type == ExpressionType::COLUMN_REF) {
         auto* right_expr = static_cast<ColumnRefExpression*>(right.get());
         auto value = static_cast<ConstantExpression*>(left.release())->getValue();
-        auto& table = catalog_.getTable(right_expr->getTableName())->get();
+        auto& table = catalog_.get().getTable(right_expr->getTableName())->get();
         auto& column = table.getColumn(right_expr->getColumnName());
         column.ensureOrdinal(value, type);
         left = std::make_unique<ConstantExpression>(value);

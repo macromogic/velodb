@@ -47,25 +47,10 @@ Result<RowBatch> FilterCompactionOperator::next()
         if (input_batch.getRowCount() == 0) {
             break; // No rows to process
         }
-        size_t batch_size = input_batch.getRowCount();
-        auto& mask_column = input_batch.getColumn(mask_index);
-        for (size_t i = 0; i < batch_size; ++i) {
-        }
 
         input_batch.to(DataLocation::CUDA);
         input_batch.compact(device_buffers_, mask_index);
         num_buffered_rows_ = device_buffers_.front().size();
-        /*
-        auto& mask_column = input_batch.getColumn(mask_index);
-        for (size_t i = 0; i < batch_size; ++i) {
-            if (mask_column.get(i).getBoolean()) {
-                for (size_t j = 0; j < column_count; ++j) {
-                    device_buffers_[j].append(input_batch.getValue(i, j));
-                }
-                ++num_buffered_rows_;
-            }
-        }
-        */
     }
 
     // Construct the new batch from the buffered data

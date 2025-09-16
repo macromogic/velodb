@@ -137,6 +137,8 @@ install(
   PATTERN "*.h"
   PATTERN "*.hpp")
 
+# add_subdirectory(benchmark)
+
 # Print configuration summary
 message(STATUS "")
 message(STATUS "Configuration Summary:")

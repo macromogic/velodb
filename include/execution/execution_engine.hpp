@@ -1,6 +1,7 @@
 #pragma once
 
 #include "catalog/catalog.hpp"
+#include "common/copy_traits.hpp"
 #include "execution/query_result.hpp"
 #include "expression/expression.hpp"
 #include "planner/abstract_plan_node.hpp"
@@ -15,14 +16,14 @@ struct SelectStatement;
 namespace velodb {
 
 // Main execution engine
-class ExecutionEngine {
+class ExecutionEngine : private NonCopyable {
 public:
     explicit ExecutionEngine(Catalog& catalog);
     ~ExecutionEngine() = default;
 
-    // Delete copy constructor and assignment
-    ExecutionEngine(const ExecutionEngine&) = delete;
-    ExecutionEngine& operator=(const ExecutionEngine&) = delete;
+    // Add move constructor and assignment
+    ExecutionEngine(ExecutionEngine&& other) noexcept;
+    ExecutionEngine& operator=(ExecutionEngine&& other) noexcept;
 
     // Main execution interface
     Result<QueryResult> executeQuery(const std::string& sql);

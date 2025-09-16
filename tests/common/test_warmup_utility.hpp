@@ -10,18 +10,8 @@
 namespace velodb {
 namespace test {
 
-    /**
-     * @brief CUDA Test Warmup Utility
-     *
-     * This class ensures CUDA is properly warmed up before running tests
-     * to avoid the 4.6-second initialization delay on first table creation.
-     */
     class CudaTestWarmup {
     public:
-        /**
-         * @brief Initialize CUDA for tests (call once per test executable)
-         * @return true if warmup succeeded, false otherwise
-         */
         static bool initializeOnce()
         {
             static bool initialized = false;
@@ -42,19 +32,9 @@ namespace test {
             return success;
         }
 
-        /**
-         * @brief Check if CUDA warmup is available (don't fail if CUDA not available)
-         * @return true if CUDA is available and warmed up
-         */
         static bool isAvailable() { return initializeOnce(); }
     };
 
-    /**
-     * @brief Base test class that automatically handles CUDA warmup
-     *
-     * Inherit from this class instead of ::testing::Test to get automatic
-     * CUDA warmup without performance penalty.
-     */
     class VeloDBTest : public ::testing::Test {
     protected:
         static void SetUpTestSuite()

@@ -19,6 +19,32 @@ ExecutionEngine::ExecutionEngine(Catalog& catalog)
 {
 }
 
+ExecutionEngine::ExecutionEngine(ExecutionEngine&& other) noexcept
+    : catalog_(other.catalog_)
+    , planner_(std::move(other.planner_))
+    , context_(std::move(other.context_))
+    , last_execution_row_count_(other.last_execution_row_count_)
+    , last_execution_time_ms_(other.last_execution_time_ms_)
+{
+    other.last_execution_row_count_ = 0;
+    other.last_execution_time_ms_ = 0.0;
+}
+
+ExecutionEngine& ExecutionEngine::operator=(ExecutionEngine&& other) noexcept
+{
+    if (this != &other) {
+        catalog_ = std::move(other.catalog_);
+        planner_ = std::move(other.planner_);
+        context_ = std::move(other.context_);
+        last_execution_row_count_ = other.last_execution_row_count_;
+        last_execution_time_ms_ = other.last_execution_time_ms_;
+
+        other.last_execution_row_count_ = 0;
+        other.last_execution_time_ms_ = 0.0;
+    }
+    return *this;
+}
+
 Result<QueryResult> ExecutionEngine::executeQuery(const std::string& sql)
 {
     PROFILE_SCOPE("Execute Query (full)");

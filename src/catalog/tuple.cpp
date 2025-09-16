@@ -5,7 +5,6 @@
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
 
-#include <fmt/core.h>
 #include <fmt/ranges.h>
 
 namespace velodb {

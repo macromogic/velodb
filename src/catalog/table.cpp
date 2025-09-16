@@ -3,9 +3,8 @@
 #include "catalog/column.hpp"
 #include "catalog/row_batch.hpp"
 #include "common/exception.hpp"
+#include "common/fmt.hpp"
 #include "common/profiler.hpp"
-
-#include <fmt/core.h>
 
 #include <utility>
 

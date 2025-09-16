@@ -17,6 +17,33 @@ Database::Database()
 {
 }
 
+Database::Database(Database&& other) noexcept
+    : catalog_(std::move(other.catalog_))
+    , execution_engine_(catalog_) // Re-bind to new catalog reference
+    , initialized_(other.initialized_)
+{
+    other.initialized_ = false; // Leave other in valid but uninitialized state
+}
+
+Database& Database::operator=(Database&& other) noexcept
+{
+    if (this != &other) {
+        // Clean up current state if needed
+        if (initialized_) {
+            shutdown();
+        }
+
+        // Move resources
+        catalog_ = std::move(other.catalog_);
+        execution_engine_ = ExecutionEngine { catalog_ }; // Reconstruct with new catalog
+        initialized_ = other.initialized_;
+
+        // Leave other in valid state
+        other.initialized_ = false;
+    }
+    return *this;
+}
+
 void Database::initialize()
 {
     auto result = runtime_warmup();

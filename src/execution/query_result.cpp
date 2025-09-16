@@ -4,8 +4,6 @@
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
 
-#include <fmt/format.h>
-
 namespace velodb {
 
 QueryResult::QueryResult(Schema schema)

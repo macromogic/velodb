@@ -1,6 +1,7 @@
 #pragma once
 
 #include "catalog/catalog.hpp"
+#include "common/copy_traits.hpp"
 #include "expression/expression.hpp"
 #include "planner/abstract_plan_node.hpp"
 
@@ -20,14 +21,14 @@ namespace velodb {
 class Schema;
 
 // Query planner interface
-class QueryPlanner {
+class QueryPlanner : private NonCopyable {
 public:
     explicit QueryPlanner(Catalog& catalog);
     ~QueryPlanner() = default;
 
-    // Delete copy constructor and assignment
-    QueryPlanner(const QueryPlanner&) = delete;
-    QueryPlanner& operator=(const QueryPlanner&) = delete;
+    // Add move constructor and assignment
+    QueryPlanner(QueryPlanner&& other) noexcept = default;
+    QueryPlanner& operator=(QueryPlanner&& other) noexcept = default;
 
     // Main planning interface
     std::unique_ptr<AbstractPlanNode> planSelect(const hsql::SelectStatement* select_stmt);
@@ -55,7 +56,7 @@ private:
                                                                std::unique_ptr<AbstractExpression> left,
                                                                std::unique_ptr<AbstractExpression> right);
 
-    Catalog& catalog_;
+    std::reference_wrapper<Catalog> catalog_;
 };
 
 } // namespace velodb

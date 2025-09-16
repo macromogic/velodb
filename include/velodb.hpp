@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/copy_traits.hpp"
+
 // Core type system
 #include "data/data_type.hpp"
 #include "data/value.hpp"
@@ -27,14 +29,14 @@
 namespace velodb {
 
 // Main database class that ties everything together
-class Database {
+class Database : private NonCopyable {
 public:
     Database();
     ~Database() = default;
 
-    // Delete copy constructor and assignment
-    Database(const Database&) = delete;
-    Database& operator=(const Database&) = delete;
+    // Add move constructor and assignment
+    Database(Database&& other) noexcept;
+    Database& operator=(Database&& other) noexcept;
 
     // Database operations
     void initialize();
@@ -47,6 +49,10 @@ public:
 
     // Query execution
     Result<QueryResult> executeQuery(const std::string& sql);
+
+    // Catalog access (temporary for benchmarking)
+    Catalog& getCatalog() { return catalog_; }
+    const Catalog& getCatalog() const { return catalog_; }
 
     // Statistics
     size_t getTableCount() const;
