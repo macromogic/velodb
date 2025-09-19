@@ -1,17 +1,14 @@
--- TPC-H Query 1: Pricing Summary Report
--- This query reports the amount of business that was billed, shipped, and returned.
-
 SELECT
     l_returnflag,
     l_linestatus,
-    SUM(l_quantity) as sum_qty,
-    SUM(l_extendedprice) as sum_base_price,
-    SUM(l_extendedprice * (1 - l_discount)) as sum_disc_price,
-    SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge,
-    AVG(l_quantity) as avg_qty,
-    AVG(l_extendedprice) as avg_price,
-    AVG(l_discount) as avg_disc,
-    COUNT(*) as count_order
+    SUM(l_quantity) AS sum_qty,
+    SUM(l_extendedprice) AS sum_base_price,
+    SUM(l_extendedprice * (1 - l_discount)) AS sum_disc_price,
+    SUM(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
+    AVG(l_quantity) AS avg_qty,
+    AVG(l_extendedprice) AS avg_price,
+    AVG(l_discount) AS avg_disc,
+    COUNT(*) AS count_order
 FROM
     lineitem
 WHERE

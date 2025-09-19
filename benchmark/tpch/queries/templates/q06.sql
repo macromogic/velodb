@@ -1,9 +1,5 @@
--- TPC-H Query 6: Forecasting Revenue Change
--- This query quantifies the amount of revenue increase that would have resulted
--- from eliminating certain company-wide discounts in a given percentage range in a given year.
-
 SELECT
-    SUM(l_extendedprice * l_discount) as revenue
+    SUM(l_extendedprice * l_discount) AS revenue
 FROM
     lineitem
 WHERE

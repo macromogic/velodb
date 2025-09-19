@@ -1,10 +1,6 @@
--- TPC-H Query 3: Shipping Priority
--- This query retrieves the shipping priority and potential revenue, defined as the sum of l_extendedprice * (1-l_discount),
--- of the orders having the largest revenue among those that had not been shipped as of a given date.
-
 SELECT
     l_orderkey,
-    SUM(l_extendedprice * (1 - l_discount)) as revenue,
+    SUM(l_extendedprice * (1 - l_discount)) AS revenue,
     o_orderdate,
     o_shippriority
 FROM

@@ -1,8 +1,3 @@
--- TPC-H Query 12: Shipping Modes and Order Priority
--- This query determines whether selecting less expensive modes of shipping is negatively
--- affecting the critical-priority orders by causing more parts to be received by customers
--- after the committed date.
-
 SELECT
     l_shipmode,
     SUM(CASE
@@ -10,13 +5,13 @@ SELECT
              OR o_orderpriority = '2-HIGH'
         THEN 1
         ELSE 0
-    END) as high_line_count,
+    END) AS high_line_count,
     SUM(CASE
         WHEN o_orderpriority <> '1-URGENT'
              AND o_orderpriority <> '2-HIGH'
         THEN 1
         ELSE 0
-    END) as low_line_count
+    END) AS low_line_count
 FROM
     orders,
     lineitem
