@@ -9,29 +9,38 @@ namespace velodb {
 // Forward declarations
 class BatchIterator;
 class Tuple;
+class Schema;
 
-class RowBatch {
+class RowBatch : private NonCopyable {
 public:
     RowBatch() = default;
+    RowBatch(RowBatch&& other) = default;
+    RowBatch& operator=(RowBatch&& other) = default;
 
-    explicit RowBatch(std::vector<Column> columns)
-        : columns_(std::move(columns))
-    {
-    }
-
-    void addColumn(Column column) { columns_.push_back(std::move(column)); }
+    void addColumn(Column&& column);
     Column& getColumn(size_t index);
     size_t getColumnCount() const { return columns_.size(); }
-    size_t getRowCount() const;
+    size_t getRowCount() const { return num_rows_; }
     Value getValue(size_t row_id, size_t column_index) const;
     void to(DataLocation location);
-    void compact(std::vector<Column>& destination, size_t mask_index);
+    void addRows(const RowBatch& other);
+    void addFilteredRows(const RowBatch& other, const Column& mask);
+    RowBatch splitFront(size_t size);
 
     BatchIterator begin() const;
     BatchIterator end() const;
 
+    static RowBatch createBuffered(const Schema& schema, size_t initial_capacity, DataLocation location);
+
 private:
     std::vector<Column> columns_;
+    size_t num_rows_;
+
+    explicit RowBatch(std::vector<Column> columns)
+        : columns_(std::move(columns))
+        , num_rows_(columns_.empty() ? 0 : columns_.front().size())
+    {
+    }
 };
 
 // Iterator for table scanning

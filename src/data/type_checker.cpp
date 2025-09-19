@@ -1,7 +1,11 @@
 #include "data/type_checker.hpp"
 
 #include "common/fmt.hpp"
+#include "expression/arithmetic_expression.hpp"
+#include "expression/cast_expression.hpp"
+#include "expression/comparison_expression.hpp"
 #include "expression/expression.hpp"
+#include "expression/logical_expression.hpp"
 
 #include <fmt/core.h>
 
@@ -86,10 +90,46 @@ bool TypeChecker::validateExpression(const AbstractExpression* expr) const
         return false;
     }
 
-    // TODO(unused): Implement comprehensive expression validation
-    // This would involve traversing the expression tree and validating each
-    // node
-    return true;
+    switch (expr->getExpressionType()) {
+    // Constant and column references are always valid
+    case ExpressionType::CONSTANT:
+    case ExpressionType::COLUMN_REF:
+        return true;
+    case ExpressionType::COMPARISON: {
+        auto* comp_expr = static_cast<const ComparisonExpression*>(expr);
+        return validateComparison(comp_expr->getLeftExpression().getReturnType(),
+                                  comp_expr->getRightExpression().getReturnType(),
+                                  comp_expr->getComparisonType());
+    }
+    case ExpressionType::LOGICAL: {
+        if (expr->isUnary()) {
+            auto* neg_expr = static_cast<const LogicalNotExpression*>(expr);
+            return neg_expr->getOperandExpression().getReturnType().isBoolean();
+        } else /* expr->isBinary() */ {
+            auto* bin_expr = static_cast<const BinaryLogicalExpression*>(expr);
+            return bin_expr->getLeftExpression().getReturnType().isBoolean()
+                && bin_expr->getRightExpression().getReturnType().isBoolean();
+        }
+    }
+    case ExpressionType::ARITHMETIC: {
+        auto* arith_expr = static_cast<const ArithmeticExpression*>(expr);
+        return validateArithmeticOperands(arith_expr->getLeftExpression().getReturnType(),
+                                          arith_expr->getRightExpression().getReturnType(),
+                                          arith_expr->getArithmeticType());
+    }
+    case ExpressionType::CAST: {
+        auto* cast_expr = static_cast<const CastExpression*>(expr);
+        return validateCast(cast_expr->getOperandExpression().getReturnType(), expr->getReturnType());
+    }
+    // Below types are not yet supported
+    case ExpressionType::CASE:
+    case ExpressionType::FUNCTION_CALL:
+    case ExpressionType::SUBQUERY:
+    default:
+        setError("Invalid or unsupported expression type");
+        return false;
+    }
+    __builtin_unreachable();
 }
 
 std::unique_ptr<DataType> TypeChecker::deduceArithmeticType(const DataType& left_type,
@@ -207,14 +247,12 @@ bool TypeChecker::isNumericType(const DataType& type) const
 
 bool TypeChecker::isStringType(const DataType& type) const
 {
-    DataTypeId type_id = type.getTypeId();
-    return type_id == DataTypeId::CHAR || type_id == DataTypeId::VARCHAR;
+    return type.isString();
 }
 
 bool TypeChecker::isDateTimeType(const DataType& type) const
 {
-    DataTypeId type_id = type.getTypeId();
-    return type_id == DataTypeId::DATE || type_id == DataTypeId::TIMESTAMP;
+    return type.isDateTime();
 }
 
 int TypeChecker::getTypeRank(const DataType& type) const
@@ -269,11 +307,6 @@ bool TypeChecker::validateComparisonOperands(const DataType& left_type,
 {
     DataTypeId left_id = left_type.getTypeId();
     DataTypeId right_id = right_type.getTypeId();
-
-    // NULL comparisons are always valid
-    if (comp_type == ComparisonType::IS_NULL || comp_type == ComparisonType::IS_NOT_NULL) {
-        return true;
-    }
 
     // Same types are always comparable
     if (left_id == right_id) {

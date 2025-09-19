@@ -38,10 +38,6 @@ enum class ComparisonType {
     GREATER_THAN_OR_EQUAL,
     LIKE,
     NOT_LIKE,
-    IN,
-    NOT_IN,
-    IS_NULL,
-    IS_NOT_NULL
 };
 
 // Logical connective types
@@ -106,6 +102,8 @@ public:
     UnaryExpression(UnaryExpression&&) noexcept = default;
     UnaryExpression& operator=(UnaryExpression&&) noexcept = default;
 
+    const AbstractExpression& getOperandExpression() const { return *operand_; }
+
     bool isUnary() const override { return true; }
 
 protected:
@@ -121,20 +119,14 @@ public:
     BinaryExpression(BinaryExpression&&) noexcept = default;
     BinaryExpression& operator=(BinaryExpression&&) noexcept = default;
 
+    const AbstractExpression& getLeftExpression() const { return *left_; }
+    const AbstractExpression& getRightExpression() const { return *right_; }
+
     bool isBinary() const override { return true; }
 
 protected:
     std::unique_ptr<AbstractExpression> left_;
     std::unique_ptr<AbstractExpression> right_;
 };
-
-// Forward declarations for concrete expressions
-class ConstantExpression;
-class ColumnRefExpression;
-class ComparisonExpression;
-class BinaryLogicalExpression;
-class ArithmeticExpression;
-class CastExpression;
-class FunctionCallExpression;
 
 } // namespace velodb

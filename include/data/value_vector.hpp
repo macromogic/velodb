@@ -280,6 +280,23 @@ public:
         stream_handle.release();
     }
 
+    void appendMultiple(const ValueVector& other)
+    {
+        VELODB_ASSERT_MSG(location_ == other.location_ && location_ != DataLocation::VIEW,
+                          "Append must happen on same non-VIEW location");
+        if (size_ + other.size_ > capacity_) {
+            reserve(size_ + other.capacity_);
+        }
+        if (location_ == DataLocation::HOST) {
+            std::copy(other.data_, other.data_ + other.size_, data_ + size_);
+        } else {
+            CHECKED_CALL_THROW(
+                cudaMemcpy(data_ + size_, other.data_, other.size_ * sizeof(DType), cudaMemcpyDeviceToDevice));
+        }
+        null_mask_.append(other.null_mask_);
+        size_ += other.size_;
+    }
+
     static ValueVector buildFrom(std::vector<Value>&& data, DataLocation location = DataLocation::HOST)
     {
         size_t n = data.size();
@@ -345,6 +362,7 @@ public:
     ValueVector tryOwn();
     ValueVector splitFront(size_t size);
     void appendMultiple(const ValueVector<size_t>& other, const ValueVector<uint8_t>& mask);
+    void appendMultiple(const ValueVector<size_t>& other);
 
     static ValueVector buildFrom(std::vector<Value>&& data, DataLocation location = DataLocation::HOST);
 

@@ -305,6 +305,23 @@ void ValueVector<size_t>::appendMultiple(const ValueVector<size_t>& other, const
     stream_handle.release();
 }
 
+void ValueVector<size_t>::appendMultiple(const ValueVector<size_t>& other)
+{
+    VELODB_ASSERT_MSG(location_ == other.location_ && location_ != DataLocation::VIEW,
+                      "Append must happen on same non-VIEW location");
+    if (size_ + other.size_ > capacity_) {
+        reserve(size_ + other.capacity_);
+    }
+    if (location_ == DataLocation::HOST) {
+        std::copy(other.data_, other.data_ + other.size_, data_ + size_);
+    } else {
+        CHECKED_CALL_THROW(
+            cudaMemcpy(data_ + size_, other.data_, other.size_ * sizeof(DType), cudaMemcpyDeviceToDevice));
+    }
+    null_mask_.append(other.null_mask_);
+    size_ += other.size_;
+}
+
 ValueVector<size_t> ValueVector<size_t>::buildFrom(std::vector<Value>&& data, DataLocation location)
 {
     size_t n = data.size();

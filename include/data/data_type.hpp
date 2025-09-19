@@ -34,10 +34,10 @@ public:
     DataTypeId getTypeId() const { return type_id_; }
     size_t size() const { return size_; }
     virtual std::string toString() const = 0;
-    virtual bool isFixedSize() const = 0;
-    virtual bool isNumeric() const = 0;
-    virtual bool isBoolean() const = 0;
-    virtual bool isString() const = 0;
+    virtual bool isNumeric() const { return false; }
+    virtual bool isBoolean() const { return false; }
+    virtual bool isString() const { return false; }
+    virtual bool isDateTime() const { return false; }
 
     static std::unique_ptr<DataType> createType(DataTypeId type_id, size_t size = 0);
 
@@ -59,10 +59,7 @@ public:
     {
     }
     std::string toString() const override { return "BOOLEAN"; }
-    bool isFixedSize() const override { return true; }
-    bool isNumeric() const override { return false; }
     bool isBoolean() const override { return true; }
-    bool isString() const override { return false; }
 };
 
 class TinyIntType : public DataType {
@@ -72,10 +69,7 @@ public:
     {
     }
     std::string toString() const override { return "TINYINT"; }
-    bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
-    bool isBoolean() const override { return false; }
-    bool isString() const override { return false; }
 };
 
 class SmallIntType : public DataType {
@@ -85,10 +79,7 @@ public:
     {
     }
     std::string toString() const override { return "SMALLINT"; }
-    bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
-    bool isBoolean() const override { return false; }
-    bool isString() const override { return false; }
 };
 
 class IntegerType : public DataType {
@@ -98,7 +89,6 @@ public:
     {
     }
     std::string toString() const override { return "INTEGER"; }
-    bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
     bool isBoolean() const override { return false; }
     bool isString() const override { return false; }
@@ -111,10 +101,7 @@ public:
     {
     }
     std::string toString() const override { return "BIGINT"; }
-    bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
-    bool isBoolean() const override { return false; }
-    bool isString() const override { return false; }
 };
 
 class FloatType : public DataType {
@@ -124,10 +111,7 @@ public:
     {
     }
     std::string toString() const override { return "FLOAT"; }
-    bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
-    bool isBoolean() const override { return false; }
-    bool isString() const override { return false; }
 };
 
 class DoubleType : public DataType {
@@ -137,10 +121,27 @@ public:
     {
     }
     std::string toString() const override { return "DOUBLE"; }
-    bool isFixedSize() const override { return true; }
     bool isNumeric() const override { return true; }
-    bool isBoolean() const override { return false; }
-    bool isString() const override { return false; }
+};
+
+class DecimalType : public DataType {
+public:
+    DecimalType()
+        : DataType(DataTypeId::DECIMAL, sizeof(int64_t))
+    {
+    }
+    std::string toString() const override { return "DECIMAL"; }
+    bool isNumeric() const override { return true; }
+};
+
+class CharType : public DataType {
+public:
+    explicit CharType(size_t length)
+        : DataType(DataTypeId::CHAR, length)
+    {
+    }
+    std::string toString() const override { return fmt::format("CHAR({})", size_); }
+    bool isString() const override { return true; }
 };
 
 class VarcharType : public DataType {
@@ -150,10 +151,17 @@ public:
     {
     }
     std::string toString() const override { return fmt::format("VARCHAR({})", size_); }
-    bool isFixedSize() const override { return false; }
-    bool isNumeric() const override { return false; }
-    bool isBoolean() const override { return false; }
     bool isString() const override { return true; }
+};
+
+class DateType : public DataType {
+public:
+    DateType()
+        : DataType(DataTypeId::DATE, sizeof(uint32_t))
+    {
+    }
+    std::string toString() const override { return "DATE"; }
+    bool isDateTime() const override { return true; }
 };
 
 } // namespace velodb

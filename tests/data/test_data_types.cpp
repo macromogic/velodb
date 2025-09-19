@@ -26,7 +26,6 @@ TEST_F(DataTypeTest, IntegerTypeCreation)
 
     EXPECT_EQ(int_type->getTypeId(), DataTypeId::INTEGER);
     EXPECT_EQ(int_type->size(), sizeof(int32_t));
-    EXPECT_TRUE(int_type->isFixedSize());
     EXPECT_TRUE(int_type->isNumeric());
     EXPECT_EQ(int_type->toString(), "INTEGER");
 }
@@ -37,7 +36,6 @@ TEST_F(DataTypeTest, DoubleTypeCreation)
 
     EXPECT_EQ(double_type->getTypeId(), DataTypeId::DOUBLE);
     EXPECT_EQ(double_type->size(), sizeof(double));
-    EXPECT_TRUE(double_type->isFixedSize());
     EXPECT_TRUE(double_type->isNumeric());
     EXPECT_EQ(double_type->toString(), "DOUBLE");
 }
@@ -48,7 +46,6 @@ TEST_F(DataTypeTest, VarcharTypeCreation)
 
     EXPECT_EQ(varchar_type->getTypeId(), DataTypeId::VARCHAR);
     EXPECT_EQ(varchar_type->size(), 255);
-    EXPECT_FALSE(varchar_type->isFixedSize());
     EXPECT_FALSE(varchar_type->isNumeric());
     EXPECT_EQ(varchar_type->toString(), "VARCHAR(255)");
 }
@@ -59,7 +56,6 @@ TEST_F(DataTypeTest, BooleanTypeCreation)
 
     EXPECT_EQ(bool_type->getTypeId(), DataTypeId::BOOLEAN);
     EXPECT_EQ(bool_type->size(), sizeof(bool));
-    EXPECT_TRUE(bool_type->isFixedSize());
     EXPECT_FALSE(bool_type->isNumeric());
     EXPECT_EQ(bool_type->toString(), "BOOLEAN");
 }
@@ -70,7 +66,6 @@ TEST_F(DataTypeTest, BigIntTypeCreation)
 
     EXPECT_EQ(bigint_type->getTypeId(), DataTypeId::BIGINT);
     EXPECT_EQ(bigint_type->size(), sizeof(int64_t));
-    EXPECT_TRUE(bigint_type->isFixedSize());
     EXPECT_TRUE(bigint_type->isNumeric());
     EXPECT_EQ(bigint_type->toString(), "BIGINT");
 }

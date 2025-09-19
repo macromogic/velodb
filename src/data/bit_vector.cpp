@@ -71,4 +71,30 @@ BitVector BitVector::slice(size_t start, size_t end) const
     return result;
 }
 
+void BitVector::append(const BitVector& other)
+{
+    size_t original_size = size_;
+    resize(size_ + other.size_);
+    size_t start_offset = original_size % ELEMENT_WIDTH;
+    size_t start_index = original_size / ELEMENT_WIDTH;
+    size_t n_full_elements = other.size_ / ELEMENT_WIDTH;
+    size_t remaining_bits = other.size_ % ELEMENT_WIDTH;
+
+    const Element* src_data = other.data_.data();
+    Element* dest_data = data_.data() + start_index;
+    // Copy full elements
+    for (size_t i = 0; i < n_full_elements; ++i) {
+        dest_data[i] |= (src_data[i] << start_offset);
+        dest_data[i + 1] = (src_data[i] >> (ELEMENT_WIDTH - start_offset));
+    }
+
+    // Copy the remaining bits in the last partial element
+    if (remaining_bits > 0) {
+        dest_data[n_full_elements] |= (src_data[n_full_elements] << start_offset);
+        if (start_offset + remaining_bits > ELEMENT_WIDTH) {
+            dest_data[n_full_elements + 1] = (src_data[n_full_elements] >> (ELEMENT_WIDTH - start_offset));
+        }
+    }
+}
+
 } // namespace velodb

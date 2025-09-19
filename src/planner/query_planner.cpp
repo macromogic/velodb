@@ -18,6 +18,7 @@
 #include "expression/logical_expression.hpp"
 #include "planner/abstract_plan_node.hpp"
 #include "planner/filter_compaction_plan_node.hpp"
+#include "planner/limit_plan_node.hpp"
 #include "planner/merge_sort_join_plan_node.hpp"
 #include "planner/projection_plan_node.hpp"
 #include "planner/query_planner.hpp"
@@ -127,7 +128,28 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
         plan = std::move(projection_plan);
     }
 
-    // TODO: Plan ORDER BY and LIMIT
+    // TODO: Plan ORDER BY
+    // if (auto* order = select_stmt->order) {
+    //     VELODB_THROW(ExecutionError, "ORDER BY not supported yet");
+    // }
+
+    if (auto* limit = select_stmt->limit) {
+        auto* limit_expr = limit->limit;
+        auto* offset_expr = limit->offset;
+        int64_t limit_value = 0x7FFF'FFFF'FFFF'FFFF;
+        int64_t offset_value = 0;
+        if (limit_expr != nullptr) {
+            VELODB_ASSERT_MSG(limit_expr->type == hsql::kExprLiteralInt, "LIMIT must be an integer literal");
+            limit_value = limit_expr->ival;
+        }
+        if (offset_expr != nullptr) {
+            VELODB_ASSERT_MSG(offset_expr->type == hsql::kExprLiteralInt, "OFFSET must be an integer literal");
+            offset_value = offset_expr->ival;
+        }
+        auto limit_plan = std::make_unique<LimitPlanNode>(plan->getOutputSchema().clone(), limit_value, offset_value);
+        limit_plan->addChild(std::move(plan));
+        plan = std::move(limit_plan);
+    }
 
     return plan;
 }
@@ -201,28 +223,37 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planJoin(const hsql::TableRef* l
 std::unique_ptr<AbstractExpression> QueryPlanner::planExpression(const hsql::TableRef* table_ref,
                                                                  const hsql::Expr* expr)
 {
+    std::unique_ptr<AbstractExpression> result;
     switch (expr->type) {
     case hsql::kExprLiteralInt:
         if (expr->isBoolLiteral) {
-            return std::make_unique<ConstantExpression>(Value::createBoolean(expr->ival != 0));
+            result = std::make_unique<ConstantExpression>(Value::createBoolean(expr->ival != 0));
         } else {
-            return std::make_unique<ConstantExpression>(Value::createInteger(expr->ival));
+            result = std::make_unique<ConstantExpression>(Value::createInteger(expr->ival));
         }
+        break;
     case hsql::kExprLiteralFloat:
-        return std::make_unique<ConstantExpression>(Value::createDouble(expr->fval));
+        result = std::make_unique<ConstantExpression>(Value::createDouble(expr->fval));
+        break;
     case hsql::kExprLiteralString:
-        return std::make_unique<ConstantExpression>(Value::createString(expr->name));
+        result = std::make_unique<ConstantExpression>(Value::createString(expr->name));
+        break;
     case hsql::kExprLiteralNull:
-        return std::make_unique<ConstantExpression>(Value::createNull(DataTypeId::ANY));
+        result = std::make_unique<ConstantExpression>(Value::createNull(DataTypeId::ANY));
+        break;
     case hsql::kExprColumnRef:
-        return planColumnRef(table_ref, expr);
+        result = planColumnRef(table_ref, expr);
+        break;
     case hsql::kExprOperator:
-        return planOperator(table_ref, expr);
+        result = planOperator(table_ref, expr);
+        break;
     case hsql::kExprStar:
         VELODB_THROW(ExecutionError, "* expression should be handled in planSelectList, not planExpression");
     default:
         VELODB_THROW(ExecutionError, "Expression type not implemented");
     }
+    VELODB_ASSERT_MSG(g_type_checker.validateExpression(result.get()), g_type_checker.getLastError());
+    return result;
 }
 
 std::unique_ptr<AbstractExpression> QueryPlanner::planColumnRef(const hsql::TableRef* table_ref, const hsql::Expr* expr)

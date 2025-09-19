@@ -20,6 +20,7 @@ public:
     bool get(size_t index) const;
     void resize(size_t new_size);
     BitVector slice(size_t start, size_t end) const;
+    void append(const BitVector& other);
 
 private:
     std::vector<Element> data_;

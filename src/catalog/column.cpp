@@ -216,4 +216,20 @@ void Column::appendMultiple(const Column& other, const Column& mask)
         mask.data_source_);
 }
 
+void Column::appendMultiple(const Column& other)
+{
+    std::visit(
+        [](auto&& dst, auto&& src) {
+            using DstType = std::decay_t<decltype(dst)>;
+            using SrcType = std::decay_t<decltype(src)>;
+            if constexpr (std::is_same_v<DstType, SrcType>) {
+                dst.appendMultiple(src);
+            } else {
+                VELODB_THROW(ExecutionError, "Invalid types for append");
+            }
+        },
+        data_source_,
+        other.data_source_);
+}
+
 } // namespace velodb

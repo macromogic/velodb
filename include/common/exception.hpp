@@ -103,6 +103,6 @@ public:
 #define VELODB_ASSERT_MSG(condition, message)                                                                          \
     do {                                                                                                               \
         if (!(condition)) {                                                                                            \
-            VELODB_THROW(ExecutionError, "Assertion failed: " #condition ". " message);                                \
+            VELODB_THROW(ExecutionError, std::string("Assertion failed: " #condition ". ") + message);                 \
         }                                                                                                              \
     } while (0)

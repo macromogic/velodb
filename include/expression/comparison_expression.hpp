@@ -16,8 +16,6 @@ public:
     std::string toString() const override;
 
     ComparisonType getComparisonType() const { return comp_type_; }
-    const AbstractExpression& getLeftExpression() const { return *left_; }
-    const AbstractExpression& getRightExpression() const { return *right_; }
 
 protected:
     std::unique_ptr<AbstractExpression> cloneUniqueImpl() const override;

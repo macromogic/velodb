@@ -90,6 +90,7 @@ private:
     }
 
     void appendMultiple(const Column& other, const Column& mask);
+    void appendMultiple(const Column& other);
 
     friend class RowBatch;
 };

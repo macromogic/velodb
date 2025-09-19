@@ -23,6 +23,7 @@ private:
     size_t offset_;
     size_t current_count_ { 0 };
     size_t skipped_count_ { 0 };
+    RowBatch buffer_;
 };
 
 } // namespace velodb

@@ -13,8 +13,7 @@ public:
     Result<RowBatch> next() override;
 
 private:
-    std::vector<Column> device_buffers_;
-    size_t num_buffered_rows_;
+    RowBatch buffer_;
 };
 
 } // namespace velodb

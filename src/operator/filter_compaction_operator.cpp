@@ -17,14 +17,8 @@ FilterCompactionOperator::FilterCompactionOperator(ExecutionContext& context,
                                                    Schema output_schema,
                                                    std::unique_ptr<AbstractOperator> child)
     : UnaryOperator(context, std::move(output_schema), std::move(child))
-    , num_buffered_rows_(0)
+    , buffer_(RowBatch::createBuffered(output_schema_, MAX_BATCH_SIZE * 2, DataLocation::CUDA))
 {
-    size_t num_columns = output_schema_.getColumnCount();
-    device_buffers_.reserve(num_columns);
-    for (size_t i = 0; i < num_columns; ++i) {
-        auto& type = output_schema_.getColumnInfo(i).getType();
-        device_buffers_.emplace_back(type.cloneUnique(), MAX_BATCH_SIZE * 2, DataLocation::CUDA);
-    }
 }
 
 Result<RowBatch> FilterCompactionOperator::next()
@@ -33,11 +27,10 @@ Result<RowBatch> FilterCompactionOperator::next()
     if (!child) {
         return Result<RowBatch>::failure("FilterCompactionOperator requires a child operator");
     }
+
     // We assume $_mask always exists
     auto mask_index = output_schema_.getColumnIndex("$_mask");
-    auto column_count = output_schema_.getColumnCount();
-
-    while (num_buffered_rows_ < MAX_BATCH_SIZE) {
+    while (buffer_.getRowCount() < MAX_BATCH_SIZE) {
         // Execute child operator first
         auto child_result = child->next();
         if (!child_result) {
@@ -49,15 +42,11 @@ Result<RowBatch> FilterCompactionOperator::next()
         }
 
         input_batch.to(DataLocation::CUDA);
-        input_batch.compact(device_buffers_, mask_index);
-        num_buffered_rows_ = device_buffers_.front().size();
+        buffer_.addFilteredRows(input_batch, input_batch.getColumn(mask_index));
     }
 
     // Construct the new batch from the buffered data
-    auto new_batch = RowBatch();
-    for (size_t j = 0; j < column_count; ++j) {
-        new_batch.addColumn(device_buffers_[j].splitFront(MAX_BATCH_SIZE));
-    }
+    auto new_batch = buffer_.splitFront(MAX_BATCH_SIZE);
     return Result<RowBatch>::success(std::move(new_batch));
 }
 
