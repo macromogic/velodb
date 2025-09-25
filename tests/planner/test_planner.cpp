@@ -5,6 +5,7 @@
 #include "catalog/table_builder.hpp"
 #include "common/exception.hpp"
 #include "data/data_type.hpp"
+#include "planner/limit_plan_node.hpp"
 #include "planner/query_planner.hpp"
 
 #include <SQLParser.h>
@@ -24,12 +25,22 @@ public:
 protected:
     void SetUp() override
     {
+        // Set up users table
         test::VeloDBTest::SetUp();
         auto schema = Schema();
         schema.addColumnInfo({ "id", std::make_unique<IntegerType>() });
         schema.addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
 
         auto builder = TableBuilder("users", std::move(schema));
+        catalog_.addTable(std::move(builder).build());
+
+        // Set up students table
+        schema = Schema();
+        schema.addColumnInfo({ "id", std::make_unique<IntegerType>() });
+        schema.addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
+        schema.addColumnInfo({ "score", std::make_unique<IntegerType>() });
+
+        builder = TableBuilder("students", std::move(schema));
         catalog_.addTable(std::move(builder).build());
     }
 
@@ -150,11 +161,121 @@ TEST_F(PlannerTest, PlanComplexWhere)
     EXPECT_NE(plan->getPlanType(), PlanType::INVALID);
 }
 
+TEST_F(PlannerTest, PlanSelectWithLimit)
+{
+    std::string sql = "SELECT * FROM students LIMIT 5";
+
+    hsql::SQLParserResult result;
+    hsql::SQLParser::parse(sql, &result);
+
+    ASSERT_TRUE(result.isValid());
+    ASSERT_EQ(result.size(), 1);
+
+    const hsql::SQLStatement* stmt = result.getStatement(0);
+    ASSERT_EQ(stmt->type(), hsql::kStmtSelect);
+
+    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
+
+    auto plan = planner_.planSelect(select_stmt);
+    ASSERT_NE(plan, nullptr);
+
+    // The plan should have LIMIT as the top node
+    EXPECT_EQ(plan->getPlanType(), PlanType::LIMIT);
+
+    // Cast to LimitPlanNode to check specific properties
+    auto* limit_plan = static_cast<LimitPlanNode*>(plan.get());
+    EXPECT_EQ(limit_plan->getLimit(), 5);
+    EXPECT_EQ(limit_plan->getOffset(), 0);
+
+    // Should have one child (the projection/compaction chain)
+    auto& children = plan->getChildren();
+    EXPECT_EQ(children.size(), 1);
+}
+
+TEST_F(PlannerTest, PlanSelectWithLimitAndOffset)
+{
+    std::string sql = "SELECT * FROM students LIMIT 3 OFFSET 2";
+
+    hsql::SQLParserResult result;
+    hsql::SQLParser::parse(sql, &result);
+
+    ASSERT_TRUE(result.isValid());
+    ASSERT_EQ(result.size(), 1);
+
+    const hsql::SQLStatement* stmt = result.getStatement(0);
+    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
+
+    auto plan = planner_.planSelect(select_stmt);
+    ASSERT_NE(plan, nullptr);
+
+    // The plan should have LIMIT as the top node
+    EXPECT_EQ(plan->getPlanType(), PlanType::LIMIT);
+
+    // Cast to LimitPlanNode to check specific properties
+    auto* limit_plan = static_cast<LimitPlanNode*>(plan.get());
+    EXPECT_EQ(limit_plan->getLimit(), 3);
+    EXPECT_EQ(limit_plan->getOffset(), 2);
+}
+
+TEST_F(PlannerTest, PlanSelectWithLimitAndWhere)
+{
+    std::string sql = "SELECT * FROM students WHERE id > 5 LIMIT 10";
+
+    hsql::SQLParserResult result;
+    hsql::SQLParser::parse(sql, &result);
+
+    ASSERT_TRUE(result.isValid());
+    ASSERT_EQ(result.size(), 1);
+
+    const hsql::SQLStatement* stmt = result.getStatement(0);
+    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
+
+    auto plan = planner_.planSelect(select_stmt);
+    ASSERT_NE(plan, nullptr);
+
+    // The plan should have LIMIT as the top node
+    EXPECT_EQ(plan->getPlanType(), PlanType::LIMIT);
+
+    // Cast to LimitPlanNode to check specific properties
+    auto* limit_plan = static_cast<LimitPlanNode*>(plan.get());
+    EXPECT_EQ(limit_plan->getLimit(), 10);
+    EXPECT_EQ(limit_plan->getOffset(), 0);
+
+    // Should have a child (projection -> compaction -> scan with filter)
+    auto& children = plan->getChildren();
+    EXPECT_EQ(children.size(), 1);
+    EXPECT_EQ(children[0]->getPlanType(), PlanType::PROJECTION);
+}
+
+TEST_F(PlannerTest, PlanSelectWithOnlyOffset)
+{
+    std::string sql = "SELECT * FROM students OFFSET 5";
+
+    hsql::SQLParserResult result;
+    hsql::SQLParser::parse(sql, &result);
+
+    ASSERT_TRUE(result.isValid());
+    ASSERT_EQ(result.size(), 1);
+
+    const hsql::SQLStatement* stmt = result.getStatement(0);
+    const hsql::SelectStatement* select_stmt = static_cast<const hsql::SelectStatement*>(stmt);
+
+    auto plan = planner_.planSelect(select_stmt);
+    ASSERT_NE(plan, nullptr);
+
+    // The plan should have LIMIT as the top node (even with just OFFSET)
+    EXPECT_EQ(plan->getPlanType(), PlanType::LIMIT);
+
+    // Cast to LimitPlanNode to check specific properties
+    auto* limit_plan = static_cast<LimitPlanNode*>(plan.get());
+    EXPECT_EQ(limit_plan->getLimit(), 0x7FFF'FFFF'FFFF'FFFF); // Max value when only OFFSET is specified
+    EXPECT_EQ(limit_plan->getOffset(), 5);
+}
+
 // TODO: Add more comprehensive planner tests when additional features are
 // implemented
 // - JOIN planning tests
 // - Subquery planning tests
 // - Aggregation planning tests
 // - ORDER BY planning tests
-// - LIMIT planning tests
 // - Complex expression planning tests

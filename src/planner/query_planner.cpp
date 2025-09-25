@@ -9,12 +9,10 @@
 #include "data/data_type.hpp"
 #include "data/type_checker.hpp"
 #include "expression/arithmetic_expression.hpp"
-#include "expression/cast_expression.hpp"
 #include "expression/column_ref_expression.hpp"
 #include "expression/comparison_expression.hpp"
 #include "expression/constant_expression.hpp"
 #include "expression/expression.hpp"
-#include "expression/function_call_expression.hpp"
 #include "expression/logical_expression.hpp"
 #include "planner/abstract_plan_node.hpp"
 #include "planner/filter_compaction_plan_node.hpp"
@@ -129,9 +127,10 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
     }
 
     // TODO: Plan ORDER BY
-    // if (auto* order = select_stmt->order) {
-    //     VELODB_THROW(ExecutionError, "ORDER BY not supported yet");
-    // }
+    if (auto* order = select_stmt->order) {
+        (void)order;
+        VELODB_THROW(ExecutionError, "ORDER BY not supported yet");
+    }
 
     if (auto* limit = select_stmt->limit) {
         auto* limit_expr = limit->limit;

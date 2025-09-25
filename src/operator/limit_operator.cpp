@@ -29,7 +29,10 @@ Result<RowBatch> LimitOperator::next()
         auto& input_batch = child_result.value();
         auto input_row_count = input_batch.getRowCount();
         if (input_row_count == 0) {
-            return Result<RowBatch>::success(std::move(buffer_.splitFront(buffer_.getRowCount())));
+            // Produce the last (maybe incomplete) batch if we have any rows buffered
+            auto last_batch_size = std::min(MAX_BATCH_SIZE, std::min(buffer_.getRowCount(), limit_ - current_count_));
+            current_count_ += last_batch_size;
+            return Result<RowBatch>::success(std::move(buffer_.splitFront(last_batch_size)));
         }
 
         if (skipped_count_ < offset_) {
@@ -39,18 +42,19 @@ Result<RowBatch> LimitOperator::next()
                 continue; // Skip entire batch
             }
             // Adjust input batch to skip the rows
-            input_batch.splitFront(input_row_count - to_skip);
+            input_batch.splitFront(to_skip);
         }
 
-        buffer_.addRows(input_batch);
-        size_t next_batch_size = MAX_BATCH_SIZE;
+        // Discard batches beyond the limit
         if (current_count_ < limit_) {
-            next_batch_size = std::min(next_batch_size, limit_ - current_count_);
-        }
-        current_count_ += input_batch.getRowCount();
-        if (next_batch_size > 0 && buffer_.getRowCount() >= next_batch_size) {
-            auto output_batch = buffer_.splitFront(next_batch_size);
-            return Result<RowBatch>::success(std::move(output_batch));
+            buffer_.addRows(input_batch);
+
+            // If we can produce a full batch, do so
+            if (std::min(buffer_.getRowCount(), limit_ - current_count_) >= MAX_BATCH_SIZE) {
+                auto output_batch = buffer_.splitFront(MAX_BATCH_SIZE);
+                current_count_ += MAX_BATCH_SIZE;
+                return Result<RowBatch>::success(std::move(output_batch));
+            }
         }
     }
 }
