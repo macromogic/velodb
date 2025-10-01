@@ -102,6 +102,11 @@ const ValueVector<size_t>::DType* ValueVector<size_t>::data() const
     return data_;
 }
 
+ValueVector<size_t>::DType* ValueVector<size_t>::data()
+{
+    return data_;
+}
+
 void ValueVector<size_t>::ensureOrdinal(VType& data, ComparisonType comp) const
 {
     std::visit(
@@ -137,21 +142,16 @@ void ValueVector<size_t>::ensureOrdinal(VType& data, ComparisonType comp) const
         data.str_);
 }
 
-Result<EventPool::EventHandle> ValueVector<size_t>::to(DataLocation location)
+void ValueVector<size_t>::to(DataLocation location)
 {
     VELODB_ASSERT_MSG(location != DataLocation::VIEW, "Cannot move data to VIEW");
-    auto handle_result = EventPool::instance().acquire();
     if (location_ != location) {
-        if (!handle_result) {
-            return Result<EventPool::EventHandle>::failure(handle_result.error());
-        }
         if (location_ == DataLocation::CUDA) {
             DType* host_data;
             auto& stream = CudaStream::getD2HStream();
             CHECKED_CALL_THROW(cudaMallocHost(&host_data, capacity_ * sizeof(DType)));
             CHECKED_CALL_THROW(
                 cudaMemcpyAsync(host_data, data_, capacity_ * sizeof(DType), cudaMemcpyDeviceToHost, stream.get()));
-            stream.recordEvent(*handle_result.value());
             cudaFree(data_);
             data_ = host_data;
         } else {
@@ -160,17 +160,13 @@ Result<EventPool::EventHandle> ValueVector<size_t>::to(DataLocation location)
             CHECKED_CALL_THROW(cudaMalloc(&device_data, capacity_ * sizeof(DType)));
             CHECKED_CALL_THROW(
                 cudaMemcpyAsync(device_data, data_, capacity_ * sizeof(DType), cudaMemcpyHostToDevice, stream.get()));
-            stream.recordEvent(*handle_result.value());
             if (location_ == DataLocation::HOST) {
                 cudaFreeHost(data_);
             }
             data_ = device_data;
         }
         location_ = location;
-    } else {
-        handle_result.value()->markCompleted();
     }
-    return handle_result;
 }
 
 DataLocation ValueVector<size_t>::location() const
@@ -320,6 +316,24 @@ void ValueVector<size_t>::appendMultiple(const ValueVector<size_t>& other)
     }
     null_mask_.append(other.null_mask_);
     size_ += other.size_;
+}
+
+void ValueVector<size_t>::reorder(const ValueVector<int64_t>& indices)
+{
+    VELODB_ASSERT_MSG(location_ == DataLocation::CUDA && indices.location() == DataLocation::CUDA,
+                      "Reorder must happen on CUDA data");
+    if (indices.size() != size_) {
+        VELODB_THROW(ExecutionError, "Index size does not match data size for reorder");
+    }
+    auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
+        "Failed to acquire stream for reorder");
+    auto* new_data = reorderData(data_, indices.data(), size_, stream_handle->get());
+    std::swap(data_, new_data);
+    if (new_data != nullptr) {
+        cudaFree(new_data);
+    }
+    // null_mask_ = null_mask_.slice(0, size_); // Rebuild null mask (no inplace reorder implemented)
+    stream_handle.release();
 }
 
 ValueVector<size_t> ValueVector<size_t>::buildFrom(std::vector<Value>&& data, DataLocation location)

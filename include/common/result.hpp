@@ -126,9 +126,29 @@ public:
     }
 
     // Convenience methods
-    T value_or(const T& default_value) const& { return *this ? value() : default_value; }
+    T value_or(const T& default_value) const& { return *this ? std::get<T>(value_) : default_value; }
 
-    T value_or(T&& default_value) && { return *this ? std::move(value()) : std::move(default_value); }
+    T value_or(T&& default_value) && { return *this ? std::move(std::get<T>(value_)) : std::move(default_value); }
+
+    template <typename ExceptionType = DatabaseError, typename... Args>
+    const T& value_or_throw(Args&&... args) const&
+    {
+        if (*this) {
+            return std::get<T>(value_);
+        } else {
+            throw ExceptionType(std::forward<Args>(args)...);
+        }
+    }
+
+    template <typename ExceptionType = DatabaseError, typename... Args>
+    T value_or_throw(Args&&... args) &&
+    {
+        if (*this) {
+            return std::move(std::get<T>(value_));
+        } else {
+            throw ExceptionType(std::forward<Args>(args)...);
+        }
+    }
 
     // Monadic operations
     template <typename F>

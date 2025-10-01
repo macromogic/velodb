@@ -21,8 +21,6 @@ public:
 
     Catalog& getCatalog() const { return catalog_; }
 
-    Column& createTemporaryColumn(const std::string& column_name, std::unique_ptr<DataType> type);
-
 private:
     std::reference_wrapper<Catalog> catalog_;
     std::vector<std::unique_ptr<Column>> temporary_columns_;

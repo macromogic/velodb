@@ -127,9 +127,9 @@ DataLocation Column::location() const
     return std::visit([](auto&& arg) { return arg.location(); }, data_source_);
 }
 
-Result<EventPool::EventHandle> Column::to(DataLocation location)
+void Column::to(DataLocation location)
 {
-    return std::visit([location](auto&& arg) { return arg.to(location); }, data_source_);
+    std::visit([location](auto&& arg) { arg.to(location); }, data_source_);
 }
 
 void Column::reserve(size_t new_capacity)
@@ -196,6 +196,21 @@ Column Column::splitFront(size_t size)
             return Column(type_->cloneUnique(), std::move(split_impl));
         },
         data_source_);
+}
+
+void Column::reorder(const Column& rowid_column)
+{
+    std::visit(
+        [&](auto&& data, auto&& idx) {
+            using IdxType = typename std::decay_t<decltype(idx)>::DType;
+            if constexpr (std::is_same_v<IdxType, int64_t>) {
+                data.reorder(idx);
+            } else {
+                VELODB_THROW(ExecutionError, "Invalid types for reordering");
+            }
+        },
+        data_source_,
+        rowid_column.data_source_);
 }
 
 void Column::appendMultiple(const Column& other, const Column& mask)

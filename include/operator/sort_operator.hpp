@@ -16,15 +16,17 @@ public:
     SortOperator(ExecutionContext& context,
                  Schema output_schema,
                  std::unique_ptr<AbstractOperator> child,
-                 std::vector<std::unique_ptr<AbstractExpression>> sort_expressions,
+                 std::vector<size_t> order_indices,
                  std::vector<bool> ascending_flags);
     ~SortOperator() override = default;
 
     Result<RowBatch> next() override;
 
 private:
-    std::vector<std::unique_ptr<AbstractExpression>> sort_expressions_;
+    std::vector<size_t> order_indices_;
     std::vector<bool> ascending_flags_;
+    RowBatch buffer_;
+    bool sorted_ { false };
 };
 
 } // namespace velodb

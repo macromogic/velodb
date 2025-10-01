@@ -5,9 +5,6 @@
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "common/result.hpp"
-#include "data/data_type.hpp"
-
-#include <vector>
 
 #include <cuda_runtime.h>
 

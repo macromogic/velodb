@@ -55,9 +55,9 @@ EventPool::EventPool(size_t initial_size, size_t max_size, unsigned int event_fl
 {
     // Pre-allocate initial events
     for (size_t i = 0; i < initial_size; ++i) {
-        auto result = createEvent();
-        if (result && result.value() && result.value()->isValid()) {
-            available_events_.push_back(std::move(result.value()));
+        auto event = createEvent().value();
+        if (event && event->isValid()) {
+            available_events_.push_back(std::move(event));
             ++total_count_;
         }
     }
@@ -191,12 +191,8 @@ Result<std::unique_ptr<CudaEvent>> EventPool::createEvent()
 
 Result<std::unique_ptr<CudaEvent>> EventPool::createEvent(unsigned int flags)
 {
-    try {
-        auto event = std::make_unique<CudaEvent>(flags);
-        return Result<std::unique_ptr<CudaEvent>>::success(std::move(event));
-    } catch (const std::exception& e) {
-        return Result<std::unique_ptr<CudaEvent>>::failure(e.what());
-    }
+    auto event = std::make_unique<CudaEvent>(flags);
+    return Result<std::unique_ptr<CudaEvent>>::success(std::move(event));
 }
 
 // EventGuard implementation

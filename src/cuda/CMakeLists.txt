@@ -3,6 +3,7 @@ add_library(
   ${OPERATOR_SOURCES}
   warmup.cu
   compaction.cu
+  sort.cu
   stream.cpp
   stream_pool.cpp
   event.cpp

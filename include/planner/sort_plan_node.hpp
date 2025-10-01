@@ -12,19 +12,14 @@ namespace velodb {
 // Sort plan node
 class SortPlanNode : public AbstractPlanNode {
 public:
-    SortPlanNode(Schema output_schema,
-                 std::vector<std::unique_ptr<AbstractExpression>> sort_expressions,
-                 std::vector<bool> ascending_flags);
+    SortPlanNode(Schema output_schema, std::vector<size_t> order_indices, std::vector<bool> ascending_flags);
     ~SortPlanNode() override = default;
 
     std::unique_ptr<AbstractOperator> createOperator(ExecutionContext& context) const override;
     std::string toString() const override;
 
-    const std::vector<std::unique_ptr<AbstractExpression>>& getSortExpressions() const { return sort_expressions_; }
-    const std::vector<bool>& getAscendingFlags() const { return ascending_flags_; }
-
 private:
-    std::vector<std::unique_ptr<AbstractExpression>> sort_expressions_;
+    std::vector<size_t> order_indices_;
     std::vector<bool> ascending_flags_;
 };
 

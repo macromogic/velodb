@@ -21,6 +21,7 @@
 #include "planner/projection_plan_node.hpp"
 #include "planner/query_planner.hpp"
 #include "planner/seq_scan_plan_node.hpp"
+#include "planner/sort_plan_node.hpp"
 
 #include <SQLParser.h>
 #include <fmt/format.h>
@@ -128,8 +129,21 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
 
     // TODO: Plan ORDER BY
     if (auto* order = select_stmt->order) {
-        (void)order;
-        VELODB_THROW(ExecutionError, "ORDER BY not supported yet");
+        const auto& schema = plan->getOutputSchema();
+        std::vector<size_t> order_indices;
+        std::vector<bool> ascending_flags;
+        for (auto* order_desc : *order) {
+            VELODB_ASSERT_MSG(order_desc->expr->type == hsql::kExprColumnRef, "ORDER BY must be column references");
+            auto* col_ref = order_desc->expr;
+            auto col_index = schema.getColumnIndex(col_ref->name);
+            order_indices.push_back(col_index);
+            ascending_flags.push_back(order_desc->type == hsql::kOrderAsc);
+        }
+        auto sort_plan = std::make_unique<SortPlanNode>(plan->getOutputSchema().clone(),
+                                                        std::move(order_indices),
+                                                        std::move(ascending_flags));
+        sort_plan->addChild(std::move(plan));
+        plan = std::move(sort_plan);
     }
 
     if (auto* limit = select_stmt->limit) {

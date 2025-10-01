@@ -1,6 +1,7 @@
 #include "catalog/row_batch.hpp"
 
 #include "common/exception.hpp"
+#include "cuda/sort.hpp"
 #include "cuda/stream_pool.hpp"
 
 namespace velodb {
@@ -37,20 +38,9 @@ Value RowBatch::getValue(size_t row_id, size_t column_index) const
 void RowBatch::to(DataLocation location)
 {
     // TODO: Blocking data movement here. May redesign for streaming
-    auto stream_result = StreamPool::instance().acquire();
-    if (!stream_result) {
-        VELODB_THROW(CatalogError, "Failed to acquire CUDA stream");
-    }
-    auto join_stream = std::move(stream_result.value());
     for (auto& column : columns_) {
-        auto event_result = column.to(location);
-        if (!event_result) {
-            // Handle error (e.g., throw an exception or log the error)
-            VELODB_THROW(CatalogError, "Failed to move column to the specified location");
-        }
-        join_stream->recordEvent(*event_result.value());
+        column.to(location);
     }
-    join_stream->synchronize();
 }
 
 void RowBatch::addRows(const RowBatch& other)
@@ -86,6 +76,64 @@ RowBatch RowBatch::splitFront(size_t size)
     }
     num_rows_ = columns_.empty() ? 0 : columns_.front().size();
     return RowBatch(std::move(new_columns));
+}
+
+void RowBatch::sort(const std::vector<size_t>& order_indices,
+                    const std::vector<bool>& ascending_flags,
+                    size_t rowid_index,
+                    size_t min_block_size,
+                    bool reverse)
+{
+    if (order_indices.empty()) {
+        return; // Nothing to sort
+    }
+    VELODB_ASSERT_MSG(order_indices.size() == ascending_flags.size(),
+                      "Order indices and ascending flags size must match");
+    auto n_columns = getColumnCount();
+    for (size_t index : order_indices) {
+        VELODB_ASSERT_MSG(index < n_columns, "Order index out of range");
+    }
+    auto& rowid_column = columns_[rowid_index];
+    VELODB_ASSERT_MSG(rowid_column.getType().getTypeId() == DataTypeId::BIGINT
+                          && rowid_column.location() == DataLocation::CUDA,
+                      "Row ID column must be BIGINT and in CUDA memory");
+    int64_t* rowid_data = std::get<ValueVector<int64_t>>(rowid_column.data_source_).data();
+
+    auto n_sort_columns = order_indices.size();
+    SortColumn* h_sort_columns = new SortColumn[n_sort_columns];
+    for (size_t i = 0; i < n_sort_columns; ++i) {
+        size_t col_idx = order_indices[i];
+        auto& col = columns_[col_idx];
+        std::visit(
+            [&](auto&& arg) {
+                using DT = typename std::decay_t<decltype(arg)>::DType;
+                h_sort_columns[i] = { arg.data(), dTypeId<DT>, ascending_flags[i] };
+            },
+            col.data_source_);
+    }
+    SortColumn* d_sort_columns;
+    CHECKED_CALL_THROW(cudaMalloc(&d_sort_columns, n_sort_columns * sizeof(SortColumn)));
+    CHECKED_CALL_THROW(
+        cudaMemcpy(d_sort_columns, h_sort_columns, n_sort_columns * sizeof(SortColumn), cudaMemcpyHostToDevice));
+    delete[] h_sort_columns;
+
+    auto stream_result = StreamPool::instance().acquire();
+    if (!stream_result) {
+        cudaFree(d_sort_columns);
+        VELODB_THROW(CatalogError, "Failed to acquire CUDA stream");
+    }
+    auto sort_stream = std::move(stream_result.value());
+    sortIndices(rowid_data, num_rows_, d_sort_columns, n_sort_columns, sort_stream->get(), min_block_size, reverse);
+    sort_stream->synchronize();
+    // TODO: reorder all columns based on sorted row IDs
+    for (size_t i = 0; i < n_columns; ++i) {
+        if (i == rowid_index) {
+            continue; // Skip row ID column
+        }
+        columns_[i].reorder(rowid_column);
+    }
+
+    cudaFree(d_sort_columns);
 }
 
 BatchIterator RowBatch::begin() const

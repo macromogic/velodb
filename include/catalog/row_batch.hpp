@@ -26,6 +26,11 @@ public:
     void addRows(const RowBatch& other);
     void addFilteredRows(const RowBatch& other, const Column& mask);
     RowBatch splitFront(size_t size);
+    void sort(const std::vector<size_t>& order_indices,
+              const std::vector<bool>& ascending_flags,
+              size_t rowid_index,
+              size_t min_block_size = 1,
+              bool reverse = false);
 
     BatchIterator begin() const;
     BatchIterator end() const;

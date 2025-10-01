@@ -69,7 +69,7 @@ public:
     void ensureOrdinal(Value& value, ComparisonType comp) const;
 
     DataLocation location() const;
-    Result<EventPool::EventHandle> to(DataLocation location);
+    void to(DataLocation location);
 
     void reserve(size_t new_capacity);
     void append(const Value& value);
@@ -78,6 +78,7 @@ public:
     Column slice(size_t begin, size_t end) const;
     Column tryOwn();
     Column splitFront(size_t size);
+    void reorder(const Column& rowid_column);
 
 private:
     std::unique_ptr<DataType> type_;
