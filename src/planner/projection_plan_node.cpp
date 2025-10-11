@@ -2,12 +2,9 @@
 
 #include "catalog/execution_context.hpp"
 #include "common/exception.hpp"
-#include "common/fmt.hpp"
 #include "operator/projection_operator.hpp"
 
 #include <fmt/ranges.h>
-
-#include <stdexcept>
 
 namespace velodb {
 

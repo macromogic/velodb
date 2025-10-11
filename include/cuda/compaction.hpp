@@ -1,5 +1,6 @@
 #pragma once
 
+#include "data/bit_vector.hpp"
 #include "data/type_traits.hpp"
 
 #include <cstddef>
@@ -10,10 +11,26 @@
 namespace velodb {
 
 template <typename T>
-size_t filter_compact(T* dst, const T* src, const uint8_t* mask, size_t n, cudaStream_t stream = 0, int block = 256);
+size_t filterCompact(T* dst_data,
+                     BitVector::Element* dst_bitmap,
+                     const T* src_data,
+                     const BitVector::Element* src_bitmap,
+                     const uint8_t* mask,
+                     size_t n,
+                     size_t bits_offset,
+                     cudaStream_t stream,
+                     unsigned int block = 256);
 
 #define X(name, DT, VT)                                                                                                \
-    extern template size_t filter_compact<DT>(DT*, const DT*, const uint8_t*, size_t, cudaStream_t, int);
+    extern template size_t filterCompact<DT>(DT*,                                                                      \
+                                             BitVector::Element*,                                                      \
+                                             const DT*,                                                                \
+                                             const BitVector::Element*,                                                \
+                                             const uint8_t*,                                                           \
+                                             size_t,                                                                   \
+                                             size_t,                                                                   \
+                                             cudaStream_t,                                                             \
+                                             unsigned int);
 LIST_TYPES(X)
 #undef X
 

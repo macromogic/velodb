@@ -4,7 +4,6 @@
 #include "common/exception.hpp"
 #include "cuda/compaction.hpp"
 #include "cuda/event.hpp"
-#include "cuda/event_pool.hpp"
 #include "cuda/helper.hpp"
 #include "cuda/sort.hpp"
 #include "cuda/stream.hpp"
@@ -15,25 +14,34 @@
 #include "data/value.hpp"
 #include "expression/expression.hpp"
 
+#include <fmt/ranges.h>
+
 #include <utility>
 
 #include <cuda_runtime.h>
 
 namespace velodb {
 
-template <typename T>
-class ValueVector : private NonCopyable {
-public:
-    using DType = std::decay_t<T>;
-    using VType = VTypeOfD<DType>;
+// Forward declaration
+template <typename VT>
+class ValueVector;
 
-    ValueVector(size_t capacity, DataLocation location = DataLocation::HOST)
+template <typename DT, template <typename> class VecT>
+class ValueVectorBase : private NonCopyable {
+public:
+    using DType = DT;
+    using VType = VTypeOfD<DType>;
+    using ConcreteVector = VecT<VType>;
+    using MaskVector = VecT<bool>;
+
+    ValueVectorBase(size_t capacity, DataLocation location = DataLocation::HOST)
         : data_(nullptr)
         , size_(0)
         , capacity_(capacity)
-        , null_mask_(capacity)
+        , null_mask_(0)
         , location_(location)
     {
+        null_mask_.reserve(capacity);
         if (location == DataLocation::HOST) {
             CHECKED_CALL_THROW(cudaMallocHost(&data_, capacity_ * sizeof(DType)));
         } else if (location == DataLocation::CUDA) {
@@ -44,7 +52,7 @@ public:
     }
 
     // Move constructor
-    ValueVector(ValueVector&& other) noexcept
+    ValueVectorBase(ValueVectorBase&& other) noexcept
         : data_(other.data_)
         , size_(other.size_)
         , capacity_(other.capacity_)
@@ -59,7 +67,7 @@ public:
     }
 
     // Move assignment operator
-    ValueVector& operator=(ValueVector&& other) noexcept
+    ValueVectorBase& operator=(ValueVectorBase&& other) noexcept
     {
         if (this != &other) {
             // Clean up current resources
@@ -87,7 +95,7 @@ public:
         return *this;
     }
 
-    ~ValueVector()
+    virtual ~ValueVectorBase()
     {
         if (location_ == DataLocation::VIEW) {
             return; // View mode does not possess ownership
@@ -102,16 +110,6 @@ public:
     }
 
     size_t size() const { return size_; }
-
-    Value get(size_t index) const
-    {
-        VELODB_ASSERT_MSG(location_ != DataLocation::CUDA, "Cannot access data on device");
-        VELODB_ASSERT_MSG(index < size_, "Index out of range");
-        if (null_mask_.get(index)) {
-            return Value::createNull(dTypeId<DType>);
-        }
-        return Value(dTypeId<DType>, VType(data_[index]));
-    }
 
     void to(DataLocation location)
     {
@@ -209,18 +207,18 @@ public:
         size_++;
     }
 
-    ValueVector slice(size_t start, size_t end) const
+    ConcreteVector slice(size_t start, size_t end) const
     {
         VELODB_ASSERT_MSG(start <= end && end <= size_, "Invalid slice range");
         VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot slice non-host data");
 
         size_t new_size = end - start;
-        return ValueVector(data_ + start, new_size, capacity_, null_mask_.slice(start, end));
+        return ConcreteVector(data_ + start, new_size, capacity_, null_mask_.slice(start, end));
     }
 
-    ValueVector tryOwn()
+    ConcreteVector tryOwn()
     {
-        auto ret = ValueVector(data_, size_, capacity_, null_mask_);
+        auto ret = ConcreteVector(data_, size_, capacity_, null_mask_);
         if (location_ != DataLocation::VIEW) {
             // Transfer ownership
             ret.location_ = location_;
@@ -229,7 +227,7 @@ public:
         return ret;
     }
 
-    ValueVector splitFront(size_t size)
+    ConcreteVector splitFront(size_t size)
     {
         VELODB_ASSERT_MSG(location_ != DataLocation::VIEW, "Cannot split a VIEW data source");
 
@@ -238,7 +236,7 @@ public:
             size = size_;
         }
         size_t remaining_size = size_ - size;
-        ValueVector split_vector(/* capacity = */ size, location_);
+        ConcreteVector split_vector(/* capacity = */ size, location_);
 
         if (location_ == DataLocation::HOST) {
             std::move(data_, data_ + size, split_vector.data_);
@@ -261,23 +259,35 @@ public:
         return split_vector;
     }
 
-    void appendMultiple(const ValueVector& other, const ValueVector<uint8_t>& mask)
+    void appendMaskedMultiple(const ConcreteVector& other, const MaskVector& mask)
     {
         VELODB_ASSERT_MSG(location_ == DataLocation::CUDA && other.location_ == DataLocation::CUDA
                               && mask.location() == DataLocation::CUDA,
                           "Filter compaction must happen on CUDA");
         if (size_ + other.size_ > capacity_) {
-            reserve((size_ + other.capacity_ + capacity_ - 1) / capacity_ * capacity_);
+            reserve(capacity_ + other.capacity_);
+            null_mask_.reserve(null_mask_.element_capacity_ + other.null_mask_.element_capacity_);
         }
         auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
-
-            "Failed to acquire stream for filter compaction: ");
-        size_t num_added = filter_compact(data_ + size_, other.data_, mask.data(), other.size_, stream_handle->get());
+            "Failed to acquire stream for filter compaction");
+        auto mask_elements = size_ / BitVector::ELEMENT_WIDTH;
+        auto bit_offset = size_ % BitVector::ELEMENT_WIDTH;
+        null_mask_.to(DataLocation::CUDA);
+        auto num_added = filterCompact(data_ + size_,
+                                       null_mask_.data_ + mask_elements,
+                                       other.data_,
+                                       other.null_mask_.data_,
+                                       mask.data(),
+                                       other.size_,
+                                       bit_offset,
+                                       stream_handle->get());
+        null_mask_.to(DataLocation::HOST);
         size_ += num_added;
+        null_mask_.size_ += num_added;
         stream_handle.release();
     }
 
-    void appendMultiple(const ValueVector& other)
+    void appendMultiple(const ConcreteVector& other)
     {
         VELODB_ASSERT_MSG(location_ == other.location_ && location_ != DataLocation::VIEW,
                           "Append must happen on same non-VIEW location");
@@ -294,22 +304,76 @@ public:
         size_ += other.size_;
     }
 
-    void reorder(const ValueVector<int64_t>& indices)
+    void reorder(const int64_t* indices)
     {
-        VELODB_ASSERT_MSG(location_ == DataLocation::CUDA && indices.location() == DataLocation::CUDA,
-                          "Reorder must happen on CUDA data");
-        if (indices.size() != size_) {
-            VELODB_THROW(ExecutionError, "Index size does not match data size for reorder");
-        }
         auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
             "Failed to acquire stream for reorder");
-        auto* new_data = reorderData(data_, indices.data(), size_, stream_handle->get());
+        auto* new_data = reorderData(data_, indices, size_, stream_handle->get());
+        // --- DEBUG ---
+        DType* h_tmp_data = new DType[size_];
+        DType* h_new_data = new DType[size_];
+        cudaStream_t stream;
+        cudaStreamCreate(&stream);
+        cudaMemcpyAsync(h_tmp_data, data_, size_ * sizeof(DType), cudaMemcpyDeviceToHost, stream);
+        cudaMemcpyAsync(h_new_data, new_data, size_ * sizeof(DType), cudaMemcpyDeviceToHost, stream);
+        cudaStreamSynchronize(stream);
+        fmt::println(stderr, "Before reorder: {}", fmt::join(h_tmp_data, h_tmp_data + size_, ", "));
+        fmt::println(stderr, "After reorder:  {}", fmt::join(h_new_data, h_new_data + size_, ", "));
+        cudaStreamDestroy(stream);
+        delete[] h_tmp_data;
+        delete[] h_new_data;
+        // --- END DEBUG ---
         std::swap(data_, new_data);
         if (new_data != nullptr) {
             cudaFree(new_data);
         }
-        // null_mask_ = null_mask_.slice(0, size_); // TODO: Rebuild null mask
+        null_mask_.to(DataLocation::CUDA);
+        auto* new_bitmap = reorderBitmap(null_mask_.data_, indices, size_, stream_handle->get());
+        std::swap(null_mask_.data_, new_bitmap);
+        null_mask_.to(DataLocation::HOST);
+        if (new_bitmap != nullptr) {
+            cudaFree(new_bitmap);
+        }
+        stream_handle->synchronize();
         stream_handle.release();
+    }
+
+protected:
+    DType* data_;
+    size_t size_;
+    size_t capacity_;
+    BitVector null_mask_;
+    DataLocation location_;
+
+    // Internal constructor
+    ValueVectorBase(DType* data, size_t size, size_t capacity, BitVector null_mask)
+        : data_(data)
+        , size_(size)
+        , capacity_(capacity)
+        , null_mask_(std::move(null_mask))
+        , location_(DataLocation::VIEW)
+    {
+    }
+};
+
+template <typename VT>
+class ValueVector : public ValueVectorBase<DTypeOfV<VT>, ValueVector> {
+public:
+    using Base = ValueVectorBase<DTypeOfV<VT>, ValueVector>;
+    using DType = DTypeOfV<VT>;
+    using VType = VT;
+    using Base::Base;
+    using Base::ConcreteVector;
+    using Base::MaskVector;
+
+    Value get(size_t index) const
+    {
+        VELODB_ASSERT_MSG(location_ != DataLocation::CUDA, "Cannot access data on device");
+        VELODB_ASSERT_MSG(index < size_, "Index out of range");
+        if (null_mask_.get(index)) {
+            return Value::createNull(dTypeId<DType>);
+        }
+        return Value(dTypeId<DType>, VType(data_[index]));
     }
 
     static ValueVector buildFrom(std::vector<Value>&& data, DataLocation location = DataLocation::HOST)
@@ -326,69 +390,171 @@ public:
             i++;
         }
         vec.size_ = n;
+        vec.null_mask_.size_ = n;
         return vec;
     }
 
 private:
-    DType* data_;
-    size_t size_;
-    size_t capacity_;
-    BitVector null_mask_;
-    DataLocation location_;
+    using Base::capacity_;
+    using Base::data_;
+    using Base::location_;
+    using Base::null_mask_;
+    using Base::size_;
 
-    // Internal constructor
-    ValueVector(DType* data, size_t size, size_t capacity, BitVector null_mask)
-        : data_(data)
-        , size_(size)
-        , capacity_(capacity)
-        , null_mask_(std::move(null_mask))
-        , location_(DataLocation::VIEW)
-    {
-    }
+    friend class ValueVectorBase<DTypeOfV<VT>, ValueVector>;
 };
 
-// Template specialization for strings (size_t -> StringVector functionality)
-// Implementation moved to value_vector.cpp
 template <>
-class ValueVector<size_t> : private NonCopyable {
+class ValueVector<OrdinalString> : public ValueVectorBase<size_t, ValueVector> {
 public:
+    using Base = ValueVectorBase<size_t, ValueVector>;
     using DType = size_t;
     using VType = OrdinalString;
+    using Base::Base;
+    using Base::ConcreteVector;
+    using Base::MaskVector;
 
-    ValueVector(size_t capacity, DataLocation location = DataLocation::HOST);
-    ValueVector(ValueVector&& other) noexcept;
-    ValueVector& operator=(ValueVector&& other) noexcept;
-    ~ValueVector();
+    ValueVector(size_t capacity, DataLocation location)
+        : Base(capacity, location)
+        , ordered_strings_(std::make_shared<std::vector<std::string>>())
+    {
+    }
 
-    size_t size() const;
-    Value get(size_t index) const;
-    const DType* data() const;
-    DType* data();
-    void ensureOrdinal(VType& value, ComparisonType comp) const;
+    ValueVector(ValueVector&& other) noexcept
+        : Base(std::move(other))
+        , ordered_strings_(std::move(other.ordered_strings_))
+    {
+    }
 
-    void to(DataLocation location);
-    DataLocation location() const;
+    ValueVector& operator=(ValueVector&& other) noexcept
+    {
+        if (this != &other) {
+            ordered_strings_ = std::move(other.ordered_strings_);
+            Base::operator=(std::move(other));
+        }
+        return *this;
+    }
 
-    void resize(size_t new_size, DType value = DType());
-    void reserve(size_t new_capacity);
-    void append(const DType& value);
-    void append(DType&& value);
+    Value get(size_t index) const
+    {
+        VELODB_ASSERT_MSG(location_ != DataLocation::CUDA, "Cannot access data on device");
+        VELODB_ASSERT_MSG(index < size_, "Index out of range");
+        if (null_mask_.get(index)) {
+            return Value::createNull(dTypeId<DType>);
+        }
+        auto ordinal = data_[index];
+        return Value(dTypeId<DType>, VType(ordinal, std::string_view((*ordered_strings_)[ordinal])));
+    }
 
-    ValueVector slice(size_t start, size_t end) const;
-    ValueVector tryOwn();
-    ValueVector splitFront(size_t size);
-    void appendMultiple(const ValueVector<size_t>& other, const ValueVector<uint8_t>& mask);
-    void appendMultiple(const ValueVector<size_t>& other);
-    void reorder(const ValueVector<int64_t>& indices);
+    void ensureOrdinal(VType& data, ComparisonType comp) const
+    {
+        std::visit(
+            [&data, comp, this](auto&& arg) {
+                size_t ordinal;
+                // TODO: make this oblivious?
+                switch (comp) {
+                case ComparisonType::LESS_THAN:
+                case ComparisonType::LESS_THAN_OR_EQUAL:
+                case ComparisonType::GREATER_THAN:
+                    ordinal = std::lower_bound(ordered_strings_->begin(), ordered_strings_->end(), arg)
+                        - ordered_strings_->begin();
+                    break;
+                case ComparisonType::GREATER_THAN_OR_EQUAL:
+                    ordinal = std::upper_bound(ordered_strings_->begin(), ordered_strings_->end(), arg)
+                        - ordered_strings_->begin() - 1;
+                    break;
+                case ComparisonType::EQUAL:
+                case ComparisonType::NOT_EQUAL: {
+                    auto [lb, ub] = std::equal_range(ordered_strings_->begin(), ordered_strings_->end(), arg);
+                    if (lb == ub) {
+                        ordinal = ordered_strings_->size();
+                    } else {
+                        ordinal = lb - ordered_strings_->begin();
+                    }
+                    break;
+                }
+                default:
+                    VELODB_THROW(ExecutionError, "Unsupported comparison type");
+                }
+                data.ordinal_ = ordinal;
+            },
+            data.str_);
+    }
 
-    static ValueVector buildFrom(std::vector<Value>&& data, DataLocation location = DataLocation::HOST);
+    ConcreteVector slice(size_t start, size_t end) const
+    {
+        VELODB_ASSERT_MSG(start <= end && end <= size_, "Invalid slice range");
+        VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot slice non-host data");
+
+        size_t new_size = end - start;
+        return ConcreteVector(data_ + start, new_size, capacity_, null_mask_.slice(start, end), ordered_strings_);
+    }
+
+    ConcreteVector tryOwn()
+    {
+        auto ret = ConcreteVector(data_, size_, capacity_, null_mask_, ordered_strings_);
+        if (location_ != DataLocation::VIEW) {
+            ret.location_ = location_;
+            location_ = DataLocation::VIEW;
+        }
+        return ret;
+    }
+
+    ConcreteVector splitFront(size_t size)
+    {
+        auto split_vector = Base::splitFront(size);
+        split_vector.ordered_strings_ = ordered_strings_;
+        return split_vector;
+    }
+
+    void appendMaskedMultiple(const ConcreteVector& other, const MaskVector& mask)
+    {
+        Base::appendMaskedMultiple(other, mask);
+        if (ordered_strings_ != other.ordered_strings_) {
+            ordered_strings_ = other.ordered_strings_;
+        }
+    }
+
+    void appendMultiple(const ConcreteVector& other)
+    {
+        Base::appendMultiple(other);
+        if (ordered_strings_ != other.ordered_strings_) {
+            ordered_strings_ = other.ordered_strings_;
+        }
+    }
+
+    static ValueVector buildFrom(std::vector<Value>&& data, DataLocation location = DataLocation::HOST)
+    {
+        size_t n = data.size();
+        ValueVector vec(n, location);
+
+        // Build ordered string list
+        for (const auto& value : data) {
+            if (!value.isNull()) {
+                vec.ordered_strings_->push_back(value.getString());
+            }
+        }
+        std::sort(vec.ordered_strings_->begin(), vec.ordered_strings_->end());
+
+        size_t i = 0;
+        for (auto&& value : data) {
+            if (value.isNull()) {
+                vec.null_mask_.set(i);
+            } else {
+                // TODO: Make it oblivious?
+                auto ordinal = std::distance(
+                    vec.ordered_strings_->begin(),
+                    std::lower_bound(vec.ordered_strings_->begin(), vec.ordered_strings_->end(), value.getString()));
+                vec.data_[i] = static_cast<DType>(ordinal);
+            }
+            i++;
+        }
+        vec.size_ = n;
+        vec.null_mask_.size_ = n;
+        return vec;
+    }
 
 private:
-    DType* data_;
-    size_t size_;
-    size_t capacity_;
-    BitVector null_mask_;
-    DataLocation location_;
     std::shared_ptr<std::vector<std::string>> ordered_strings_;
 
     // Internal constructor
@@ -396,10 +562,11 @@ private:
                 size_t size,
                 size_t capacity,
                 BitVector null_mask,
-                const std::shared_ptr<std::vector<std::string>>& ordered_strings);
+                const std::shared_ptr<std::vector<std::string>>& ordered_strings)
+        : Base(data, size, capacity, std::move(null_mask))
+        , ordered_strings_(ordered_strings)
+    {
+    }
 };
-
-// Type alias for backward compatibility
-using StringVector = ValueVector<size_t>;
 
 } // namespace velodb

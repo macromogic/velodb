@@ -105,19 +105,27 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
 {
     PROFILE_SCOPE("Query Planning");
     // Plan the FROM clause
-    VELODB_ASSERT_MSG(select_stmt->fromTable != nullptr, "SELECT without FROM not supported");
+    auto* table_ref = select_stmt->fromTable;
+    VELODB_ASSERT_MSG(table_ref != nullptr, "SELECT without FROM not supported");
 
     // Plan WHERE clause and merge with scan
     std::unique_ptr<AbstractExpression> predicate = nullptr;
     if (select_stmt->whereClause != nullptr) {
-        predicate = planExpression(select_stmt->fromTable, select_stmt->whereClause);
+        predicate = planExpression(table_ref, select_stmt->whereClause);
     }
 
-    auto plan = planTableRef(select_stmt->fromTable, std::move(predicate));
+    auto plan = planTableRef(table_ref, std::move(predicate));
 
     // Plan SELECT list (projection)
     if (select_stmt->selectList && !select_stmt->selectList->empty()) {
-        auto projection_expressions = planSelectList(select_stmt->fromTable, select_stmt->selectList);
+        auto projection_expressions = planSelectList(table_ref, select_stmt->selectList);
+        if (!projection_expressions.empty()) {
+            auto table_name = table_ref->name;
+            projection_expressions.push_back(
+                std::make_unique<ColumnRefExpression>(table_name, "$_rowid", std::make_unique<BigIntType>()));
+            projection_expressions.push_back(
+                std::make_unique<ColumnRefExpression>(table_name, "$_mask", std::make_unique<BooleanType>()));
+        }
         auto& input_schema = plan->getOutputSchema();
         auto projection_schema = inferProjectionSchema(projection_expressions, input_schema);
         auto projection_plan = std::make_unique<ProjectionPlanNode>(input_schema.clone(),
@@ -476,7 +484,6 @@ Schema QueryPlanner::inferProjectionSchema(const std::vector<std::unique_ptr<Abs
 {
     if (expressions.empty()) {
         // SELECT * case - return clone of input schema
-        // TODO: exclude $_rowid and $_mask
         return input_schema.clone();
     }
 

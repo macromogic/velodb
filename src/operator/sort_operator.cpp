@@ -25,10 +25,6 @@ Result<RowBatch> SortOperator::next()
         if (!child) {
             return Result<RowBatch>::failure("FilterCompactionOperator requires a child operator");
         }
-        if (!output_schema_.hasColumn("$_rowid")) {
-            return Result<RowBatch>::failure("SortOperator requires $_rowid column in output schema");
-        }
-        auto rowid_index = output_schema_.getColumnIndex("$_rowid");
         bool reverse = false;
         while (true) {
             auto child_result = child->next();
@@ -39,11 +35,11 @@ Result<RowBatch> SortOperator::next()
             if (batch.getRowCount() == 0) {
                 break;
             }
-            batch.sort(order_indices_, ascending_flags_, rowid_index, 1, reverse);
+            batch.sort(order_indices_, ascending_flags_, 1, reverse);
             buffer_.addRows(batch);
             reverse = !reverse;
         }
-        buffer_.sort(order_indices_, ascending_flags_, rowid_index, MAX_BATCH_SIZE);
+        buffer_.sort(order_indices_, ascending_flags_, MAX_BATCH_SIZE);
         sorted_ = true;
     }
     return Result<RowBatch>::success(buffer_.splitFront(MAX_BATCH_SIZE));

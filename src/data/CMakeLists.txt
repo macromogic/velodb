@@ -1,5 +1,5 @@
 add_library(velodb_data OBJECT bit_vector.cpp data_type.cpp type_checker.cpp
-                               value_vector.cpp value.cpp)
+                               value.cpp)
 
 target_link_libraries(velodb_data ${DEPENDENCY_LIBS})
 

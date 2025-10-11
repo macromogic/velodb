@@ -1,4 +1,3 @@
-#include "common/exception.hpp"
 #include "cuda/helper.hpp"
 #include "cuda/sort.hpp"
 #include "data/type_traits.hpp"
@@ -11,7 +10,7 @@ namespace velodb {
 
 namespace gpu {
 
-    __device__ int compare_single(int64_t row_i, int64_t row_j, const SortColumn& col, bool reverse)
+    __device__ __forceinline__ int compareSingle(int64_t row_i, int64_t row_j, const SortColumn& col, bool reverse)
     {
         switch (col.id) {
 #define X(name, DT, VT)                                                                                                \
@@ -31,15 +30,15 @@ namespace gpu {
         }
     }
 
-    __device__ bool multi_key_less(int64_t row_i, int64_t row_j, SortColumn* cols, size_t n_cols, bool reverse)
+    __device__ bool multiKeyLess(int64_t row_i, int64_t row_j, SortColumn* cols, size_t n_cols, bool reverse)
     {
         if (row_i == -1)
             return false; // row -1 is always the largest
         if (row_j == -1)
             return true;
 
-        for (int k = 0; k < n_cols; k++) {
-            int cmp = compare_single(row_i, row_j, cols[k], reverse);
+        for (size_t k = 0; k < n_cols; k++) {
+            int cmp = compareSingle(row_i, row_j, cols[k], reverse);
             if (cmp < 0)
                 return true;
             if (cmp > 0)
@@ -48,20 +47,28 @@ namespace gpu {
         return row_i < row_j;
     }
 
-    __global__ void bitonic_step(int64_t* d_row_ids,
-                                 SortColumn* d_sort_columns,
-                                 size_t n_sort_columns,
-                                 int j,
-                                 int k,
-                                 int N,
-                                 bool reverse)
+    __global__ void initializeIndices(int64_t* d_indices, size_t n)
+    {
+        unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
+        if (i < n) {
+            d_indices[i] = static_cast<int64_t>(i);
+        }
+    }
+
+    __global__ void bitonicStep(int64_t* d_row_ids,
+                                SortColumn* d_sort_columns,
+                                size_t n_sort_columns,
+                                unsigned int j,
+                                unsigned int k,
+                                unsigned int N,
+                                bool reverse)
     {
         unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
         unsigned int ixj = i ^ j;
 
         if (ixj > i && ixj < N && i < N) {
             bool ascending = ((i & k) == 0);
-            bool should_swap = multi_key_less(d_row_ids[ixj], d_row_ids[i], d_sort_columns, n_sort_columns, reverse);
+            bool should_swap = multiKeyLess(d_row_ids[ixj], d_row_ids[i], d_sort_columns, n_sort_columns, reverse);
             if (ascending ? should_swap : !should_swap) {
                 int64_t tmp = d_row_ids[i];
                 d_row_ids[i] = d_row_ids[ixj];
@@ -71,7 +78,7 @@ namespace gpu {
     }
 
     template <typename T>
-    __global__ void reorder_kernel(T* d_out, const T* d_in, const int64_t* d_indices, size_t n)
+    __global__ void reorder(T* d_out, const T* d_in, const int64_t* d_indices, size_t n)
     {
         unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
         if (i < n) {
@@ -80,7 +87,43 @@ namespace gpu {
         }
     }
 
+    template <typename Elem>
+    __global__ void reorderBitmap(Elem* d_out, const Elem* d_in, const int64_t* d_indices, size_t n)
+    {
+        constexpr auto ElemSize = sizeof(Elem) * 8;
+
+        unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
+        unsigned int warp_id = i >> WARP_BITS;
+        unsigned int lane_id = i & WARP_MASK;
+        unsigned int mask = __activemask();
+
+        int bit = 0;
+        if (i < n) {
+            int64_t idx = d_indices[i];
+            bit = d_in[idx / ElemSize] >> (idx % ElemSize) & 1;
+        }
+
+        uint32_t ballot = __ballot_sync(mask, bit);
+        if (lane_id == 0) {
+            reinterpret_cast<uint32_t*>(d_out)[warp_id] = ballot;
+        }
+    }
+
 } // namespace gpu
+
+int64_t* initializeIndices(size_t n, cudaStream_t stream)
+{
+    if (n == 0)
+        return nullptr;
+
+    int64_t* d_indices;
+    CHECKED_CALL_THROW(cudaMalloc(&d_indices, n * sizeof(int64_t)));
+
+    int threads = 256;
+    int blocks = (n + threads - 1) / threads;
+    gpu::initializeIndices<<<blocks, threads, 0, stream>>>(d_indices, n);
+    return d_indices;
+}
 
 void sortIndices(int64_t* d_row_ids,
                  size_t n_rows,
@@ -105,13 +148,13 @@ void sortIndices(int64_t* d_row_ids,
     int blocks = (padded_rows + threads - 1) / threads;
     for (size_t k = min_block_size * 2; k <= padded_rows; k <<= 1) {
         for (size_t j = k >> 1; j >= min_block_size; j >>= 1) {
-            gpu::bitonic_step<<<blocks, threads, 0, stream>>>(d_padded_row_ids,
-                                                              d_sort_columns,
-                                                              n_sort_columns,
-                                                              j,
-                                                              k,
-                                                              padded_rows,
-                                                              reverse);
+            gpu::bitonicStep<<<blocks, threads, 0, stream>>>(d_padded_row_ids,
+                                                             d_sort_columns,
+                                                             n_sort_columns,
+                                                             j,
+                                                             k,
+                                                             padded_rows,
+                                                             reverse);
         }
     }
 
@@ -132,7 +175,23 @@ T* reorderData(T* d_data, const int64_t* d_indices, size_t n, cudaStream_t strea
     // Launch kernel to reorder data
     int threads = 256;
     int blocks = (n + threads - 1) / threads;
-    gpu::reorder_kernel<<<blocks, threads, 0, stream>>>(d_out, d_data, d_indices, n);
+    gpu::reorder<<<blocks, threads, 0, stream>>>(d_out, d_data, d_indices, n);
+    return d_out;
+}
+
+template <typename Elem>
+Elem* reorderBitmap(Elem* d_bitmap, const int64_t* d_indices, size_t n, cudaStream_t stream)
+{
+    if (n == 0)
+        return nullptr;
+
+    Elem* d_out;
+    CHECKED_CALL_THROW(cudaMalloc(&d_out, n * sizeof(Elem)));
+
+    // Launch kernel to reorder data
+    int threads = 256;
+    int blocks = (n + threads - 1) / threads;
+    gpu::reorderBitmap<Elem><<<blocks, threads, 0, stream>>>(d_out, d_bitmap, d_indices, n);
     return d_out;
 }
 
@@ -140,5 +199,10 @@ T* reorderData(T* d_data, const int64_t* d_indices, size_t n, cudaStream_t strea
 #define X(name, DT, VT) template DT* reorderData<DT>(DT*, const int64_t*, size_t, cudaStream_t);
 LIST_TYPES(X)
 #undef X
+
+template BitVector::Element* reorderBitmap<BitVector::Element>(BitVector::Element*,
+                                                               const int64_t*,
+                                                               size_t,
+                                                               cudaStream_t);
 
 } // namespace velodb

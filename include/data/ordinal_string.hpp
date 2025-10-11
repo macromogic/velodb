@@ -84,7 +84,7 @@ private:
     std::optional<size_t> ordinal_;
     std::variant<std::string, std::string_view> str_;
 
-    friend class ValueVector<size_t>;
+    friend class ValueVector<OrdinalString>;
 };
 
 } // namespace velodb

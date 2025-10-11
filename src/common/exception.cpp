@@ -62,7 +62,7 @@ void TracedException::capture_stack_trace(size_t trace_depth)
 void TracedException::format_full_message()
 {
     if (!stack_trace_.empty()) {
-        full_message_ = fmt::format("{}\n\n{}", message_, stack_trace_);
+        full_message_ = fmt::format("{}\n{}", stack_trace_, message_);
     } else {
         full_message_ = message_;
     }

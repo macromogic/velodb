@@ -4,14 +4,10 @@
 #include "catalog/table.hpp"
 #include "catalog/table_builder.hpp"
 #include "data/data_type.hpp"
-#include "expression/arithmetic_expression.hpp"
-#include "expression/cast_expression.hpp"
 #include "expression/column_ref_expression.hpp"
 #include "expression/comparison_expression.hpp"
 #include "expression/constant_expression.hpp"
 #include "expression/expression.hpp"
-#include "expression/function_call_expression.hpp"
-#include "expression/logical_expression.hpp"
 #include "operator/filter_compaction_operator.hpp"
 #include "operator/seq_scan_operator.hpp"
 
@@ -96,7 +92,7 @@ TEST_F(OperatorTest, SeqScanOperatorWithPredicate)
                                                                            std::move(scan_op));
 
     auto view_result = filter_compaction_op->next();
-    EXPECT_TRUE(static_cast<bool>(view_result));
+    ASSERT_TRUE(static_cast<bool>(view_result)) << view_result.error();
     auto view = std::move(view_result.value());
     view.to(DataLocation::HOST);
 

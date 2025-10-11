@@ -51,7 +51,7 @@ static Column::DataSource createDataSource(const DataType& type, size_t initial_
 #define X(name, DT, VT)                                                                                                \
     case DataTypeId::name: {                                                                                           \
         PROFILE_SCOPE("Creating ValueVector for " #name);                                                              \
-        return ValueVector<DT>(initial_capacity, location);                                                            \
+        return ValueVector<VT>(initial_capacity, location);                                                            \
     }
         LIST_TYPES(X)
 #undef X
@@ -73,7 +73,7 @@ Column Column::buildFrom(std::unique_ptr<DataType> type, std::vector<Value>&& va
     switch (type->getTypeId()) {
 #define X(name, DT, VT)                                                                                                \
     case DataTypeId::name: {                                                                                           \
-        auto vec = ValueVector<DT>::buildFrom(std::move(values), location);                                            \
+        auto vec = ValueVector<VT>::buildFrom(std::move(values), location);                                            \
         return Column(type->cloneUnique(), std::move(vec));                                                            \
     }
         LIST_TYPES(X)
@@ -198,22 +198,12 @@ Column Column::splitFront(size_t size)
         data_source_);
 }
 
-void Column::reorder(const Column& rowid_column)
+void Column::reorder(const int64_t* indices)
 {
-    std::visit(
-        [&](auto&& data, auto&& idx) {
-            using IdxType = typename std::decay_t<decltype(idx)>::DType;
-            if constexpr (std::is_same_v<IdxType, int64_t>) {
-                data.reorder(idx);
-            } else {
-                VELODB_THROW(ExecutionError, "Invalid types for reordering");
-            }
-        },
-        data_source_,
-        rowid_column.data_source_);
+    std::visit([&](auto&& data) { data.reorder(indices); }, data_source_);
 }
 
-void Column::appendMultiple(const Column& other, const Column& mask)
+void Column::appendMaskedMultiple(const Column& other, const Column& mask)
 {
     std::visit(
         [](auto&& dst, auto&& src, auto&& mask) {
@@ -221,7 +211,7 @@ void Column::appendMultiple(const Column& other, const Column& mask)
             using SrcType = std::decay_t<decltype(src)>;
             using MaskType = std::decay_t<decltype(mask)>;
             if constexpr (std::is_same_v<DstType, SrcType> && std::is_same_v<typename MaskType::VType, bool>) {
-                dst.appendMultiple(src, mask);
+                dst.appendMaskedMultiple(src, mask);
             } else {
                 VELODB_THROW(ExecutionError, "Invalid types for compaction");
             }

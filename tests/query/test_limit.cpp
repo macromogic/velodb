@@ -56,7 +56,7 @@ TEST_F(LimitOperatorTest, LimitExecution)
     std::string sql = "SELECT id, name FROM students LIMIT 3 OFFSET 1";
 
     auto result = engine_.executeQuery(sql);
-    ASSERT_TRUE(static_cast<bool>(result));
+    ASSERT_TRUE(static_cast<bool>(result)) << result.error();
     auto& view = result.value();
 
     // Should return exactly 3 rows (LIMIT 3)

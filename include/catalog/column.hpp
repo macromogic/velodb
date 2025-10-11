@@ -42,14 +42,14 @@ private:
 
 class Column : private NonCopyable {
 public:
-    using DataSource = std::variant<ValueVector<uint8_t>,
+    using DataSource = std::variant<ValueVector<bool>,
                                     ValueVector<int8_t>,
                                     ValueVector<int16_t>,
                                     ValueVector<int32_t>,
                                     ValueVector<int64_t>,
                                     ValueVector<float>,
                                     ValueVector<double>,
-                                    StringVector>;
+                                    ValueVector<OrdinalString>>;
 
     explicit Column(std::unique_ptr<DataType> type,
                     size_t initial_capacity = 16,
@@ -78,7 +78,7 @@ public:
     Column slice(size_t begin, size_t end) const;
     Column tryOwn();
     Column splitFront(size_t size);
-    void reorder(const Column& rowid_column);
+    void reorder(const int64_t* indices);
 
 private:
     std::unique_ptr<DataType> type_;
@@ -90,7 +90,7 @@ private:
     {
     }
 
-    void appendMultiple(const Column& other, const Column& mask);
+    void appendMaskedMultiple(const Column& other, const Column& mask);
     void appendMultiple(const Column& other);
 
     friend class RowBatch;

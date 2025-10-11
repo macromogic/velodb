@@ -86,7 +86,7 @@ const Value Table::getValue(size_t row_id, size_t column_index) const
 
 std::string Table::toString() const
 {
-    return fmt::format("{} {}", name_, schema_);
+    return fmt::format("{} {}", name_, schema_.toString());
 }
 
 RowBatch Table::slice(size_t begin, size_t end) const

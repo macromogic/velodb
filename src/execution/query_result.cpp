@@ -2,7 +2,6 @@
 
 #include "catalog/row_batch.hpp"
 #include "common/exception.hpp"
-#include "common/fmt.hpp"
 
 namespace velodb {
 
@@ -27,7 +26,7 @@ Value QueryResult::getValue(size_t row, size_t column) const
     // position 0 reserved for end iterator
     auto index = std::upper_bound(row_offsets_.begin(), row_offsets_.end(), row) - row_offsets_.begin();
     const auto& batch = batches_[index];
-    size_t local_row = row - row_offsets_[index];
+    size_t local_row = row - row_offsets_[index - 1];
     if (local_row >= batch.getRowCount()) {
         VELODB_THROW(CatalogError, "Row index out of range");
     }
@@ -39,7 +38,7 @@ Value QueryResult::getValue(size_t row, size_t column) const
 
 std::string QueryResult::toString() const
 {
-    return fmt::format("QueryResult: {} rows\nSchema: {}", row_count_, schema_);
+    return fmt::format("QueryResult: {} rows\nSchema: {}", row_count_, schema_.toString());
 }
 
 QueryResultIterator QueryResult::begin() const

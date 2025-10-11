@@ -1,11 +1,8 @@
 #include "operator/projection_operator.hpp"
 
 #include "catalog/table.hpp"
-#include "common/fmt.hpp"
 #include "common/result.hpp"
-#include "execution/execution_engine.hpp"
 #include "expression/column_ref_expression.hpp"
-#include "operator/seq_scan_operator.hpp"
 
 #include <fmt/format.h>
 
@@ -39,7 +36,6 @@ Result<RowBatch> ProjectionOperator::next()
     }
 
     if (expressions_.empty()) {
-        // TODO: exclude $_rowid and $_mask
         return child_result;
     } else {
         RowBatch batch;
