@@ -309,20 +309,6 @@ public:
         auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
             "Failed to acquire stream for reorder");
         auto* new_data = reorderData(data_, indices, size_, stream_handle->get());
-        // --- DEBUG ---
-        DType* h_tmp_data = new DType[size_];
-        DType* h_new_data = new DType[size_];
-        cudaStream_t stream;
-        cudaStreamCreate(&stream);
-        cudaMemcpyAsync(h_tmp_data, data_, size_ * sizeof(DType), cudaMemcpyDeviceToHost, stream);
-        cudaMemcpyAsync(h_new_data, new_data, size_ * sizeof(DType), cudaMemcpyDeviceToHost, stream);
-        cudaStreamSynchronize(stream);
-        fmt::println(stderr, "Before reorder: {}", fmt::join(h_tmp_data, h_tmp_data + size_, ", "));
-        fmt::println(stderr, "After reorder:  {}", fmt::join(h_new_data, h_new_data + size_, ", "));
-        cudaStreamDestroy(stream);
-        delete[] h_tmp_data;
-        delete[] h_new_data;
-        // --- END DEBUG ---
         std::swap(data_, new_data);
         if (new_data != nullptr) {
             cudaFree(new_data);

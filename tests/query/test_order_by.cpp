@@ -116,9 +116,6 @@ TEST_F(OrderByTest, BasicOrderByIntegerAscending)
 
     EXPECT_EQ(view.getRowCount(), 8);
 
-    for (auto& tuple : view) {
-        fmt::println(stderr, "{}", tuple);
-    }
     // Verify ascending order by id
     if (view.getRowCount() >= 4) {
         EXPECT_EQ(view.getValue(0, 0).getInteger(), 1); // Alice

@@ -135,7 +135,6 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
         plan = std::move(projection_plan);
     }
 
-    // TODO: Plan ORDER BY
     if (auto* order = select_stmt->order) {
         const auto& schema = plan->getOutputSchema();
         std::vector<size_t> order_indices;
