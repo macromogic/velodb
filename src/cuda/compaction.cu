@@ -111,10 +111,6 @@ namespace gpu {
         }
     }
 
-    // Precondition: The destination bit range written by this kernel
-    // [bits_offset, bits_offset + total_kept) must be zero-initialized.
-    // With that, we only ever set bits (no clears) and can aggregate per-word
-    // contributions within a warp and emit a single atomicOr per word.
     __global__ void filterCompactionBitmap(BitVector::Element* __restrict__ dst,
                                            const BitVector::Element* __restrict__ src,
                                            const uint8_t* __restrict__ mask,
@@ -207,9 +203,6 @@ namespace gpu {
         }
     }
 
-    // ---- Device-side scan helpers (no CUB) ----
-
-    // Per-tile exclusive Blelloch scan: processes TILE=2*BLOCK elements per block
     __global__ void scanTileExclusive(const unsigned int* __restrict__ in,
                                       unsigned int* __restrict__ out,
                                       unsigned int* __restrict__ block_sums,
@@ -254,10 +247,12 @@ namespace gpu {
             __syncthreads();
         }
 
-        if (base + ai < n)
+        if (base + ai < n) {
             out[base + ai] = s[ai];
-        if (base + bi < n)
+        }
+        if (base + bi < n) {
             out[base + bi] = s[bi];
+        }
     }
 
     // Single-block exclusive scan for block_sums array (length m), padded to next power of two
@@ -436,15 +431,19 @@ size_t filterCompact(T* dst_data,
 
     const size_t total_kept = (grid > 0) ? (static_cast<size_t>(*h_last_off) + static_cast<size_t>(*h_last_cnt)) : 0u;
 
-    if (h_last_off)
+    if (h_last_off) {
         CHECKED_CALL_THROW(cudaFreeHost(h_last_off));
-    if (h_last_cnt)
+    }
+    if (h_last_cnt) {
         CHECKED_CALL_THROW(cudaFreeHost(h_last_cnt));
+    }
 
-    if (d_block_sums_offsets)
+    if (d_block_sums_offsets) {
         CHECKED_CALL_THROW(cudaFree(d_block_sums_offsets));
-    if (d_block_sums)
+    }
+    if (d_block_sums) {
         CHECKED_CALL_THROW(cudaFree(d_block_sums));
+    }
     CHECKED_CALL_THROW(cudaFree(d_block_counts));
     CHECKED_CALL_THROW(cudaFree(d_block_offsets));
 
