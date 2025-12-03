@@ -48,7 +48,7 @@ Result<void> runtime_warmup()
 
     // 4. Launch warmup kernel
     dim3 block(128);
-    dim3 grid((bytes / sizeof(uint32_t) + block.x - 1) / block.x);
+    dim3 grid(DIV_UP(bytes / sizeof(uint32_t), block.x));
     gpu::warmup_kernel<<<grid, block, 4096, s>>>(d_buf, bytes / sizeof(uint32_t));
 
     // 5. Synchronize and clean up

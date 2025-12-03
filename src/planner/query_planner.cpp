@@ -17,9 +17,9 @@
 #include "planner/abstract_plan_node.hpp"
 #include "planner/filter_compaction_plan_node.hpp"
 #include "planner/limit_plan_node.hpp"
+#include "planner/materialization_plan_node.hpp"
 #include "planner/merge_sort_join_plan_node.hpp"
 #include "planner/projection_plan_node.hpp"
-#include "planner/query_planner.hpp"
 #include "planner/seq_scan_plan_node.hpp"
 #include "planner/sort_plan_node.hpp"
 
@@ -116,9 +116,10 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
 
     auto plan = planTableRef(table_ref, std::move(predicate));
 
-    // Plan SELECT list (projection)
+    bool is_select_star = false;
     if (select_stmt->selectList && !select_stmt->selectList->empty()) {
         auto projection_expressions = planSelectList(table_ref, select_stmt->selectList);
+        is_select_star = projection_expressions.empty();
         if (!projection_expressions.empty()) {
             auto table_name = table_ref->name;
             projection_expressions.push_back(
@@ -133,6 +134,52 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
                                                                     std::move(projection_expressions));
         projection_plan->addChild(std::move(plan));
         plan = std::move(projection_plan);
+    }
+
+    // If this is SELECT * over a join result that currently only has rowid pair schema, inject materialization node
+    if (is_select_star && plan->getOutputSchema().getColumnCount() == 2) {
+        const auto& c0 = plan->getOutputSchema().getColumnInfo(0).getName();
+        const auto& c1 = plan->getOutputSchema().getColumnInfo(1).getName();
+        auto ends_with = [](const std::string& s, const std::string& suffix) {
+            return s.size() >= suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+        };
+        if (ends_with(c0, "$_rowid") && ends_with(c1, "$_rowid")) {
+            // Build disambiguated output schema: concatenate left & right table non-internal columns with table prefix
+            auto strip_suffix = [](const std::string& name) {
+                constexpr std::string_view suff = "$_rowid";
+                if (name.size() >= suff.size() && name.substr(name.size() - suff.size()) == suff) {
+                    auto base = name.substr(0, name.size() - suff.size());
+                    // If the base ends with an underscore (e.g. "A_$_rowid"), strip it.
+                    if (!base.empty() && base.back() == '_') {
+                        base.pop_back();
+                    }
+                    return base;
+                }
+                return name;
+            };
+            auto left_table_name = strip_suffix(c0);
+            auto right_table_name = strip_suffix(c1);
+            auto left_table_opt = catalog_.get().getTable(left_table_name);
+            auto right_table_opt = catalog_.get().getTable(right_table_name);
+            VELODB_ASSERT_MSG(left_table_opt && right_table_opt, "Materialization: source tables not found");
+            auto& left_table = left_table_opt->get();
+            auto& right_table = right_table_opt->get();
+            std::vector<ColumnInfo> final_columns;
+            auto collect = [&](const Table& table) {
+                for (size_t ci = 0; ci < table.getColumnCount(); ++ci) {
+                    const auto& col_name = table.getColumnName(ci);
+                    if (col_name == "$_rowid" || col_name == "$_mask")
+                        continue;
+                    final_columns.emplace_back(fmt::format("{}.{}", table.getName(), col_name),
+                                               table.getColumnType(ci).cloneUnique());
+                }
+            };
+            collect(left_table);
+            collect(right_table);
+            auto materialization_plan = std::make_unique<MaterializationPlanNode>(Schema(std::move(final_columns)));
+            materialization_plan->addChild(std::move(plan));
+            plan = std::move(materialization_plan);
+        }
     }
 
     if (auto* order = select_stmt->order) {
@@ -217,9 +264,44 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planJoin(const hsql::TableRef* l
     VELODB_ASSERT_MSG(join_expr->type == hsql::kExprOperator, "Join condition must be an operator expression");
     VELODB_ASSERT_MSG(join_expr->opType == hsql::kOpEquals, "Only equality joins are supported");
 
-    // Plan the left and right key expressions
+    // Plan the left and right key expressions for original schemas
     auto left_key_expr = planExpression(left_ref, join_expr->expr);
     auto right_key_expr = planExpression(right_ref, join_expr->expr2);
+
+    // Build side projections: keep join key + $_rowid + $_mask
+    auto build_side_pipeline = [&](std::unique_ptr<AbstractPlanNode> side_plan,
+                                   const hsql::TableRef* side_ref,
+                                   const hsql::Expr* key_expr) -> std::unique_ptr<AbstractPlanNode> {
+        // Input schema after seq scan + compaction
+        const auto& input_schema = side_plan->getOutputSchema();
+
+        // Plan key expression again for projection context (clone)
+        auto key_planned = planExpression(side_ref, key_expr);
+        std::vector<std::unique_ptr<AbstractExpression>> proj_exprs;
+        proj_exprs.push_back(std::move(key_planned));
+        // Add $_rowid and $_mask columns
+        proj_exprs.push_back(
+            std::make_unique<ColumnRefExpression>(side_ref->name, "$_rowid", std::make_unique<BigIntType>()));
+        proj_exprs.push_back(
+            std::make_unique<ColumnRefExpression>(side_ref->name, "$_mask", std::make_unique<BooleanType>()));
+        auto proj_schema = inferProjectionSchema(proj_exprs, input_schema);
+        auto projection_plan = std::make_unique<ProjectionPlanNode>(input_schema.clone(),
+                                                                    proj_schema.clone(),
+                                                                    std::move(proj_exprs));
+        projection_plan->addChild(std::move(side_plan));
+
+        // Sort by first column (join key) ascending for merge sort join
+        std::vector<size_t> order_indices { 0 };
+        std::vector<bool> ascending { true };
+        auto sort_plan = std::make_unique<SortPlanNode>(proj_schema.clone(),
+                                                        std::move(order_indices),
+                                                        std::move(ascending));
+        sort_plan->addChild(std::move(projection_plan));
+        return sort_plan;
+    };
+
+    left_plan = build_side_pipeline(std::move(left_plan), left_ref, join_expr->expr);
+    right_plan = build_side_pipeline(std::move(right_plan), right_ref, join_expr->expr2);
 
     // Infer the output schema for the join
     auto left_table = catalog_.get().getTable(left_ref->name);
@@ -506,14 +588,12 @@ Schema QueryPlanner::inferProjectionSchema(const std::vector<std::unique_ptr<Abs
 
 Schema QueryPlanner::inferJoinSchema(const Table& left_table, const Table& right_table)
 {
-    // For simplicity, we'll just combine the schemas of both tables
-    // In a real implementation, we'd need to consider the join type and conditions
-    Schema schema = left_table.getSchema().clone();
-    for (const auto& col : right_table.getSchema()) {
-        // TODO: Avoid column name clashes
-        schema.addColumnInfo({ col.getName(), col.getType().cloneUnique() });
-    }
-    return schema;
+    // Join output schema (phase 1): only expose the rowid pairs from original tables.
+    // Downstream materialization operator will use these rowids to fetch required columns.
+    std::vector<ColumnInfo> columns;
+    columns.emplace_back(fmt::format("{}_$_rowid", left_table.getName()), std::make_unique<BigIntType>());
+    columns.emplace_back(fmt::format("{}_$_rowid", right_table.getName()), std::make_unique<BigIntType>());
+    return Schema(std::move(columns));
 }
 
 } // namespace velodb

@@ -19,6 +19,7 @@ public:
 
     void addColumn(Column&& column);
     Column& getColumn(size_t index);
+    const Column& getColumn(size_t index) const;
     size_t getColumnCount() const { return columns_.size(); }
     size_t getRowCount() const { return num_rows_; }
     Value getValue(size_t row_id, size_t column_index) const;
@@ -35,6 +36,10 @@ public:
     BatchIterator end() const;
 
     static RowBatch createBuffered(const Schema& schema, size_t initial_capacity, DataLocation location);
+    static RowBatch sortMergeJoinBatches(const RowBatch& left,
+                                         size_t left_key_index,
+                                         const RowBatch& right,
+                                         size_t right_key_index);
 
 private:
     std::vector<Column> columns_;

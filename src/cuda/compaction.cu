@@ -16,9 +16,9 @@ namespace gpu {
         return __popc(lower);
     }
 
-    __global__ void countMaskPerBlock(const uint8_t* __restrict__ mask,
-                                      size_t n,
-                                      unsigned int* __restrict__ block_counts)
+    __global__ void countMaskPerBlockKernel(const uint8_t* __restrict__ mask,
+                                            size_t n,
+                                            unsigned int* __restrict__ block_counts)
     {
         // Optimized reduction for H100: warp-level shuffle reductions with minimal shared memory
         extern __shared__ unsigned int warp_sums[]; // [num_warps]
@@ -47,7 +47,7 @@ namespace gpu {
 
         // First warp reduces warp_sums to a single block sum
         if (warp_id == 0) {
-            unsigned int warp_sum = (lane < (blockDim.x + WARP_SIZE - 1) / WARP_SIZE) ? warp_sums[lane] : 0u;
+            unsigned int warp_sum = (lane < DIV_UP(blockDim.x, WARP_SIZE)) ? warp_sums[lane] : 0u;
 #pragma unroll
             for (int offset = WARP_SIZE >> 1; offset > 0; offset >>= 1) {
                 warp_sum += __shfl_down_sync(0xffffffffu, warp_sum, offset);
@@ -68,7 +68,7 @@ namespace gpu {
         const unsigned int gid = blockIdx.x * blockDim.x + threadIdx.x;
         const unsigned int lane = threadIdx.x & WARP_MASK;
         const unsigned int warp_id = threadIdx.x / WARP_SIZE;
-        const unsigned int num_warps = (blockDim.x + WARP_SIZE - 1) / WARP_SIZE;
+        const unsigned int num_warps = DIV_UP(blockDim.x, WARP_SIZE);
 
         extern __shared__ unsigned int shmem[];
         unsigned int* warp_counts = shmem; // [num_warps]
@@ -111,17 +111,17 @@ namespace gpu {
         }
     }
 
-    __global__ void filterCompactionBitmap(BitVector::Element* __restrict__ dst,
-                                           const BitVector::Element* __restrict__ src,
-                                           const uint8_t* __restrict__ mask,
-                                           size_t n,
-                                           size_t bits_offset,
-                                           const unsigned int* __restrict__ block_offsets)
+    __global__ void filterCompactionBitmapKernel(BitVector::Element* __restrict__ dst,
+                                                 const BitVector::Element* __restrict__ src,
+                                                 const uint8_t* __restrict__ mask,
+                                                 size_t n,
+                                                 size_t bits_offset,
+                                                 const unsigned int* __restrict__ block_offsets)
     {
         const unsigned int gid = blockIdx.x * blockDim.x + threadIdx.x;
         const unsigned int lane = threadIdx.x & WARP_MASK;
         const unsigned int warp_id = threadIdx.x / WARP_SIZE;
-        const unsigned int num_warps = (blockDim.x + WARP_SIZE - 1) / WARP_SIZE;
+        const unsigned int num_warps = DIV_UP(blockDim.x, WARP_SIZE);
 
         extern __shared__ unsigned int shmem[];
         unsigned int* warp_counts = shmem; // [num_warps]
@@ -203,10 +203,10 @@ namespace gpu {
         }
     }
 
-    __global__ void scanTileExclusive(const unsigned int* __restrict__ in,
-                                      unsigned int* __restrict__ out,
-                                      unsigned int* __restrict__ block_sums,
-                                      unsigned int n)
+    __global__ void scanTileExclusiveKernel(const unsigned int* __restrict__ in,
+                                            unsigned int* __restrict__ out,
+                                            unsigned int* __restrict__ block_sums,
+                                            unsigned int n)
     {
         const unsigned int tid = threadIdx.x;
         const unsigned int BLOCK = blockDim.x;
@@ -256,10 +256,10 @@ namespace gpu {
     }
 
     // Single-block exclusive scan for block_sums array (length m), padded to next power of two
-    __global__ void scanSingleBlockExclusive(const unsigned int* __restrict__ in,
-                                             unsigned int* __restrict__ out,
-                                             unsigned int m,
-                                             unsigned int padded)
+    __global__ void scanSingleBlockExclusiveKernel(const unsigned int* __restrict__ in,
+                                                   unsigned int* __restrict__ out,
+                                                   unsigned int m,
+                                                   unsigned int padded)
     {
         const unsigned int tid = threadIdx.x;
         const unsigned int BLOCK = blockDim.x; // expect 2*BLOCK == padded
@@ -299,10 +299,10 @@ namespace gpu {
     }
 
     // Uniform add scanned block offsets to each tile of the per-element scan
-    __global__ void uniformAdd(unsigned int* __restrict__ data,
-                               unsigned int n,
-                               const unsigned int* __restrict__ block_offsets,
-                               unsigned int tile)
+    __global__ void uniformAddKernel(unsigned int* __restrict__ data,
+                                     unsigned int n,
+                                     const unsigned int* __restrict__ block_offsets,
+                                     unsigned int tile)
     {
         const unsigned int tid = threadIdx.x;
         const unsigned int base = blockIdx.x * tile;
@@ -350,7 +350,7 @@ size_t filterCompact(T* dst_data,
     if (n == 0)
         return 0;
 
-    const unsigned int grid = static_cast<unsigned int>((n + block - 1) / block);
+    const unsigned int grid = static_cast<unsigned int>(DIV_UP(n, block));
 
     unsigned int* d_block_counts = nullptr;
     unsigned int* d_block_offsets = nullptr;
@@ -358,9 +358,9 @@ size_t filterCompact(T* dst_data,
     CHECKED_CALL_THROW(cudaMalloc(&d_block_offsets, grid * sizeof(unsigned int)));
 
     // 1. Count the masks in each block
-    const unsigned int num_warps = (block + WARP_SIZE - 1) / WARP_SIZE;
+    const unsigned int num_warps = DIV_UP(block, WARP_SIZE);
     const size_t shmem_count = num_warps * sizeof(unsigned int);
-    gpu::countMaskPerBlock<<<grid, block, shmem_count, stream>>>(mask, n, d_block_counts);
+    gpu::countMaskPerBlockKernel<<<grid, block, shmem_count, stream>>>(mask, n, d_block_counts);
     CHECKED_CALL_THROW(cudaGetLastError());
 
     // 2. Exclusive scan on device (no CUB): two-stage scan + uniform add
@@ -376,24 +376,24 @@ size_t filterCompact(T* dst_data,
     }
 
     // Stage 1: per-tile scan
-    gpu::scanTileExclusive<<<num_tiles, SCAN_BLOCK, TILE * sizeof(unsigned int), stream>>>(d_block_counts,
-                                                                                           d_block_offsets,
-                                                                                           d_block_sums,
-                                                                                           grid);
+    gpu::scanTileExclusiveKernel<<<num_tiles, SCAN_BLOCK, TILE * sizeof(unsigned int), stream>>>(d_block_counts,
+                                                                                                 d_block_offsets,
+                                                                                                 d_block_sums,
+                                                                                                 grid);
     CHECKED_CALL_THROW(cudaGetLastError());
 
     // Stage 2: scan tile sums if multiple tiles
     if (num_tiles > 1u) {
         const unsigned int padded = nextPow2(num_tiles);
         const unsigned int BLOCK2 = padded / 2u; // since TILE2 = 2*BLOCK2
-        gpu::scanSingleBlockExclusive<<<1, BLOCK2, padded * sizeof(unsigned int), stream>>>(d_block_sums,
-                                                                                            d_block_sums_offsets,
-                                                                                            num_tiles,
-                                                                                            padded);
+        gpu::scanSingleBlockExclusiveKernel<<<1, BLOCK2, padded * sizeof(unsigned int), stream>>>(d_block_sums,
+                                                                                                  d_block_sums_offsets,
+                                                                                                  num_tiles,
+                                                                                                  padded);
         CHECKED_CALL_THROW(cudaGetLastError());
 
         // Stage 3: uniform add
-        gpu::uniformAdd<<<num_tiles, SCAN_BLOCK, 0, stream>>>(d_block_offsets, grid, d_block_sums_offsets, TILE);
+        gpu::uniformAddKernel<<<num_tiles, SCAN_BLOCK, 0, stream>>>(d_block_offsets, grid, d_block_sums_offsets, TILE);
         CHECKED_CALL_THROW(cudaGetLastError());
     }
 
@@ -401,12 +401,12 @@ size_t filterCompact(T* dst_data,
     const size_t shmem_compact = 2 * num_warps * sizeof(unsigned int);
     gpu::filterCompaction<T><<<grid, block, shmem_compact, stream>>>(dst_data, src_data, mask, n, d_block_offsets);
     CHECKED_CALL_THROW(cudaGetLastError());
-    gpu::filterCompactionBitmap<<<grid, block, shmem_compact, stream>>>(dst_bitmap,
-                                                                        src_bitmap,
-                                                                        mask,
-                                                                        n,
-                                                                        bits_offset,
-                                                                        d_block_offsets);
+    gpu::filterCompactionBitmapKernel<<<grid, block, shmem_compact, stream>>>(dst_bitmap,
+                                                                              src_bitmap,
+                                                                              mask,
+                                                                              n,
+                                                                              bits_offset,
+                                                                              d_block_offsets);
 
     // 4. Retrieve total kept elements (last offset + last count)
     unsigned int* h_last_off = nullptr;

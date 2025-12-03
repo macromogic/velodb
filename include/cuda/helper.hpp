@@ -14,6 +14,8 @@ constexpr unsigned int WARP_SIZE = 32;
 constexpr unsigned int WARP_MASK = WARP_SIZE - 1;
 constexpr int WARP_BITS = 5;
 
+#define DIV_UP(a, b) (((a) + (b) - 1) / (b))
+
 #define CHECKED_CALL(call)                                                                                             \
     do {                                                                                                               \
         cudaError_t err = (call);                                                                                      \

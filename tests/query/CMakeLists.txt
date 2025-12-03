@@ -1,5 +1,6 @@
-add_executable(test_query test_filter_complex.cpp test_filter.cpp
-                          test_limit.cpp test_order_by.cpp ../test_main.cpp)
+add_executable(
+  test_query test_filter_complex.cpp test_filter.cpp test_limit.cpp
+             test_order_by.cpp test_join_execution.cpp ../test_main.cpp)
 
 target_link_libraries(test_query ${ALL_OBJS} ${DEPENDENCY_LIBS} GTest::GTest
                       GTest::Main pthread)

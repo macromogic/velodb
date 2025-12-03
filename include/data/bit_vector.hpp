@@ -17,7 +17,7 @@ public:
     using Element = uint64_t;
     static constexpr size_t ELEMENT_WIDTH = 8 * sizeof(Element);
 
-    BitVector(size_t num_bits);
+    explicit BitVector(size_t num_bits);
     BitVector(const BitVector&);
     BitVector(BitVector&&) noexcept;
     BitVector& operator=(const BitVector&);

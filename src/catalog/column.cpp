@@ -64,7 +64,6 @@ Column::Column(std::unique_ptr<DataType> type, size_t initial_capacity, DataLoca
     : type_(std::move(type))
     , data_source_(createDataSource(*type_, initial_capacity, location))
 {
-    PROFILE_SCOPE("Column Constructor");
 }
 
 Column Column::buildFrom(std::unique_ptr<DataType> type, std::vector<Value>&& values, DataLocation location)

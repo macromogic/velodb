@@ -1,6 +1,7 @@
 #include "catalog/row_batch.hpp"
 
 #include "common/exception.hpp"
+#include "cuda/join.hpp"
 #include "cuda/sort.hpp"
 #include "cuda/stream_pool.hpp"
 
@@ -17,6 +18,14 @@ void RowBatch::addColumn(Column&& column)
 }
 
 Column& RowBatch::getColumn(size_t index)
+{
+    if (index >= columns_.size()) {
+        VELODB_THROW(CatalogError, "Column index out of range");
+    }
+    return columns_[index];
+}
+
+const Column& RowBatch::getColumn(size_t index) const
 {
     if (index >= columns_.size()) {
         VELODB_THROW(CatalogError, "Column index out of range");
@@ -151,6 +160,58 @@ RowBatch RowBatch::createBuffered(const Schema& schema, size_t initial_capacity,
         columns.emplace_back(col_info.getType().cloneUnique(), initial_capacity, location);
     }
     return RowBatch(std::move(columns));
+}
+
+RowBatch RowBatch::sortMergeJoinBatches(const RowBatch& left,
+                                        size_t left_key_index,
+                                        const RowBatch& right,
+                                        size_t right_key_index)
+{
+    // Prepare JoinColumn structures for left and right inputs
+    // JoinColumn<int64_t> left_join_col;
+    // JoinColumn<int64_t> right_join_col;
+
+    const Column& lkey_col = left.getColumn(left_key_index);
+    const Column& lrowid_col = left.getColumn(1); // Assuming rowid is at index 1
+    const Column& rkey_col = right.getColumn(right_key_index);
+    const Column& rrowid_col = right.getColumn(1); // Assuming rowid is at index 1
+
+    return std::visit(
+        [&](auto&& lkey, auto&& lrowid, auto&& rkey, auto&& rrowid) -> RowBatch {
+            using LKeyDT = typename std::decay_t<decltype(lkey)>::DType;
+            using LRowIdDT = typename std::decay_t<decltype(lrowid)>::DType;
+            using RKeyDT = typename std::decay_t<decltype(rkey)>::DType;
+            using RRowIdDT = typename std::decay_t<decltype(rrowid)>::DType;
+            if constexpr (std::is_same_v<LKeyDT, RKeyDT> && std::is_same_v<LRowIdDT, int64_t>
+                          && std::is_same_v<RRowIdDT, int64_t>) {
+                // Types are valid
+                JoinColumn<LKeyDT> left_join_col { lkey.data(), lrowid.data(), lkey.size() };
+                JoinColumn<RKeyDT> right_join_col { rkey.data(), rrowid.data(), rkey.size() };
+
+                auto stream_result = StreamPool::instance().acquire();
+                if (!stream_result) {
+                    VELODB_THROW(CatalogError, "Failed to acquire CUDA stream");
+                }
+                auto join_stream = std::move(stream_result.value());
+                JoinResult result = sortMergeJoin<LKeyDT>(left_join_col, right_join_col, join_stream->get());
+                Column left_out_col(
+                    DataType::createType(DataTypeId::BIGINT),
+                    ValueVector<int64_t>::buildFrom(result.out_left, result.row_count, DataLocation::CUDA));
+                Column right_out_col(
+                    DataType::createType(DataTypeId::BIGINT),
+                    ValueVector<int64_t>::buildFrom(result.out_right, result.row_count, DataLocation::CUDA));
+                RowBatch out;
+                out.addColumn(std::move(left_out_col));
+                out.addColumn(std::move(right_out_col));
+                return out;
+            } else {
+                VELODB_THROW(ExecutionError, "Invalid column types for sort-merge join");
+            }
+        },
+        lkey_col.data_source_,
+        lrowid_col.data_source_,
+        rkey_col.data_source_,
+        rrowid_col.data_source_);
 }
 
 // BatchIterator implementation

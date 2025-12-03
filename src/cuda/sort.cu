@@ -47,7 +47,7 @@ namespace gpu {
         return row_i < row_j;
     }
 
-    __global__ void initializeIndices(int64_t* d_indices, size_t n)
+    __global__ void initializeIndicesKernel(int64_t* d_indices, size_t n)
     {
         unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
         if (i < n) {
@@ -55,13 +55,13 @@ namespace gpu {
         }
     }
 
-    __global__ void bitonicStep(int64_t* d_row_ids,
-                                SortColumn* d_sort_columns,
-                                size_t n_sort_columns,
-                                unsigned int j,
-                                unsigned int k,
-                                unsigned int N,
-                                bool reverse)
+    __global__ void bitonicStepKernel(int64_t* d_row_ids,
+                                      SortColumn* d_sort_columns,
+                                      size_t n_sort_columns,
+                                      unsigned int j,
+                                      unsigned int k,
+                                      unsigned int N,
+                                      bool reverse)
     {
         unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
         unsigned int ixj = i ^ j;
@@ -78,7 +78,7 @@ namespace gpu {
     }
 
     template <typename T>
-    __global__ void reorder(T* d_out, const T* d_in, const int64_t* d_indices, size_t n)
+    __global__ void reorderKernel(T* d_out, const T* d_in, const int64_t* d_indices, size_t n)
     {
         unsigned int i = threadIdx.x + blockIdx.x * blockDim.x;
         if (i < n) {
@@ -88,7 +88,7 @@ namespace gpu {
     }
 
     template <typename Elem>
-    __global__ void reorderBitmap(Elem* d_out, const Elem* d_in, const int64_t* d_indices, size_t n)
+    __global__ void reorderBitmapKernel(Elem* d_out, const Elem* d_in, const int64_t* d_indices, size_t n)
     {
         constexpr auto ElemSize = sizeof(Elem) * 8;
 
@@ -120,8 +120,8 @@ int64_t* initializeIndices(size_t n, cudaStream_t stream)
     CHECKED_CALL_THROW(cudaMalloc(&d_indices, n * sizeof(int64_t)));
 
     int threads = 256;
-    int blocks = (n + threads - 1) / threads;
-    gpu::initializeIndices<<<blocks, threads, 0, stream>>>(d_indices, n);
+    int blocks = DIV_UP(n, threads);
+    gpu::initializeIndicesKernel<<<blocks, threads, 0, stream>>>(d_indices, n);
     return d_indices;
 }
 
@@ -145,16 +145,16 @@ void sortIndices(int64_t* d_row_ids,
         cudaMemcpyAsync(d_padded_row_ids, d_row_ids, n_rows * sizeof(int64_t), cudaMemcpyDeviceToDevice, stream));
 
     int threads = 256;
-    int blocks = (padded_rows + threads - 1) / threads;
+    int blocks = DIV_UP(padded_rows, threads);
     for (size_t k = min_block_size * 2; k <= padded_rows; k <<= 1) {
         for (size_t j = k >> 1; j >= min_block_size; j >>= 1) {
-            gpu::bitonicStep<<<blocks, threads, 0, stream>>>(d_padded_row_ids,
-                                                             d_sort_columns,
-                                                             n_sort_columns,
-                                                             j,
-                                                             k,
-                                                             padded_rows,
-                                                             reverse);
+            gpu::bitonicStepKernel<<<blocks, threads, 0, stream>>>(d_padded_row_ids,
+                                                                   d_sort_columns,
+                                                                   n_sort_columns,
+                                                                   j,
+                                                                   k,
+                                                                   padded_rows,
+                                                                   reverse);
         }
     }
 
@@ -174,8 +174,8 @@ T* reorderData(T* d_data, const int64_t* d_indices, size_t n, cudaStream_t strea
 
     // Launch kernel to reorder data
     int threads = 256;
-    int blocks = (n + threads - 1) / threads;
-    gpu::reorder<<<blocks, threads, 0, stream>>>(d_out, d_data, d_indices, n);
+    int blocks = DIV_UP(n, threads);
+    gpu::reorderKernel<<<blocks, threads, 0, stream>>>(d_out, d_data, d_indices, n);
     return d_out;
 }
 
@@ -190,8 +190,8 @@ Elem* reorderBitmap(Elem* d_bitmap, const int64_t* d_indices, size_t n, cudaStre
 
     // Launch kernel to reorder data
     int threads = 256;
-    int blocks = (n + threads - 1) / threads;
-    gpu::reorderBitmap<Elem><<<blocks, threads, 0, stream>>>(d_out, d_bitmap, d_indices, n);
+    int blocks = DIV_UP(n, threads);
+    gpu::reorderBitmapKernel<Elem><<<blocks, threads, 0, stream>>>(d_out, d_bitmap, d_indices, n);
     return d_out;
 }
 

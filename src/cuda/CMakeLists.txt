@@ -4,6 +4,7 @@ add_library(
   warmup.cu
   compaction.cu
   sort.cu
+  join.cu
   stream.cpp
   stream_pool.cpp
   event.cpp

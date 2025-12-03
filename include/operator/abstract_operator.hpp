@@ -7,8 +7,6 @@
 #include "common/result.hpp"
 
 #include <memory>
-#include <stdexcept>
-#include <vector>
 
 namespace velodb {
 

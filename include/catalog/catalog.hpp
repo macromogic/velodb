@@ -4,7 +4,6 @@
 #include "catalog/table.hpp"
 #include "common/copy_traits.hpp"
 
-#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>

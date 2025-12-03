@@ -4,14 +4,12 @@
 #include "operator/join_type.hpp"
 
 #include <memory>
-#include <vector>
 
 namespace velodb {
 
 // Forward declarations
 class AbstractExpression;
 
-// Merge sort join operator
 class MergeSortJoinOperator : public BinaryOperator {
 public:
     MergeSortJoinOperator(ExecutionContext& context,
@@ -29,6 +27,9 @@ private:
     std::unique_ptr<AbstractExpression> left_key_expr_;
     std::unique_ptr<AbstractExpression> right_key_expr_;
     JoinType join_type_;
+    RowBatch left_buffer_;
+    RowBatch right_buffer_;
+    bool joined_ { false };
 };
 
 } // namespace velodb

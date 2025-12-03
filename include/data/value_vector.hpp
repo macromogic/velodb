@@ -292,7 +292,7 @@ public:
         VELODB_ASSERT_MSG(location_ == other.location_ && location_ != DataLocation::VIEW,
                           "Append must happen on same non-VIEW location");
         if (size_ + other.size_ > capacity_) {
-            reserve((size_ + other.capacity_ + capacity_ - 1) / capacity_ * capacity_);
+            reserve(DIV_UP(size_ + other.capacity_, capacity_) * capacity_);
         }
         if (location_ == DataLocation::HOST) {
             std::copy(other.data_, other.data_ + other.size_, data_ + size_);
@@ -332,12 +332,16 @@ protected:
     DataLocation location_;
 
     // Internal constructor
-    ValueVectorBase(DType* data, size_t size, size_t capacity, BitVector null_mask)
+    ValueVectorBase(DType* data,
+                    size_t size,
+                    size_t capacity,
+                    BitVector null_mask,
+                    DataLocation location = DataLocation::VIEW)
         : data_(data)
         , size_(size)
         , capacity_(capacity)
         , null_mask_(std::move(null_mask))
-        , location_(DataLocation::VIEW)
+        , location_(location)
     {
     }
 };
@@ -349,8 +353,8 @@ public:
     using DType = DTypeOfV<VT>;
     using VType = VT;
     using Base::Base;
-    using Base::ConcreteVector;
-    using Base::MaskVector;
+    using typename Base::ConcreteVector;
+    using typename Base::MaskVector;
 
     Value get(size_t index) const
     {
@@ -374,6 +378,21 @@ public:
                 vec.data_[i] = static_cast<DType>(value.get<VType>());
             }
             i++;
+        }
+        vec.size_ = n;
+        vec.null_mask_.size_ = n;
+        return vec;
+    }
+
+    static ValueVector buildFrom(const DType* data, size_t n, DataLocation location = DataLocation::HOST)
+    {
+        ValueVector vec(n, location);
+        if (location == DataLocation::HOST) {
+            std::copy(data, data + n, vec.data_);
+        } else if (location == DataLocation::CUDA) {
+            CHECKED_CALL_THROW(cudaMemcpy(vec.data_, data, n * sizeof(DType), cudaMemcpyDeviceToDevice));
+        } else {
+            VELODB_THROW(ExecutionError, "Invalid data location");
         }
         vec.size_ = n;
         vec.null_mask_.size_ = n;

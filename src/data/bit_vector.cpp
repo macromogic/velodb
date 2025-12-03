@@ -12,7 +12,7 @@ namespace velodb {
 
 BitVector::BitVector(size_t num_bits)
     : size_(num_bits)
-    , element_capacity_((num_bits + ELEMENT_WIDTH - 1) / ELEMENT_WIDTH)
+    , element_capacity_(DIV_UP(num_bits, ELEMENT_WIDTH))
     , location_(DataLocation::HOST)
     , data_(nullptr)
 {
@@ -130,8 +130,8 @@ void BitVector::resize(size_t new_size)
 {
     VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot resize non-host BitVector");
     reserve(new_size);
-    size_t old_element_count = (size_ + ELEMENT_WIDTH - 1) / ELEMENT_WIDTH;
-    size_t new_element_count = (new_size + ELEMENT_WIDTH - 1) / ELEMENT_WIDTH;
+    size_t old_element_count = DIV_UP(size_, ELEMENT_WIDTH);
+    size_t new_element_count = DIV_UP(new_size, ELEMENT_WIDTH);
     if (new_element_count < old_element_count) {
         // Clear bits in the last element if size is reduced
         std::fill_n(data_ + new_element_count, old_element_count - new_element_count, Element(0));
@@ -146,7 +146,7 @@ void BitVector::resize(size_t new_size)
 void BitVector::reserve(size_t new_capacity)
 {
     VELODB_ASSERT_MSG(location_ != DataLocation::VIEW, "Cannot reserve a VIEW BitVector");
-    size_t new_element_capacity = (new_capacity + ELEMENT_WIDTH - 1) / ELEMENT_WIDTH;
+    size_t new_element_capacity = DIV_UP(new_capacity, ELEMENT_WIDTH);
     if (new_element_capacity > element_capacity_) {
         Element* new_data;
         if (location_ == DataLocation::CUDA) {
@@ -178,7 +178,7 @@ BitVector BitVector::slice(size_t start, size_t end) const
 
     size_t start_offset = start % ELEMENT_WIDTH;
     size_t start_index = start / ELEMENT_WIDTH;
-    size_t n_elements = (slice_bits + ELEMENT_WIDTH - 1) / ELEMENT_WIDTH;
+    size_t n_elements = DIV_UP(slice_bits, ELEMENT_WIDTH);
     size_t last_effective_bits = slice_bits % ELEMENT_WIDTH;
 
     const Element* src_data = data_ + start_index;
