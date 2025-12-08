@@ -1,5 +1,5 @@
 add_executable(test_planner test_plan_visualization.cpp test_planner.cpp
-                            ../test_main.cpp)
+                            test_join_planner.cpp ../test_main.cpp)
 
 target_link_libraries(test_planner ${ALL_OBJS} ${DEPENDENCY_LIBS} GTest::GTest
                       GTest::Main pthread)

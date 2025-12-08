@@ -16,7 +16,7 @@ static std::string strip_rowid_suffix(const std::string& name)
     constexpr std::string_view suffix = "$_rowid";
     if (name.size() >= suffix.size() && name.substr(name.size() - suffix.size()) == suffix) {
         auto base = name.substr(0, name.size() - suffix.size());
-        if (!base.empty() && base.back() == '_') {
+        if (!base.empty() && base.back() == '.') {
             base.pop_back();
         }
         return base;
@@ -45,16 +45,16 @@ Result<RowBatch> MaterializationOperator::next()
     }
 
     // Expect two columns: left_rowid, right_rowid
-    const auto& out_schema = getOutputSchema();
+    const auto& in_schema = child->getOutputSchema();
     // Derive source table names from column names
-    std::string left_table_name = strip_rowid_suffix(out_schema.getColumnInfo(0).getName());
-    std::string right_table_name = strip_rowid_suffix(out_schema.getColumnInfo(1).getName());
+    std::string left_table_name = strip_rowid_suffix(in_schema.getColumnInfo(0).getName());
+    std::string right_table_name = strip_rowid_suffix(in_schema.getColumnInfo(1).getName());
 
-    auto* catalog = &context_.getCatalog();
-    auto left_table_opt = catalog->getTable(left_table_name);
-    auto right_table_opt = catalog->getTable(right_table_name);
+    auto& catalog = context_.getCatalog();
+    auto left_table_opt = catalog.getTable(left_table_name);
+    auto right_table_opt = catalog.getTable(right_table_name);
     if (!left_table_opt || !right_table_opt) {
-        return Result<RowBatch>::failure("MaterializationOperator: source tables not found");
+        return Result<RowBatch>::failure("Source table(s) not found for materialization");
     }
     auto& left_table = left_table_opt->get();
     auto& right_table = right_table_opt->get();
@@ -96,11 +96,12 @@ Result<RowBatch> MaterializationOperator::next()
     }
 
     // Fill values by iterating rowid pairs
+    join_batch.to(DataLocation::HOST); // Ensure accessible
     for (size_t i = 0; i < pair_count; ++i) {
         auto lrowid_val = join_batch.getValue(i, 0);
         auto rrowid_val = join_batch.getValue(i, 1);
-        uint64_t lrowid = static_cast<uint64_t>(lrowid_val.getInteger());
-        uint64_t rrowid = static_cast<uint64_t>(rrowid_val.getInteger());
+        uint64_t lrowid = static_cast<uint64_t>(lrowid_val.getBigInt());
+        uint64_t rrowid = static_cast<uint64_t>(rrowid_val.getBigInt());
 
         // Left table columns
         size_t dest_index = left_base;

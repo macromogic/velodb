@@ -149,8 +149,8 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
                 constexpr std::string_view suff = "$_rowid";
                 if (name.size() >= suff.size() && name.substr(name.size() - suff.size()) == suff) {
                     auto base = name.substr(0, name.size() - suff.size());
-                    // If the base ends with an underscore (e.g. "A_$_rowid"), strip it.
-                    if (!base.empty() && base.back() == '_') {
+                    // If the base ends with a dot (e.g. "A.$_rowid"), strip it.
+                    if (!base.empty() && base.back() == '.') {
                         base.pop_back();
                     }
                     return base;
@@ -161,7 +161,7 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
             auto right_table_name = strip_suffix(c1);
             auto left_table_opt = catalog_.get().getTable(left_table_name);
             auto right_table_opt = catalog_.get().getTable(right_table_name);
-            VELODB_ASSERT_MSG(left_table_opt && right_table_opt, "Materialization: source tables not found");
+            VELODB_ASSERT_MSG(left_table_opt && right_table_opt, "Invalid source table(s) for materialization");
             auto& left_table = left_table_opt->get();
             auto& right_table = right_table_opt->get();
             std::vector<ColumnInfo> final_columns;
@@ -591,8 +591,8 @@ Schema QueryPlanner::inferJoinSchema(const Table& left_table, const Table& right
     // Join output schema (phase 1): only expose the rowid pairs from original tables.
     // Downstream materialization operator will use these rowids to fetch required columns.
     std::vector<ColumnInfo> columns;
-    columns.emplace_back(fmt::format("{}_$_rowid", left_table.getName()), std::make_unique<BigIntType>());
-    columns.emplace_back(fmt::format("{}_$_rowid", right_table.getName()), std::make_unique<BigIntType>());
+    columns.emplace_back(fmt::format("{}.$_rowid", left_table.getName()), std::make_unique<BigIntType>());
+    columns.emplace_back(fmt::format("{}.$_rowid", right_table.getName()), std::make_unique<BigIntType>());
     return Schema(std::move(columns));
 }
 
