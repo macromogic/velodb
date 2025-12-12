@@ -43,7 +43,7 @@ public:
 
 private:
     std::vector<Column> columns_;
-    size_t num_rows_;
+    size_t num_rows_ { 0 };
 
     explicit RowBatch(std::vector<Column> columns)
         : columns_(std::move(columns))
