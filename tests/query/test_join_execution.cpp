@@ -59,6 +59,7 @@ TEST_F(JoinExecutionTest, BasicInnerJoinSelectStar)
     auto batch_result = root_op->next();
     ASSERT_TRUE(batch_result) << batch_result.error();
     auto batch = std::move(batch_result.value());
+    batch.to(DataLocation::HOST);
     // Expect 5 joined rows
     EXPECT_EQ(batch.getRowCount(), 5);
     // Expect 4 output columns: A.id, A.x, B.id, B.y (disambiguated as A.id etc.)

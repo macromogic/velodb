@@ -1,5 +1,5 @@
 add_executable(test_data test_data_types.cpp test_type_checker.cpp
-                         test_value.cpp ../test_main.cpp)
+                         test_value.cpp test_bit_vector.cpp ../test_main.cpp)
 
 target_link_libraries(test_data ${ALL_OBJS} ${DEPENDENCY_LIBS} GTest::GTest
                       GTest::Main pthread)
