@@ -19,7 +19,6 @@ FunctionCallExpression::FunctionCallExpression(std::string function_name,
 const Value FunctionCallExpression::evaluate([[maybe_unused]] const Tuple& tuple,
                                              [[maybe_unused]] const Schema& schema) const
 {
-    // TODO: Implement function call evaluation logic
     VELODB_THROW(ExecutionError, "FunctionCallExpression::evaluate not implemented yet");
 }
 

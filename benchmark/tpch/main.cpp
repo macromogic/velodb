@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
 {
     argparse::ArgumentParser program("tpch_benchmark", "1.0");
 
-    program.add_description("VeloDB TPC-H Benchmark Suite");
+    program.add_description("VelODB TPC-H Benchmark Suite");
 
     // Scale factor configuration
     program.add_argument("--scale-factor", "-s")
@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
         config.measure_throughput_test = (test_type == "throughput" || test_type == "full");
 
         if (config.verbose) {
-            fmt::println("VeloDB TPC-H Benchmark");
+            fmt::println("VelODB TPC-H Benchmark");
             fmt::println("======================");
             fmt::println("Scale Factors: {}", fmt::join(config.scale_factors, ", "));
             fmt::println("Queries: {}", fmt::join(config.query_numbers, ", "));

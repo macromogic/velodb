@@ -1,5 +1,5 @@
 #!/bin/bash
-# TPC-H Data Generation and Setup Script for VeloDB
+# TPC-H Data Generation and Setup Script for VelODB
 
 set -e
 
@@ -8,7 +8,7 @@ SCALE_FACTOR=${1:-0.01}
 DATA_DIR="$(pwd)/benchmark/data"
 TPCH_TOOLS_DIR="/tmp/tpch-tools"
 
-echo "VeloDB TPC-H Data Generation Script"
+echo "VelODB TPC-H Data Generation Script"
 echo "==================================="
 echo "Scale Factor: $SCALE_FACTOR"
 echo "Data Directory: $DATA_DIR"

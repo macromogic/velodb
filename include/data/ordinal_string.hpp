@@ -53,8 +53,8 @@ public:
     std::string toString() const
     {
         return std::visit(
-            [this](auto&& arg) {
-                auto str = std::string(arg);
+            [this](auto&& s) {
+                auto str = std::string(s);
                 if (ordinal_.has_value()) {
                     str += " (ord: " + std::to_string(*ordinal_) + ")";
                 }
@@ -65,7 +65,7 @@ public:
 
     operator std::string() const
     {
-        return std::visit([](auto&& arg) { return std::string(arg); }, str_);
+        return std::visit([](auto&& s) { return std::string(s); }, str_);
     }
 
     bool operator<(const OrdinalString& other) const { return ordinal_ < other.ordinal_; }

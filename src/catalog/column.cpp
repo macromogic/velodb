@@ -82,6 +82,24 @@ Column Column::buildFrom(std::unique_ptr<DataType> type, std::vector<Value>&& va
     }
 }
 
+Column Column::materializeFrom(const Column& source, const Column& rowids)
+{
+    PROFILE_SCOPE("Column::materializeFrom");
+    return std::visit(
+        [&](auto&& src_vv, auto&& rowid_vv) -> Column {
+            using SrcType = std::decay_t<decltype(src_vv)>;
+            using RowidType = std::decay_t<decltype(rowid_vv)>;
+            if constexpr (std::is_same_v<typename RowidType::VType, int64_t>) {
+                auto vec = SrcType::materializeFrom(src_vv, rowid_vv);
+                return Column(source.type_->cloneUnique(), std::move(vec));
+            } else {
+                VELODB_THROW(ExecutionError, "Rowid column must be of type BIGINT for materialization");
+            }
+        },
+        source.data_source_,
+        rowids.data_source_);
+}
+
 const DataType& Column::getType() const
 {
     return *type_;
@@ -89,12 +107,12 @@ const DataType& Column::getType() const
 
 size_t Column::size() const
 {
-    return std::visit([](auto&& arg) { return arg.size(); }, data_source_);
+    return std::visit([](auto&& vv) { return vv.size(); }, data_source_);
 }
 
 Value Column::get(size_t index) const
 {
-    return std::visit([index](auto&& arg) { return arg.get(index); }, data_source_);
+    return std::visit([index](auto&& vv) { return vv.get(index); }, data_source_);
 }
 
 Value Column::operator[](size_t index) const
@@ -123,31 +141,31 @@ void Column::ensureOrdinal(Value& value, ComparisonType comp) const
 
 DataLocation Column::location() const
 {
-    return std::visit([](auto&& arg) { return arg.location(); }, data_source_);
+    return std::visit([](auto&& vv) { return vv.location(); }, data_source_);
 }
 
 void Column::to(DataLocation location)
 {
-    std::visit([location](auto&& arg) { arg.to(location); }, data_source_);
+    std::visit([location](auto&& vv) { vv.to(location); }, data_source_);
 }
 
 void Column::reserve(size_t new_capacity)
 {
-    std::visit([new_capacity](auto&& arg) { arg.reserve(new_capacity); }, data_source_);
+    std::visit([new_capacity](auto&& vv) { vv.reserve(new_capacity); }, data_source_);
 }
 
 void Column::append(const Value& value)
 {
     std::visit(
-        [&](auto&& arg) {
-            using ImplType = std::decay_t<decltype(arg)>;
+        [&](auto&& vv) {
+            using ImplType = std::decay_t<decltype(vv)>;
             using DType = typename ImplType::DType;
 
             if (value.isNull()) {
                 // Use default-constructed value for null values
-                arg.append(DType {});
+                vv.append(DType {});
             } else {
-                arg.append(value.get<DType>());
+                vv.append(value.get<DType>());
             }
         },
         data_source_);
@@ -156,15 +174,15 @@ void Column::append(const Value& value)
 void Column::append(Value&& value)
 {
     std::visit(
-        [&](auto&& arg) {
-            using ImplType = std::decay_t<decltype(arg)>;
+        [&](auto&& vv) {
+            using ImplType = std::decay_t<decltype(vv)>;
             using DType = typename ImplType::DType;
 
             if (value.isNull()) {
                 // Use default-constructed value for null values
-                arg.append(DType {});
+                vv.append(DType {});
             } else {
-                arg.append(std::move(value.get<DType>()));
+                vv.append(std::move(value.get<DType>()));
             }
         },
         data_source_);
@@ -174,32 +192,31 @@ Column Column::slice(size_t start, size_t end) const
 {
     VELODB_ASSERT_MSG(start <= end && end <= size(), "Invalid slice range");
     return std::visit(
-        [start, end, this](auto&& arg) -> Column {
-            auto sliced_impl = arg.slice(start, end);
-            return Column(type_->cloneUnique(), std::move(sliced_impl));
+        [start, end, this](auto&& vv) -> Column {
+            auto sliced = vv.slice(start, end);
+            return Column(type_->cloneUnique(), std::move(sliced));
         },
         data_source_);
 }
 
 Column Column::tryOwn()
 {
-    return std::visit([this](auto&& arg) -> Column { return Column(type_->cloneUnique(), arg.tryOwn()); },
-                      data_source_);
+    return std::visit([this](auto&& vv) -> Column { return Column(type_->cloneUnique(), vv.tryOwn()); }, data_source_);
 }
 
 Column Column::splitFront(size_t size)
 {
     return std::visit(
-        [this, size](auto&& arg) -> Column {
-            auto split_impl = arg.splitFront(size);
-            return Column(type_->cloneUnique(), std::move(split_impl));
+        [this, size](auto&& vv) -> Column {
+            auto splitted = vv.splitFront(size);
+            return Column(type_->cloneUnique(), std::move(splitted));
         },
         data_source_);
 }
 
 void Column::reorder(const int64_t* indices)
 {
-    std::visit([&](auto&& data) { data.reorder(indices); }, data_source_);
+    std::visit([&](auto&& vv) { vv.reorder(indices); }, data_source_);
 }
 
 void Column::appendMaskedMultiple(const Column& other, const Column& mask)

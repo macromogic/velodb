@@ -11,11 +11,11 @@
 
 using namespace velodb;
 
-class JoinExecutionTest : public test::VeloDBTest {
+class JoinExecutionTest : public test::VelODBTest {
 protected:
     void SetUp() override
     {
-        test::VeloDBTest::SetUp();
+        test::VelODBTest::SetUp();
         Schema a;
         a.addColumnInfo({ "id", std::make_unique<IntegerType>() });
         a.addColumnInfo({ "x", std::make_unique<IntegerType>() });

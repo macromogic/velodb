@@ -12,7 +12,7 @@
 
 using namespace velodb;
 
-class LimitOperatorTest : public test::VeloDBTest {
+class LimitOperatorTest : public test::VelODBTest {
 public:
     LimitOperatorTest()
         : catalog_()
@@ -23,7 +23,7 @@ public:
 protected:
     void SetUp() override
     {
-        test::VeloDBTest::SetUp();
+        test::VelODBTest::SetUp();
 
         // Create a test table with more sample data for comprehensive testing
         auto schema = Schema();
@@ -45,7 +45,7 @@ protected:
         catalog_.addTable(std::move(builder).build());
     }
 
-    void TearDown() override { test::VeloDBTest::TearDown(); }
+    void TearDown() override { test::VelODBTest::TearDown(); }
 
     Catalog catalog_;
     ExecutionEngine engine_;

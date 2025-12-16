@@ -5,9 +5,9 @@
 
 using namespace velodb;
 
-class BitVectorTest : public test::VeloDBTest {
+class BitVectorTest : public test::VelODBTest {
 protected:
-    void SetUp() override { test::VeloDBTest::SetUp(); }
+    void SetUp() override { test::VelODBTest::SetUp(); }
 };
 
 TEST_F(BitVectorTest, BasicOperations)

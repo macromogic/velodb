@@ -283,7 +283,7 @@ std::string PerformanceMonitor::formatSummary() const
     std::ostringstream summary;
     auto system_info = getSystemInfo();
 
-    summary << "VeloDB TPC-H Benchmark Summary\n";
+    summary << "VelODB TPC-H Benchmark Summary\n";
     summary << "============================\n\n";
     summary << "Timestamp: " << system_info.timestamp << "\n";
     summary << "CPU: " << system_info.cpu_info << "\n";

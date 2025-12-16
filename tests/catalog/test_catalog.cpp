@@ -10,13 +10,13 @@
 
 using namespace velodb;
 
-class CatalogTest : public test::VeloDBTest {
+class CatalogTest : public test::VelODBTest {
 protected:
-    void SetUp() override { test::VeloDBTest::SetUp(); }
+    void SetUp() override { test::VelODBTest::SetUp(); }
 
     void TearDown() override
     {
-        test::VeloDBTest::TearDown();
+        test::VelODBTest::TearDown();
         // Cleanup code if needed
     }
 

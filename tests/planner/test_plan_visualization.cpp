@@ -12,7 +12,7 @@
 
 using namespace velodb;
 
-class PlanVisualizationTest : public test::VeloDBTest {
+class PlanVisualizationTest : public test::VelODBTest {
 public:
     PlanVisualizationTest()
         : catalog_(MockCatalogBuilder::createSampleCatalog())
@@ -21,7 +21,7 @@ public:
     }
 
 protected:
-    void SetUp() override { test::VeloDBTest::SetUp(); }
+    void SetUp() override { test::VelODBTest::SetUp(); }
 
     void TearDown() override
     {

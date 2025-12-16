@@ -107,7 +107,7 @@ std::string Database::getDatabaseInfo() const
     if (!initialized_)
         return "Database not initialized";
 
-    return fmt::format("VeloDB Database Information:\n"
+    return fmt::format("VelODB Database Information:\n"
                        "  Tables: {}\n"
                        "\nCatalog Details:\n"
                        "{}",

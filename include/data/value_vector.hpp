@@ -5,6 +5,7 @@
 #include "cuda/compaction.hpp"
 #include "cuda/event.hpp"
 #include "cuda/helper.hpp"
+#include "cuda/materialization.hpp"
 #include "cuda/sort.hpp"
 #include "cuda/stream.hpp"
 #include "cuda/stream_pool.hpp"
@@ -33,6 +34,7 @@ public:
     using VType = VTypeOfD<DType>;
     using ConcreteVector = VecT<VType>;
     using MaskVector = VecT<bool>;
+    using IntVector = VecT<int64_t>;
 
     ValueVectorBase(size_t capacity, DataLocation location = DataLocation::HOST)
         : data_(nullptr)
@@ -354,6 +356,7 @@ public:
     using VType = VT;
     using Base::Base;
     using typename Base::ConcreteVector;
+    using typename Base::IntVector;
     using typename Base::MaskVector;
 
     Value get(size_t index) const
@@ -396,6 +399,27 @@ public:
         }
         vec.size_ = n;
         vec.null_mask_.size_ = n;
+        return vec;
+    }
+
+    static ValueVector materializeFrom(const ValueVector& source, const IntVector& rowids)
+    {
+        VELODB_ASSERT_MSG(source.location() == DataLocation::CUDA && rowids.location() == DataLocation::CUDA,
+                          "Materialization must happen on CUDA");
+        ValueVector vec(rowids.size(), DataLocation::CUDA);
+        auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
+            "Failed to acquire stream for filter compaction");
+        materializeArray<DType>(vec.data_,
+                                vec.null_mask_.data_,
+                                source.data_,
+                                source.null_mask_.data_,
+                                rowids.data(),
+                                rowids.size(),
+                                stream_handle->get());
+        stream_handle->synchronize();
+        vec.size_ = rowids.size();
+        vec.null_mask_.size_ = rowids.size();
+        stream_handle.release();
         return vec;
     }
 
@@ -454,23 +478,23 @@ public:
     void ensureOrdinal(VType& data, ComparisonType comp) const
     {
         std::visit(
-            [&data, comp, this](auto&& arg) {
+            [&data, comp, this](auto&& s) {
                 size_t ordinal;
                 // TODO: make this oblivious?
                 switch (comp) {
                 case ComparisonType::LESS_THAN:
                 case ComparisonType::LESS_THAN_OR_EQUAL:
                 case ComparisonType::GREATER_THAN:
-                    ordinal = std::lower_bound(ordered_strings_->begin(), ordered_strings_->end(), arg)
+                    ordinal = std::lower_bound(ordered_strings_->begin(), ordered_strings_->end(), s)
                         - ordered_strings_->begin();
                     break;
                 case ComparisonType::GREATER_THAN_OR_EQUAL:
-                    ordinal = std::upper_bound(ordered_strings_->begin(), ordered_strings_->end(), arg)
+                    ordinal = std::upper_bound(ordered_strings_->begin(), ordered_strings_->end(), s)
                         - ordered_strings_->begin() - 1;
                     break;
                 case ComparisonType::EQUAL:
                 case ComparisonType::NOT_EQUAL: {
-                    auto [lb, ub] = std::equal_range(ordered_strings_->begin(), ordered_strings_->end(), arg);
+                    auto [lb, ub] = std::equal_range(ordered_strings_->begin(), ordered_strings_->end(), s);
                     if (lb == ub) {
                         ordinal = ordered_strings_->size();
                     } else {
@@ -556,6 +580,28 @@ public:
         }
         vec.size_ = n;
         vec.null_mask_.size_ = n;
+        return vec;
+    }
+
+    static ValueVector materializeFrom(const ValueVector& source, const IntVector& rowids)
+    {
+        VELODB_ASSERT_MSG(source.location() == DataLocation::CUDA && rowids.location() == DataLocation::CUDA,
+                          "Materialization must happen on CUDA");
+        ValueVector vec(rowids.size(), DataLocation::CUDA);
+        auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
+            "Failed to acquire stream for filter compaction");
+        materializeArray<DType>(vec.data_,
+                                vec.null_mask_.data_,
+                                source.data_,
+                                source.null_mask_.data_,
+                                rowids.data(),
+                                rowids.size(),
+                                stream_handle->get());
+        stream_handle->synchronize();
+        vec.size_ = rowids.size();
+        vec.null_mask_.size_ = rowids.size();
+        vec.ordered_strings_ = source.ordered_strings_;
+        stream_handle.release();
         return vec;
     }
 

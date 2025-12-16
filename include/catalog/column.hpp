@@ -61,6 +61,7 @@ public:
     static Column buildFrom(std::unique_ptr<DataType> type,
                             std::vector<Value>&& values,
                             DataLocation location = DataLocation::HOST);
+    static Column materializeFrom(const Column& source, const Column& rowids);
 
     const DataType& getType() const;
     size_t size() const;

@@ -9,11 +9,11 @@
 
 using namespace velodb;
 
-class TableTest : public test::VeloDBTest {
+class TableTest : public test::VelODBTest {
 protected:
     void SetUp() override
     {
-        test::VeloDBTest::SetUp();
+        test::VelODBTest::SetUp();
         // Create a simple schema for testing
         test_schema_ = Schema();
         test_schema_.addColumnInfo({ "id", std::make_unique<IntegerType>() });
@@ -22,7 +22,7 @@ protected:
 
     void TearDown() override
     {
-        test::VeloDBTest::TearDown();
+        test::VelODBTest::TearDown();
         // Cleanup code if needed
     }
 

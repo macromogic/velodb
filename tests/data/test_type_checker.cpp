@@ -8,18 +8,18 @@
 
 using namespace velodb;
 
-class TypeCheckerTest : public test::VeloDBTest {
+class TypeCheckerTest : public test::VelODBTest {
 protected:
     void SetUp() override
     {
-        test::VeloDBTest::SetUp();
+        test::VelODBTest::SetUp();
         // Setup code if needed
     }
 
     void TearDown() override
     {
         // Cleanup code if needed
-        test::VeloDBTest::TearDown();
+        test::VelODBTest::TearDown();
     }
 };
 

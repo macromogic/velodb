@@ -35,7 +35,7 @@ namespace test {
         static bool isAvailable() { return initializeOnce(); }
     };
 
-    class VeloDBTest : public ::testing::Test {
+    class VelODBTest : public ::testing::Test {
     protected:
         static void SetUpTestSuite()
         {

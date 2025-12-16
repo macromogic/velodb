@@ -7,17 +7,17 @@
 
 using namespace velodb;
 
-class SchemaTest : public test::VeloDBTest {
+class SchemaTest : public test::VelODBTest {
 protected:
     void SetUp() override
     {
-        test::VeloDBTest::SetUp();
+        test::VelODBTest::SetUp();
         // Setup code if needed
     }
 
     void TearDown() override
     {
-        test::VeloDBTest::TearDown();
+        test::VelODBTest::TearDown();
         // Cleanup code if needed
     }
 };

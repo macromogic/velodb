@@ -14,7 +14,7 @@
 
 using namespace velodb;
 
-class PlannerTest : public test::VeloDBTest {
+class PlannerTest : public test::VelODBTest {
 public:
     PlannerTest()
         : catalog_()
@@ -26,7 +26,7 @@ protected:
     void SetUp() override
     {
         // Set up users table
-        test::VeloDBTest::SetUp();
+        test::VelODBTest::SetUp();
         auto schema = Schema();
         schema.addColumnInfo({ "id", std::make_unique<IntegerType>() });
         schema.addColumnInfo({ "name", std::make_unique<VarcharType>(100) });
@@ -46,7 +46,7 @@ protected:
 
     void TearDown() override
     {
-        test::VeloDBTest::TearDown();
+        test::VelODBTest::TearDown();
         // Cleanup code if needed
     }
 

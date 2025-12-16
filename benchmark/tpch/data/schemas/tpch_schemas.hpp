@@ -71,7 +71,7 @@ public:
 // TPC-H data type mappings
 class TPCHTypes {
 public:
-    // Standard TPC-H types mapped to VeloDB types
+    // Standard TPC-H types mapped to VelODB types
     static std::unique_ptr<DataType> createIdentifierType(); // For keys: BIGINT
     static std::unique_ptr<DataType> createIntegerType(); // For integers: INTEGER
     static std::unique_ptr<DataType> createDecimalType(); // For prices/amounts: DOUBLE

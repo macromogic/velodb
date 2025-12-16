@@ -1,4 +1,4 @@
-# Unit tests for VeloDB
+# Unit tests for VelODB
 
 # Find Google Test
 find_package(GTest REQUIRED)

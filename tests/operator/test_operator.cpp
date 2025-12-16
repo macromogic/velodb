@@ -15,11 +15,11 @@
 
 using namespace velodb;
 
-class OperatorTest : public test::VeloDBTest {
+class OperatorTest : public test::VelODBTest {
 protected:
     void SetUp() override
     {
-        test::VeloDBTest::SetUp();
+        test::VelODBTest::SetUp();
         // Create a test table with sample data
         auto schema = Schema();
         schema.addColumnInfo({ "id", std::make_unique<IntegerType>() });
@@ -43,7 +43,7 @@ protected:
 
     void TearDown() override
     {
-        test::VeloDBTest::TearDown();
+        test::VelODBTest::TearDown();
         // Cleanup code if needed
     }
 

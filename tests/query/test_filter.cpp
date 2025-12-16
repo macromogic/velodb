@@ -13,7 +13,7 @@
 
 using namespace velodb;
 
-class WhereClauseTest : public test::VeloDBTest {
+class WhereClauseTest : public test::VelODBTest {
 public:
     WhereClauseTest()
         : catalog_()
@@ -25,7 +25,7 @@ public:
 protected:
     void SetUp() override
     {
-        test::VeloDBTest::SetUp();
+        test::VelODBTest::SetUp();
 
         setupTestTables();
     }

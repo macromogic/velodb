@@ -13,7 +13,7 @@
 
 using namespace velodb;
 
-class OrderByTest : public test::VeloDBTest {
+class OrderByTest : public test::VelODBTest {
 public:
     OrderByTest()
         : catalog_()
@@ -24,7 +24,7 @@ public:
 protected:
     void SetUp() override
     {
-        test::VeloDBTest::SetUp();
+        test::VelODBTest::SetUp();
         setupTestTables();
     }
 
@@ -99,7 +99,7 @@ protected:
         builder.insertRow(values);
     }
 
-    void TearDown() override { test::VeloDBTest::TearDown(); }
+    void TearDown() override { test::VelODBTest::TearDown(); }
 
     Catalog catalog_;
     ExecutionEngine engine_;

@@ -2,6 +2,7 @@
 
 #include "common/exception.hpp"
 #include "cuda/join.hpp"
+#include "cuda/materialization.hpp"
 #include "cuda/sort.hpp"
 #include "cuda/stream_pool.hpp"
 
@@ -114,9 +115,9 @@ void RowBatch::sort(const std::vector<size_t>& order_indices,
         size_t col_idx = order_indices[i];
         auto& col = columns_[col_idx];
         std::visit(
-            [&](auto&& arg) {
-                using DT = typename std::decay_t<decltype(arg)>::DType;
-                h_sort_columns[i] = { arg.data(), dTypeId<DT>, ascending_flags[i] };
+            [&](auto&& vv) {
+                using DT = typename std::decay_t<decltype(vv)>::DType;
+                h_sort_columns[i] = { vv.data(), dTypeId<DT>, ascending_flags[i] };
             },
             col.data_source_);
     }
@@ -162,15 +163,30 @@ RowBatch RowBatch::createBuffered(const Schema& schema, size_t initial_capacity,
     return RowBatch(std::move(columns));
 }
 
+RowBatch RowBatch::materializeColumns(const std::vector<std::reference_wrapper<Column>>& columns,
+                                      const std::vector<std::reference_wrapper<const Column>>& rowids)
+{
+    VELODB_ASSERT_MSG(columns.size() == rowids.size(), "Number of columns and rowid columns must match");
+    size_t n_columns = columns.size();
+    std::vector<Column> materialized_columns;
+    materialized_columns.reserve(n_columns);
+    for (size_t i = 0; i < n_columns; ++i) {
+        Column& src_col = columns[i].get();
+        const Column& rowid_col = rowids[i].get();
+        src_col.to(DataLocation::CUDA);
+        auto materialized_col = Column::materializeFrom(src_col, rowid_col);
+        src_col.to(DataLocation::HOST);
+        materialized_col.to(DataLocation::HOST);
+        materialized_columns.push_back(std::move(materialized_col));
+    }
+    return RowBatch(std::move(materialized_columns));
+}
+
 RowBatch RowBatch::sortMergeJoinBatches(const RowBatch& left,
                                         size_t left_key_index,
                                         const RowBatch& right,
                                         size_t right_key_index)
 {
-    // Prepare JoinColumn structures for left and right inputs
-    // JoinColumn<int64_t> left_join_col;
-    // JoinColumn<int64_t> right_join_col;
-
     const Column& lkey_col = left.getColumn(left_key_index);
     const Column& lrowid_col = left.getColumn(1); // Assuming rowid is at index 1
     const Column& rkey_col = right.getColumn(right_key_index);

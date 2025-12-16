@@ -12,17 +12,17 @@
 
 using namespace velodb;
 
-class ExpressionTest : public test::VeloDBTest {
+class ExpressionTest : public test::VelODBTest {
 protected:
     void SetUp() override
     {
-        test::VeloDBTest::SetUp();
+        test::VelODBTest::SetUp();
         // Setup code if needed
     }
 
     void TearDown() override
     {
-        test::VeloDBTest::TearDown();
+        test::VelODBTest::TearDown();
         // Cleanup code if needed
     }
 };

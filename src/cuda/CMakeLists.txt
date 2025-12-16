@@ -5,6 +5,7 @@ add_library(
   compaction.cu
   sort.cu
   join.cu
+  materialization.cu
   stream.cpp
   stream_pool.cpp
   event.cpp

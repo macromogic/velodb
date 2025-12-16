@@ -12,7 +12,7 @@
 
 using namespace velodb;
 
-class AdaptiveCatalogTest : public test::VeloDBTest {
+class AdaptiveCatalogTest : public test::VelODBTest {
 public:
     AdaptiveCatalogTest()
         : catalog_(MockCatalogBuilder::createAdaptiveCatalog())
@@ -20,11 +20,11 @@ public:
     }
 
 protected:
-    void SetUp() override { test::VeloDBTest::SetUp(); }
+    void SetUp() override { test::VelODBTest::SetUp(); }
 
     void TearDown() override
     {
-        test::VeloDBTest::TearDown();
+        test::VelODBTest::TearDown();
         // Cleanup
     }
 

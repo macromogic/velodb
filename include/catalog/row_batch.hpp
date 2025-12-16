@@ -36,6 +36,8 @@ public:
     BatchIterator end() const;
 
     static RowBatch createBuffered(const Schema& schema, size_t initial_capacity, DataLocation location);
+    static RowBatch materializeColumns(const std::vector<std::reference_wrapper<Column>>& columns,
+                                       const std::vector<std::reference_wrapper<const Column>>& rowids);
     static RowBatch sortMergeJoinBatches(const RowBatch& left,
                                          size_t left_key_index,
                                          const RowBatch& right,

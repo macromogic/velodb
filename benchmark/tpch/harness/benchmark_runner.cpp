@@ -285,7 +285,7 @@ std::string TPCHBenchmarkRunner::formatBenchmarkSummary(const BenchmarkResults& 
 {
     std::ostringstream summary;
 
-    summary << "VeloDB TPC-H Benchmark Report\n";
+    summary << "VelODB TPC-H Benchmark Report\n";
     summary << "=============================\n\n";
     summary << fmt::format("Benchmark ID: {}\n", results.benchmark_id);
     summary << fmt::format("Timestamp: {}\n", results.system_info.timestamp);

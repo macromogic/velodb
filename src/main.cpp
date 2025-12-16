@@ -40,7 +40,7 @@ int main(int argc, char* argv[])
 
     // Debug: Print what argparse actually parsed
     if (verbose) {
-        std::cout << "VeloDB v" << VERSION_STRING << std::endl;
+        std::cout << "VelODB v" << VERSION_STRING << std::endl;
         std::cout << "Query Plan Visualization Tool" << std::endl;
         std::cout << "=============================" << std::endl;
     }
@@ -90,7 +90,7 @@ int main(int argc, char* argv[])
                     std::cout << PlanVisualizer::visualizeDetailed(plan) << std::endl;
                 }
             } catch (const TracedException& e) {
-                std::cerr << "VeloDB Error: " << e.message() << std::endl;
+                std::cerr << "VelODB Error: " << e.message() << std::endl;
                 if (program["--verbose"] == true) {
                     std::cerr << "\nFull error with stack trace:" << std::endl;
                     std::cerr << e.what() << std::endl;

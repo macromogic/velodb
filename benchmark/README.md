@@ -1,11 +1,11 @@
-# VeloDB TPC-H Benchmark Suite
+# VelODB TPC-H Benchmark Suite
 
-This directory contains the TPC-H (Transaction Processing Performance Council - Ad Hoc) benchmark implementation for VeloDB. TPC-H is a decision support benchmark that consists of a suite of business-oriented ad-hoc queries and concurrent data modifications.
+This directory contains the TPC-H (Transaction Processing Performance Council - Ad Hoc) benchmark implementation for VelODB. TPC-H is a decision support benchmark that consists of a suite of business-oriented ad-hoc queries and concurrent data modifications.
 
 ## Overview
 
 The benchmark suite provides:
-- **Complete TPC-H Schema Implementation**: All 8 standard tables with proper VeloDB type mapping
+- **Complete TPC-H Schema Implementation**: All 8 standard tables with proper VelODB type mapping
 - **Query Templates**: Standard TPC-H queries (Q1, Q3, Q6, Q12 initially implemented)
 - **Performance Monitoring**: Comprehensive metrics collection including memory usage, execution time, and GPU acceleration tracking
 - **Data Loading Framework**: Efficient loading of TPC-H datasets with validation
@@ -136,7 +136,7 @@ Results are automatically exported to the `results/` directory:
 
 ### Sample Summary Report
 ```
-VeloDB TPC-H Benchmark Report
+VelODB TPC-H Benchmark Report
 =============================
 
 Benchmark ID: 20250911_143022
@@ -195,10 +195,10 @@ Supported scale factors and approximate dataset sizes:
 | 1.0 | ~1GB | 150,000 | 6,000,000 | Standard Benchmark |
 | 10.0 | ~10GB | 1,500,000 | 60,000,000 | Large-scale Testing |
 
-## Integration with VeloDB Features
+## Integration with VelODB Features
 
 ### Late Materialization Testing
-The benchmark specifically tests VeloDB's late materialization optimization:
+The benchmark specifically tests VelODB's late materialization optimization:
 - Tracks whether late materialization was used for each query
 - Measures performance improvement from delayed tuple construction
 - Validates column-oriented storage benefits
@@ -210,7 +210,7 @@ When CUDA is enabled, the benchmark:
 - Measures data transfer overhead
 
 ### Query Optimization
-The benchmark validates VeloDB's query optimization capabilities:
+The benchmark validates VelODB's query optimization capabilities:
 - Cost-based query planning
 - Join order optimization
 - Predicate pushdown effectiveness
@@ -278,7 +278,7 @@ For optimal benchmark performance:
 ## Contributing
 
 When contributing to the benchmark suite:
-1. Follow VeloDB coding standards and patterns
+1. Follow VelODB coding standards and patterns
 2. Add comprehensive tests for new features
 3. Update documentation for new queries or features
 4. Validate results against reference TPC-H implementations
@@ -287,5 +287,5 @@ When contributing to the benchmark suite:
 ## References
 
 - [TPC-H Benchmark Specification](http://www.tpc.org/tpch/)
-- [VeloDB Architecture Documentation](../docs/)
+- [VelODB Architecture Documentation](../docs/)
 - [CUDA Programming Guide](https://docs.nvidia.com/cuda/)

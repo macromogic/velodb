@@ -12,7 +12,7 @@
 
 using namespace velodb;
 
-class FilterComplexTest : public test::VeloDBTest {
+class FilterComplexTest : public test::VelODBTest {
 public:
     FilterComplexTest()
         : catalog_()
@@ -23,7 +23,7 @@ public:
 protected:
     void SetUp() override
     {
-        test::VeloDBTest::SetUp();
+        test::VelODBTest::SetUp();
 
         createTestTable();
     }

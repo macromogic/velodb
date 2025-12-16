@@ -9,9 +9,9 @@
 
 using namespace velodb;
 
-class RowBatchTest : public test::VeloDBTest {
+class RowBatchTest : public test::VelODBTest {
 protected:
-    void SetUp() override { test::VeloDBTest::SetUp(); }
+    void SetUp() override { test::VelODBTest::SetUp(); }
 };
 
 TEST_F(RowBatchTest, BasicConstruction)
