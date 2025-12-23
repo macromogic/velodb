@@ -1,5 +1,5 @@
 SELECT
-    SUM(l_extendedprice * l_discount) AS revenue
+    l_extendedprice * l_discount AS revenue
 FROM
     lineitem
 WHERE

@@ -19,7 +19,8 @@
                 "CMAKE_CUDA_ARCHITECTURES": "70;75;80;86;89;90",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
                 "BUILD_TESTS": "ON",
-                "ENABLE_PROFILING": "ON"
+                "ENABLE_PROFILING": "ON",
+                "BUILD_BENCHMARKS": "ON"
             }
         },
         {
@@ -44,7 +45,8 @@
                 "CMAKE_CUDA_ARCHITECTURES": "70;75;80;86;89;90",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
                 "BUILD_TESTS": "ON",
-                "ENABLE_PROFILING": "ON"
+                "ENABLE_PROFILING": "ON",
+                "BUILD_BENCHMARKS": "ON"
             }
         },
         {
@@ -53,6 +55,12 @@
             "description": "Release build with tests enabled, profiling disabled",
             "inherits": "release",
             "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_CXX_STANDARD": "17",
+                "CMAKE_CUDA_STANDARD": "17",
+                "CMAKE_CUDA_ARCHITECTURES": "70;75;80;86;89;90",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "BUILD_TESTS": "ON",
                 "ENABLE_PROFILING": "OFF"
             }
         }

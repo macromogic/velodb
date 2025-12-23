@@ -153,8 +153,8 @@ int main(int argc, char* argv[])
             fmt::println("Scale Factors: {}", fmt::join(config.scale_factors, ", "));
             fmt::println("Queries: {}", fmt::join(config.query_numbers, ", "));
             fmt::println("Iterations: {}", config.iterations);
-            fmt::println("Data Directory: {}", config.data_directory);
-            fmt::println("Results Directory: {}\n", config.results_directory);
+            fmt::println("Data Directory: {}", std::string(config.data_directory));
+            fmt::println("Results Directory: {}\n", std::string(config.results_directory));
         }
 
         // Create and run benchmark
@@ -180,7 +180,7 @@ int main(int argc, char* argv[])
         if (!summary_result) {
             fmt::println(stderr, "Warning: Failed to export summary report: {}", summary_result.error());
         } else if (config.verbose) {
-            fmt::println("Results exported to: {}", config.results_directory);
+            fmt::println("Results exported to: {}", std::string(config.results_directory));
         }
 
         // Print summary to console
@@ -197,8 +197,13 @@ int main(int argc, char* argv[])
 
             fmt::println("\nBenchmark Summary:");
             fmt::println("------------------");
+            fmt::println("Benchmark ID: {}", benchmark_results.benchmark_id);
+            fmt::println("Benchmark Success: {}", benchmark_results.success ? "Yes" : "No");
+            if (!benchmark_results.success) {
+                fmt::println("Error Message: {}", benchmark_results.error_message);
+            }
             fmt::println("Total Queries: {}", benchmark_results.query_results.size());
-            fmt::println("Successful: {} ({:.1f}%)",
+            fmt::println("Successful queries: {} ({:.1f}%)",
                          successful,
                          100.0 * successful / benchmark_results.query_results.size());
             if (successful > 0) {

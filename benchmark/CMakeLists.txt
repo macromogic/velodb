@@ -25,9 +25,15 @@ target_link_libraries(tpch_benchmark tpch_benchmark_lib argparse::argparse)
 
 # Custom targets for running benchmarks
 add_custom_target(
+  generate_tpch_data
+  COMMAND ${CMAKE_SOURCE_DIR}/benchmark/generate_data.sh 0.01
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  COMMENT "Generating TPC-H data (Scale Factor: 0.01)")
+
+add_custom_target(
   run_quick_benchmark
-  COMMAND $<TARGET_FILE:tpch_benchmark> --quick
-  DEPENDS tpch_benchmark
+  COMMAND $<TARGET_FILE:tpch_benchmark> --quick --verbose
+  DEPENDS tpch_benchmark generate_tpch_data
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
   COMMENT "Running quick TPC-H benchmark")
 

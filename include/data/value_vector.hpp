@@ -129,7 +129,7 @@ public:
             } else {
                 DType* device_data;
                 auto& stream = CudaStream::getH2DStream();
-                CHECKED_CALL_THROW(cudaMalloc(&device_data, capacity_ * sizeof(DType)));
+                CHECKED_CALL_THROW(cudaMallocAsync(&device_data, capacity_ * sizeof(DType), stream.get()));
                 CHECKED_CALL_THROW(cudaMemcpyAsync(device_data,
                                                    data_,
                                                    capacity_ * sizeof(DType),

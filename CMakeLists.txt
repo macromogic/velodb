@@ -94,9 +94,7 @@ option(ENABLE_PROFILING "Enable performance profiling" ON)
 option(BUILD_BENCHMARKS "Build benchmark programs" OFF)
 
 if(BUILD_BENCHMARKS)
-  set(ENABLE_PROFILING OFF) # Disable profiling for benchmarks to avoid overhead
-  message(
-    STATUS "Building benchmarks: ENABLED (profiling disabled for benchmarks)")
+  message(STATUS "Building benchmarks: ENABLED")
 else()
   message(STATUS "Building benchmarks: DISABLED")
 endif()

@@ -5,8 +5,9 @@ set -e
 
 # Configuration
 SCALE_FACTOR=${1:-0.01}
-DATA_DIR="$(pwd)/benchmark/data"
-TPCH_TOOLS_DIR="/tmp/tpch-tools"
+VELODB_ROOT_DIR=$(readlink -f "$(dirname "$0")/..")
+DATA_DIR="$VELODB_ROOT_DIR/benchmark/data"
+TPCH_TOOLS_DIR="$VELODB_ROOT_DIR/thirdparty/tpch-dbgen"
 
 echo "VelODB TPC-H Data Generation Script"
 echo "==================================="
@@ -16,6 +17,9 @@ echo ""
 
 # Create data directory
 mkdir -p "$DATA_DIR"
+if [ ! -f "$DATA_DIR/.gitignore" ]; then
+    echo "*" > "$DATA_DIR/.gitignore"
+fi
 
 # Check if data files already exist
 if [ -f "$DATA_DIR/customer.tbl" ] && [ -f "$DATA_DIR/lineitem.tbl" ]; then
@@ -28,12 +32,11 @@ fi
 if [ ! -f "$TPCH_TOOLS_DIR/dbgen" ]; then
     echo "TPC-H dbgen tool not found. Attempting to build..."
 
-    # Clone and build TPC-H tools
-    if [ ! -d "$TPCH_TOOLS_DIR" ]; then
-        echo "Cloning TPC-H tools..."
-        git clone https://github.com/electrum/tpch-dbgen.git "$TPCH_TOOLS_DIR" || {
-            echo "Error: Failed to clone TPC-H tools"
-            echo "Please manually install TPC-H dbgen tool"
+    # Initialize submodule if needed
+    if [ ! -f "$TPCH_TOOLS_DIR/makefile" ]; then
+        echo "Initializing TPC-H tools submodule..."
+        git submodule update --init --recursive "$TPCH_TOOLS_DIR" || {
+            echo "Error: Failed to initialize TPC-H tools submodule"
             exit 1
         }
     fi
@@ -64,6 +67,7 @@ cd "$TPCH_TOOLS_DIR"
 # Move generated files to data directory
 echo "Moving data files to $DATA_DIR..."
 mv *.tbl "$DATA_DIR/"
+chmod 644 "$DATA_DIR"/*.tbl
 
 cd - > /dev/null
 

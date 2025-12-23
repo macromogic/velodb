@@ -1,7 +1,6 @@
 #include "velodb.hpp"
 
 #include "catalog/table_builder.hpp"
-#include "common/fmt.hpp"
 #include "cuda/warmup.hpp"
 
 #include <fmt/core.h>

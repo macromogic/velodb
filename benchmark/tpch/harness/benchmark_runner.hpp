@@ -8,6 +8,7 @@
 #include "common/result.hpp"
 #include "execution/query_result.hpp"
 
+#include <filesystem>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -24,8 +25,8 @@ public:
         bool measure_throughput_test = false;
         bool validate_results = true;
         bool verbose = true;
-        std::string data_directory = "./benchmark/data";
-        std::string results_directory = "./benchmark/results";
+        std::filesystem::path data_directory = "./benchmark/data";
+        std::filesystem::path results_directory = "./benchmark/results";
     };
 
     struct QueryResult {
@@ -57,7 +58,7 @@ public:
     Result<BenchmarkResults> runFullBenchmark(const BenchmarkConfig& config);
 
     // Individual query execution
-    Result<QueryResult> runSingleQuery(int query_number, double scale_factor, int iteration = 1);
+    QueryResult runSingleQuery(int query_number, double scale_factor, int iteration = 1);
 
     // Data management
     Result<void> loadBenchmarkData(const BenchmarkConfig& config);
