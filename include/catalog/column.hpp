@@ -49,7 +49,8 @@ public:
                                     ValueVector<int64_t>,
                                     ValueVector<float>,
                                     ValueVector<double>,
-                                    ValueVector<OrdinalString>>;
+                                    ValueVector<OrdinalString>,
+                                    ValueVector<uint32_t>>;
 
     explicit Column(std::unique_ptr<DataType> type,
                     size_t initial_capacity = 16,

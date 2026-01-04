@@ -9,13 +9,13 @@ if(NOT CMAKE_CUDA_COMPILER)
     NO_DEFAULT_PATH)
 endif()
 
-set(CMAKE_CUDA_ARCHITECTURES "70;75;80;86;89;90")
+set(CMAKE_CUDA_ARCHITECTURES "75;80;86;89;90")
 
 # Project configuration
 project(
   velodb
   VERSION 0.0.1
-  DESCRIPTION "GPU-accelerated Object Database"
+  DESCRIPTION "GPU-accelerated Oblivious Relational Database"
   LANGUAGES CXX CUDA)
 
 find_package(CUDAToolkit REQUIRED)

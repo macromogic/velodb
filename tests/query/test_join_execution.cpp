@@ -4,6 +4,7 @@
 #include "catalog/table_builder.hpp"
 #include "operator/operator.hpp"
 #include "planner/query_planner.hpp"
+#include "planner/plan_visualizer.hpp"
 
 #include <SQLParser.h>
 
@@ -54,6 +55,7 @@ TEST_F(JoinExecutionTest, BasicInnerJoinSelectStar)
     ASSERT_EQ(stmt->type(), hsql::kStmtSelect);
     auto* select = static_cast<const hsql::SelectStatement*>(stmt);
     auto plan = planner_->planSelect(select);
+    fmt::println("Execution Plan:\n{}", PlanVisualizer::visualizeDetailed(plan));
     ExecutionContext ctx(catalog_);
     auto root_op = plan->createOperator(ctx);
     auto batch_result = root_op->next();

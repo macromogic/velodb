@@ -76,7 +76,7 @@ TEST_F(PlannerTest, PlanSimpleSelect)
     auto& children = plan->getChildren();
     EXPECT_EQ(children.size(), 1);
     EXPECT_EQ(children[0]->getPlanType(), PlanType::COMPACTION);
-    EXPECT_EQ(plan->getOutputSchema().getColumnCount(), 4); // TODO: remove $_rowid and $_mask
+    EXPECT_EQ(plan->getOutputSchema().getColumnCount(), 2);
 }
 
 TEST_F(PlannerTest, PlanSelectWithWhere)

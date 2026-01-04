@@ -12,7 +12,7 @@ namespace velodb {
 
 BitVector::BitVector(size_t num_bits)
     : size_(num_bits)
-    , element_capacity_(DIV_UP(num_bits, ELEMENT_WIDTH))
+    , element_capacity_(std::max(DIV_UP(nextPow2(num_bits), ELEMENT_WIDTH), 1ul))
     , location_(DataLocation::HOST)
     , data_(nullptr)
 {
@@ -146,7 +146,7 @@ void BitVector::resize(size_t new_size)
 void BitVector::reserve(size_t new_capacity)
 {
     VELODB_ASSERT_MSG(location_ != DataLocation::VIEW, "Cannot reserve a VIEW BitVector");
-    size_t new_element_capacity = DIV_UP(new_capacity, ELEMENT_WIDTH);
+    size_t new_element_capacity = DIV_UP(nextPow2(new_capacity), ELEMENT_WIDTH);
     if (new_element_capacity > element_capacity_) {
         Element* new_data;
         if (location_ == DataLocation::CUDA) {

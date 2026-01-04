@@ -423,8 +423,7 @@ TEST_F(OrderByTest, OrderByWithSelectAll)
     auto& view = result.value();
 
     EXPECT_EQ(view.getRowCount(), 5);
-    // TODO: temporarily include $_rowid and $_mask in count
-    EXPECT_EQ(view.getSchema().getColumnCount(), 6); // All columns from products table
+    EXPECT_EQ(view.getSchema().getColumnCount(), 4); // All columns from products table
 
     // Verify descending order by product_id
     if (view.getRowCount() >= 3) {

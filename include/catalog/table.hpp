@@ -36,6 +36,7 @@ public:
 
     const Column& getColumn(const std::string& name) const;
     const Column& getColumn(size_t column_index) const;
+    bool hasColumn(const std::string& name) const;
 
     const Value getValue(size_t row_id, size_t column_index) const;
 

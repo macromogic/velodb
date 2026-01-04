@@ -39,15 +39,17 @@ public:
     ValueVectorBase(size_t capacity, DataLocation location = DataLocation::HOST)
         : data_(nullptr)
         , size_(0)
-        , capacity_(capacity)
+        , capacity_(location == DataLocation::CUDA ? nextPow2(capacity) : capacity)
         , null_mask_(0)
         , location_(location)
     {
-        null_mask_.reserve(capacity);
+        null_mask_.reserve(capacity_);
         if (location == DataLocation::HOST) {
             CHECKED_CALL_THROW(cudaMallocHost(&data_, capacity_ * sizeof(DType)));
         } else if (location == DataLocation::CUDA) {
             CHECKED_CALL_THROW(cudaMalloc(&data_, capacity_ * sizeof(DType)));
+            // Zero-initialize padding region to prevent data leaks during oblivious transfer
+            CHECKED_CALL_THROW(cudaMemset(data_, 0, capacity_ * sizeof(DType)));
         } else {
             VELODB_THROW(ExecutionError, "Invalid data location");
         }
@@ -118,18 +120,24 @@ public:
         VELODB_ASSERT_MSG(location != DataLocation::VIEW, "Cannot move data to VIEW");
         if (location_ != location) {
             if (location_ == DataLocation::CUDA) {
+                // Oblivious transfer: round up to next power of 2 to hide selectivity
+                size_t padded_capacity = nextPow2(capacity_);
+                VELODB_ASSERT_MSG(capacity_ >= padded_capacity, "Insufficient capacity for oblivious transfer");
                 DType* host_data;
                 auto& stream = CudaStream::getD2HStream();
-                CHECKED_CALL_THROW(cudaMallocHost(&host_data, capacity_ * sizeof(DType)));
+                CHECKED_CALL_THROW(cudaMallocHost(&host_data, padded_capacity * sizeof(DType)));
                 CHECKED_CALL_THROW(
-                    cudaMemcpyAsync(host_data, data_, capacity_ * sizeof(DType), cudaMemcpyDeviceToHost, stream.get()));
+                    cudaMemcpyAsync(host_data, data_, padded_capacity * sizeof(DType), cudaMemcpyDeviceToHost, stream.get()));
                 stream.synchronize();
                 cudaFree(data_);
                 data_ = host_data;
+                capacity_ = padded_capacity;
             } else {
+                size_t padded_capacity = nextPow2(capacity_);
                 DType* device_data;
                 auto& stream = CudaStream::getH2DStream();
-                CHECKED_CALL_THROW(cudaMallocAsync(&device_data, capacity_ * sizeof(DType), stream.get()));
+                CHECKED_CALL_THROW(cudaMallocAsync(&device_data, padded_capacity * sizeof(DType), stream.get()));
+                stream.synchronize();
                 CHECKED_CALL_THROW(cudaMemcpyAsync(device_data,
                                                    data_,
                                                    capacity_ * sizeof(DType),
@@ -140,6 +148,7 @@ public:
                     cudaFreeHost(data_);
                 }
                 data_ = device_data;
+                capacity_ = padded_capacity;
             }
             location_ = location;
         }
@@ -168,6 +177,10 @@ public:
 
     void reserve(size_t new_capacity)
     {
+        // For CUDA, use padded capacity to support oblivious transfer
+        if (location_ == DataLocation::CUDA) {
+            new_capacity = nextPow2(new_capacity);
+        }
         if (new_capacity > capacity_) {
             if (location_ == DataLocation::HOST) {
                 DType* new_data;
@@ -180,6 +193,8 @@ public:
                 DType* new_data;
                 CHECKED_CALL_THROW(cudaMalloc(&new_data, new_capacity * sizeof(DType)));
                 CHECKED_CALL_THROW(cudaMemcpy(new_data, data_, size_ * sizeof(DType), cudaMemcpyDeviceToDevice));
+                // Zero-initialize padding region to prevent data leaks
+                CHECKED_CALL_THROW(cudaMemset(new_data + size_, 0, (new_capacity - size_) * sizeof(DType)));
                 cudaFree(data_);
                 data_ = new_data;
                 capacity_ = new_capacity;
@@ -215,7 +230,7 @@ public:
         VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot slice non-host data");
 
         size_t new_size = end - start;
-        return ConcreteVector(data_ + start, new_size, capacity_, null_mask_.slice(start, end));
+        return ConcreteVector(data_ + start, new_size, capacity_ - start, null_mask_.slice(start, end));
     }
 
     ConcreteVector tryOwn()
@@ -292,7 +307,8 @@ public:
     void appendMultiple(const ConcreteVector& other)
     {
         VELODB_ASSERT_MSG(location_ == other.location_ && location_ != DataLocation::VIEW,
-                          "Append must happen on same non-VIEW location");
+                          fmt::format("Incompatible data locations: {} vs {}",
+                                      location_, other.location_));
         if (size_ + other.size_ > capacity_) {
             reserve(DIV_UP(size_ + other.capacity_, capacity_) * capacity_);
         }
@@ -406,7 +422,7 @@ public:
     {
         VELODB_ASSERT_MSG(source.location() == DataLocation::CUDA && rowids.location() == DataLocation::CUDA,
                           "Materialization must happen on CUDA");
-        ValueVector vec(rowids.size(), DataLocation::CUDA);
+        ValueVector vec(nextPow2(rowids.size()), DataLocation::CUDA);
         auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
             "Failed to acquire stream for filter compaction");
         materializeArray<DType>(vec.data_,
@@ -516,7 +532,7 @@ public:
         VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot slice non-host data");
 
         size_t new_size = end - start;
-        return ConcreteVector(data_ + start, new_size, capacity_, null_mask_.slice(start, end), ordered_strings_);
+        return ConcreteVector(data_ + start, new_size, capacity_ - start, null_mask_.slice(start, end), ordered_strings_);
     }
 
     ConcreteVector tryOwn()
@@ -587,7 +603,7 @@ public:
     {
         VELODB_ASSERT_MSG(source.location() == DataLocation::CUDA && rowids.location() == DataLocation::CUDA,
                           "Materialization must happen on CUDA");
-        ValueVector vec(rowids.size(), DataLocation::CUDA);
+        ValueVector vec(nextPow2(rowids.size()), DataLocation::CUDA);
         auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
             "Failed to acquire stream for filter compaction");
         materializeArray<DType>(vec.data_,

@@ -55,7 +55,6 @@ Result<RowBatch> MaterializationOperator::next()
         }
     }
     auto materialized_batch = RowBatch::materializeColumns(src_columns, rowid_columns);
-    // materialized_batch.to(DataLocation::HOST);
     produced_ = true;
     return Result<RowBatch>::success(std::move(materialized_batch));
 }

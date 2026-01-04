@@ -175,8 +175,8 @@ RowBatch RowBatch::materializeColumns(const std::vector<std::reference_wrapper<C
         const Column& rowid_col = rowids[i].get();
         src_col.to(DataLocation::CUDA);
         auto materialized_col = Column::materializeFrom(src_col, rowid_col);
-        src_col.to(DataLocation::HOST);
-        materialized_col.to(DataLocation::HOST);
+        // src_col.to(DataLocation::HOST);
+        // materialized_col.to(DataLocation::HOST);
         materialized_columns.push_back(std::move(materialized_col));
     }
     return RowBatch(std::move(materialized_columns));

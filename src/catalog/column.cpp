@@ -77,6 +77,10 @@ Column Column::buildFrom(std::unique_ptr<DataType> type, std::vector<Value>&& va
     }
         LIST_TYPES(X)
 #undef X
+    case DataTypeId::CHAR: {
+        auto vec = ValueVector<OrdinalString>::buildFrom(std::move(values), location);
+        return Column(type->cloneUnique(), std::move(vec));
+    }
     default:
         VELODB_THROW(ExecutionError, "Unsupported data type");
     }

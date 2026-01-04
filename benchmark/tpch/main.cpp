@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
     // Quick benchmark presets
     program.add_argument("--quick").help("Run quick benchmark (SF=0.01, Q1,Q6, 1 iteration)").flag();
 
-    program.add_argument("--standard").help("Run standard benchmark (SF=0.1, Q1,Q3,Q6,Q12, 3 iterations)").flag();
+    program.add_argument("--standard").help("Run standard benchmark (SF=0.1, Q1,Q6,Q12,Q14,Q19, 3 iterations)").flag();
 
     try {
         program.parse_args(argc, argv);
@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
             config.iterations = 1;
         } else if (program.get<bool>("--standard")) {
             config.scale_factors = { 0.1 };
-            config.query_numbers = { 1, 3, 6, 12 };
+            config.query_numbers = { 1, 6, 12, 14, 19 };
             config.iterations = 3;
         } else {
             // Parse individual arguments

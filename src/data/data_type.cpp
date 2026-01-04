@@ -30,6 +30,10 @@ std::unique_ptr<DataType> DataType::createType(DataTypeId type_id, size_t size)
         return std::make_unique<DoubleType>();
     case DataTypeId::VARCHAR:
         return std::make_unique<VarcharType>(size);
+    case DataTypeId::CHAR:
+        return std::make_unique<CharType>(size);
+    case DataTypeId::DATE:
+        return std::make_unique<DateType>();
     default:
         VELODB_THROW(TypeError, "Unsupported data type");
     }

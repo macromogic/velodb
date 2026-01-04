@@ -187,6 +187,7 @@ Elem* reorderBitmap(Elem* d_bitmap, const int64_t* d_indices, size_t n, cudaStre
 
     Elem* d_out;
     CHECKED_CALL_THROW(cudaMalloc(&d_out, n * sizeof(Elem)));
+    CHECKED_CALL_THROW(cudaMemsetAsync(d_out, 0, n * sizeof(Elem), stream));
 
     // Launch kernel to reorder data
     int threads = 256;

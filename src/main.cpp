@@ -42,7 +42,6 @@ int main(int argc, char* argv[])
     bool use_mock_catalog = program.get<bool>("--mock-catalog");
     bool use_tpch_catalog = program.get<bool>("--tpch-catalog");
 
-    // Debug: Print what argparse actually parsed
     if (verbose) {
         std::cout << "VelODB v" << VERSION_STRING << std::endl;
         std::cout << "Query Plan Visualization Tool" << std::endl;

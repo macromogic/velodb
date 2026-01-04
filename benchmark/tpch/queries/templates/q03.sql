@@ -1,6 +1,7 @@
 SELECT
     l_orderkey,
-    SUM(l_extendedprice * (1 - l_discount)) AS revenue,
+    l_extendedprice,
+    l_discount,
     o_orderdate,
     o_shippriority
 FROM
@@ -13,10 +14,6 @@ WHERE
     AND l_orderkey = o_orderkey
     AND o_orderdate < '1995-03-15'
     AND l_shipdate > '1995-03-15'
-GROUP BY
-    l_orderkey,
-    o_orderdate,
-    o_shippriority
 ORDER BY
     revenue DESC,
     o_orderdate
