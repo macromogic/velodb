@@ -182,16 +182,16 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRe
         auto key_expr_2 = parseExpression(table_ref, join_expr->expr2);
         if (expressionReferencesOnlyTable(key_expr_1.get(), join->left->name)) {
             return planEquiJoin(join->left,
-                               join->right,
-                               std::move(key_expr_1),
-                               std::move(key_expr_2),
-                               std::move(predicate));
+                                join->right,
+                                std::move(key_expr_1),
+                                std::move(key_expr_2),
+                                std::move(predicate));
         } else {
             return planEquiJoin(join->left,
-                               join->right,
-                               std::move(key_expr_2),
-                               std::move(key_expr_1),
-                               std::move(predicate));
+                                join->right,
+                                std::move(key_expr_2),
+                                std::move(key_expr_1),
+                                std::move(predicate));
         }
     }
     case hsql::kTableSelect:
@@ -317,8 +317,8 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planLimitOffset(std::unique_ptr<
 }
 
 std::unique_ptr<AbstractPlanNode> QueryPlanner::planJoinSide(const hsql::TableRef* table_ref,
-                                                         std::unique_ptr<AbstractExpression> join_key_expr,
-                                                         std::unique_ptr<AbstractExpression> predicate)
+                                                             std::unique_ptr<AbstractExpression> join_key_expr,
+                                                             std::unique_ptr<AbstractExpression> predicate)
 {
     auto plan = planTableRef(table_ref, std::move(predicate));
     // Input schema after seq scan + compaction

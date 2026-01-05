@@ -3,8 +3,8 @@
 #include "catalog/execution_context.hpp"
 #include "catalog/table_builder.hpp"
 #include "operator/operator.hpp"
-#include "planner/query_planner.hpp"
 #include "planner/plan_visualizer.hpp"
+#include "planner/query_planner.hpp"
 
 #include <SQLParser.h>
 

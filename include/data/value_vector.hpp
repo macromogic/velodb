@@ -126,8 +126,11 @@ public:
                 DType* host_data;
                 auto& stream = CudaStream::getD2HStream();
                 CHECKED_CALL_THROW(cudaMallocHost(&host_data, padded_capacity * sizeof(DType)));
-                CHECKED_CALL_THROW(
-                    cudaMemcpyAsync(host_data, data_, padded_capacity * sizeof(DType), cudaMemcpyDeviceToHost, stream.get()));
+                CHECKED_CALL_THROW(cudaMemcpyAsync(host_data,
+                                                   data_,
+                                                   padded_capacity * sizeof(DType),
+                                                   cudaMemcpyDeviceToHost,
+                                                   stream.get()));
                 stream.synchronize();
                 cudaFree(data_);
                 data_ = host_data;
@@ -307,8 +310,7 @@ public:
     void appendMultiple(const ConcreteVector& other)
     {
         VELODB_ASSERT_MSG(location_ == other.location_ && location_ != DataLocation::VIEW,
-                          fmt::format("Incompatible data locations: {} vs {}",
-                                      location_, other.location_));
+                          fmt::format("Incompatible data locations: {} vs {}", location_, other.location_));
         if (size_ + other.size_ > capacity_) {
             reserve(DIV_UP(size_ + other.capacity_, capacity_) * capacity_);
         }
@@ -532,7 +534,11 @@ public:
         VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot slice non-host data");
 
         size_t new_size = end - start;
-        return ConcreteVector(data_ + start, new_size, capacity_ - start, null_mask_.slice(start, end), ordered_strings_);
+        return ConcreteVector(data_ + start,
+                              new_size,
+                              capacity_ - start,
+                              null_mask_.slice(start, end),
+                              ordered_strings_);
     }
 
     ConcreteVector tryOwn()
