@@ -38,27 +38,31 @@ private:
     // Helper methods for planning
     std::unique_ptr<AbstractPlanNode> planTableRef(const hsql::TableRef* table_ref,
                                                    std::unique_ptr<AbstractExpression> predicate = nullptr);
-    std::unique_ptr<AbstractPlanNode> planJoin(const hsql::TableRef* left_ref,
-                                               const hsql::TableRef* right_ref,
-                                               const hsql::Expr* join_expr,
-                                               std::unique_ptr<AbstractExpression> predicate = nullptr);
+    std::unique_ptr<AbstractPlanNode> planEquiJoin(const hsql::TableRef* left_ref,
+                                                   const hsql::TableRef* right_ref,
+                                                   std::unique_ptr<AbstractExpression> left_key_expr,
+                                                   std::unique_ptr<AbstractExpression> right_key_expr,
+                                                   std::unique_ptr<AbstractExpression> predicate = nullptr);
     std::unique_ptr<AbstractPlanNode> planOrderBy(std::unique_ptr<AbstractPlanNode>&& plan,
                                                   const std::vector<hsql::OrderDescription*>* orders);
     std::unique_ptr<AbstractPlanNode> planLimitOffset(std::unique_ptr<AbstractPlanNode>&& plan,
-                                                  const hsql::LimitDescription* limit_desc);
+                                                      const hsql::LimitDescription* limit_desc);
+    std::unique_ptr<AbstractPlanNode> planJoinSide(const hsql::TableRef* table_ref,
+                                                   std::unique_ptr<AbstractExpression> join_key_expr,
+                                                   std::unique_ptr<AbstractExpression> predicate = nullptr);
 
     Schema inferSeqScanSchema(const Table& table);
     Schema inferSelectSchema(const std::vector<std::unique_ptr<AbstractExpression>>& expressions);
     Schema inferJoinSchema(const Table& left_table, const Table& right_table);
 
     std::vector<std::unique_ptr<AbstractExpression>> parseSelectList(const hsql::TableRef* table_ref,
-                                                                    const std::vector<hsql::Expr*>* select_list);
+                                                                     const std::vector<hsql::Expr*>* select_list);
     std::unique_ptr<AbstractExpression> parseExpression(const hsql::TableRef* table_ref, const hsql::Expr* expr);
     std::unique_ptr<AbstractExpression> parseColumnRef(const hsql::TableRef* table_ref, const hsql::Expr* expr);
     std::unique_ptr<AbstractExpression> parseOperator(const hsql::TableRef* table_ref, const hsql::Expr* expr);
     std::unique_ptr<AbstractExpression> createComparisonOperator(ComparisonType type,
-                                                               std::unique_ptr<AbstractExpression> left,
-                                                               std::unique_ptr<AbstractExpression> right);
+                                                                 std::unique_ptr<AbstractExpression> left,
+                                                                 std::unique_ptr<AbstractExpression> right);
 
     // Helper methods for predicate decomposition
     void extractConjuncts(const AbstractExpression* expr, std::vector<const AbstractExpression*>& conjuncts);

@@ -199,6 +199,9 @@ Result<Value> TPCHDataLoader::parseValue(const std::string& str_value, const Dat
             bool bool_val = (str_value == "true" || str_value == "1" || str_value == "t");
             return Result<Value>::success(Value::createBoolean(bool_val));
         }
+        case DataTypeId::DATE: {
+            return Result<Value>::success(Value::createDate(str_value));
+        }
         default:
             return Result<Value>::failure(fmt::format("Unsupported type: {}", type.toString()));
         }
