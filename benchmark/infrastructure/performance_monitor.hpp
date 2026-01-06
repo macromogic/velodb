@@ -2,6 +2,7 @@
 
 #include "common/copy_traits.hpp"
 #include "common/result.hpp"
+#include "execution/query_result.hpp"
 
 #include <chrono>
 #include <memory>
@@ -19,7 +20,6 @@ public:
         size_t gpu_memory_usage = 0;
         size_t rows_processed = 0;
         size_t bytes_processed = 0;
-        bool used_late_materialization = false;
         std::string error_message;
         bool success = false;
     };
@@ -33,15 +33,13 @@ public:
     };
 
     PerformanceMonitor();
-    ~PerformanceMonitor();
+    ~PerformanceMonitor() = default;
 
     // Query monitoring
     void startQuery(const std::string& query_name);
-    QueryMetrics finishQuery();
-    void recordPlanningTime(std::chrono::duration<double> time);
+    QueryMetrics finishQuery(const velodb::QueryStatistics& stats);
     void recordMemoryUsage(size_t bytes);
     void recordRowsProcessed(size_t rows);
-    void recordLateMaterialization(bool used);
 
     // System information
     SystemInfo getSystemInfo() const;
@@ -61,8 +59,6 @@ private:
     };
 
     std::string current_query_;
-    std::chrono::steady_clock::time_point query_start_time_;
-    std::chrono::steady_clock::time_point planning_start_time_;
     std::unordered_map<std::string, QueryMetrics> metrics_;
 
     // Memory monitoring

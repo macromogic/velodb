@@ -1,10 +1,10 @@
 #pragma once
 
 #include <string>
+#include <vector>
 #if VELODB_ENABLE_PROFILING
 #include <chrono>
 #include <map>
-#include <vector>
 #endif // VELODB_ENABLE_PROFILING
 
 namespace velodb {

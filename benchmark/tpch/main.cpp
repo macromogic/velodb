@@ -87,13 +87,6 @@ int main(int argc, char* argv[])
         .default_value(std::string("./benchmark/results"))
         .metavar("DIR");
 
-    // Test type
-    program.add_argument("--test-type", "-t")
-        .help("Type of test to run")
-        .default_value(std::string("power"))
-        .choices("power", "throughput", "full")
-        .metavar("TYPE");
-
     // Output options
     program.add_argument("--verbose", "-v").help("Enable verbose output").flag();
 
@@ -143,10 +136,6 @@ int main(int argc, char* argv[])
         config.validate_results = program.get<bool>("--validate");
         config.verbose = program.get<bool>("--verbose");
 
-        std::string test_type = program.get<std::string>("--test-type");
-        config.measure_power_test = (test_type == "power" || test_type == "full");
-        config.measure_throughput_test = (test_type == "throughput" || test_type == "full");
-
         if (config.verbose) {
             fmt::println("VelODB TPC-H Benchmark");
             fmt::println("======================");
@@ -160,7 +149,7 @@ int main(int argc, char* argv[])
         // Create and run benchmark
         TPCHBenchmarkRunner runner;
 
-        auto result = runner.runFullBenchmark(config);
+        auto result = runner.runPowerTest(config);
         if (!result) {
             fmt::println(stderr, "Benchmark failed: {}", result.error());
             return 1;

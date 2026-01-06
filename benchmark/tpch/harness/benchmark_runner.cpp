@@ -98,37 +98,6 @@ Result<TPCHBenchmarkRunner::BenchmarkResults> TPCHBenchmarkRunner::runPowerTest(
     return Result<BenchmarkResults>::success(std::move(results));
 }
 
-Result<TPCHBenchmarkRunner::BenchmarkResults> TPCHBenchmarkRunner::runFullBenchmark(const BenchmarkConfig& config)
-{
-    // 1. Run Power Test
-    auto result = runPowerTest(config);
-    if (!result || !config.measure_throughput_test) {
-        return result;
-    }
-
-    BenchmarkResults& results = result.value();
-
-    if (config.verbose) {
-        fmt::println("\nStarting TPC-H Throughput Test");
-    }
-
-    // Simple throughput test: run queries again in a new stream
-    // In a real TPC-H, we would have multiple streams
-    int stream_id = 1;
-    double scale_factor = config.scale_factors.empty() ? 1.0 : config.scale_factors[0];
-
-    for (int query_number : config.query_numbers) {
-        if (config.verbose) {
-            fmt::println("Running Throughput Stream {} - Q{}", stream_id, query_number);
-        }
-
-        auto qr = runSingleQuery(query_number, scale_factor, stream_id);
-        results.query_results.push_back(qr);
-    }
-
-    return result;
-}
-
 TPCHBenchmarkRunner::QueryResult TPCHBenchmarkRunner::runSingleQuery(int query_number,
                                                                      double scale_factor,
                                                                      int iteration)
@@ -140,18 +109,18 @@ TPCHBenchmarkRunner::QueryResult TPCHBenchmarkRunner::runSingleQuery(int query_n
 
     try {
         // Load and prepare query
-        std::string query_template = loadQueryTemplate(query_number);
-        std::string sql = substituteQueryParameters(query_template, query_number);
+        std::string sql = loadQuery(query_number);
 
         // Start performance monitoring
         std::string query_name = fmt::format("Q{}_SF{}_I{}", query_number, scale_factor, iteration);
         performance_monitor_.startQuery(query_name);
 
         // Execute query
-        auto query_result = executeQuery(sql, query_number);
+        velodb::QueryStatistics stats;
+        auto query_result = executeQuery(sql, &stats);
 
         // Finish performance monitoring
-        result.metrics = performance_monitor_.finishQuery();
+        result.metrics = performance_monitor_.finishQuery(stats);
 
         if (query_result) {
             result.success = true;
@@ -246,7 +215,7 @@ Result<void> TPCHBenchmarkRunner::exportResults(const BenchmarkResults& results,
             file << fmt::format("      \"iteration\": {},\n", qr.iteration);
             file << fmt::format("      \"time_s\": {:.4f},\n", qr.metrics.execution_time.count());
             file << fmt::format("      \"rows\": {},\n", qr.result_row_count);
-            file << fmt::format("      \"success\": {}\n", qr.success ? "true" : "false");
+            file << fmt::format("      \"success\": {},\n", qr.success ? "true" : "false");
             file << fmt::format("      \"error_message\": \"{}\"\n", qr.error_message);
             file << "    }" << (i < results.query_results.size() - 1 ? "," : "") << "\n";
         }
@@ -299,7 +268,7 @@ Result<void> TPCHBenchmarkRunner::exportSummaryReport(const BenchmarkResults& re
     }
 }
 
-std::string TPCHBenchmarkRunner::loadQueryTemplate(int query_number)
+std::string TPCHBenchmarkRunner::loadQuery(int query_number)
 {
     std::string filename = fmt::format("benchmark/tpch/queries/templates/q{:02d}.sql", query_number);
 
@@ -312,21 +281,12 @@ std::string TPCHBenchmarkRunner::loadQueryTemplate(int query_number)
     return content;
 }
 
-std::string TPCHBenchmarkRunner::substituteQueryParameters(const std::string& query_template, int query_number)
-{
-    auto params_list = QueryParameterGenerator::generateParameters(query_number, 1);
-    if (params_list.empty()) {
-        return query_template;
-    }
-    return QueryParameterGenerator::substituteParameters(query_template, params_list[0]);
-}
-
-Result<velodb::QueryResult> TPCHBenchmarkRunner::executeQuery(const std::string& sql, [[maybe_unused]] int query_number)
+Result<velodb::QueryResult> TPCHBenchmarkRunner::executeQuery(const std::string& sql, velodb::QueryStatistics* stats)
 {
     try {
-        return database_.executeQuery(sql);
+        return database_.executeQuery(sql, stats);
     } catch (const std::exception& e) {
-        return Result<velodb::QueryResult>::failure(fmt::format("Query execution failed: {}", e.what()));
+        return Result<velodb::QueryResult>::failure(fmt::format("Query execution failed:\n{}", e.what()));
     }
 }
 
@@ -399,44 +359,37 @@ std::string TPCHBenchmarkRunner::formatBenchmarkSummary(const BenchmarkResults& 
 
     summary << "Query Results:\n";
     summary << "--------------\n";
-    summary << fmt::format("{:>5} {:>5} {:>4} {:>10} {:>8} {:>8} {:>8} {:>6}\n",
+    summary << fmt::format("{:>5} {:>5} {:>4} {:>10} {:>8} {:>8} {:>8}\n",
                            "Query",
                            "SF",
                            "Iter",
                            "Time(s)",
                            "Rows",
                            "Memory",
-                           "Status",
-                           "LM");
+                           "Status");
     summary << std::string(65, '-') << "\n";
 
     for (const auto& qr : results.query_results) {
         std::string status = qr.success ? "OK" : "FAIL";
-        std::string lm_flag = qr.metrics.used_late_materialization ? "Y" : "N";
 
-        summary << fmt::format("{:>5} {:>5} {:>4} {:>10.3f} {:>8} {:>8} {:>8} {:>6}\n",
+        summary << fmt::format("{:>5} {:>5} {:>4} {:>10.3f} {:>8} {:>8} {:>8}\n",
                                "Q" + std::to_string(qr.query_number),
                                qr.scale_factor,
                                qr.iteration,
                                qr.metrics.execution_time.count(),
                                qr.result_row_count,
                                qr.metrics.memory_usage_peak / (1024 * 1024),
-                               status,
-                               lm_flag);
+                               status);
     }
 
     // Calculate summary statistics
     size_t successful_queries = 0;
     double total_time = 0;
-    size_t late_mat_count = 0;
 
     for (const auto& qr : results.query_results) {
         if (qr.success) {
             successful_queries++;
             total_time += qr.metrics.execution_time.count();
-            if (qr.metrics.used_late_materialization) {
-                late_mat_count++;
-            }
         }
     }
 
@@ -448,10 +401,6 @@ std::string TPCHBenchmarkRunner::formatBenchmarkSummary(const BenchmarkResults& 
                            100.0 * successful_queries / results.query_results.size());
     if (successful_queries > 0) {
         summary << fmt::format("Average Query Time: {:.3f}s\n", total_time / successful_queries);
-        summary << fmt::format("Late Materialization Usage: {}/{} ({:.1f}%)\n",
-                               late_mat_count,
-                               successful_queries,
-                               100.0 * late_mat_count / successful_queries);
     }
 
     return summary.str();
@@ -460,66 +409,6 @@ std::string TPCHBenchmarkRunner::formatBenchmarkSummary(const BenchmarkResults& 
 std::string TPCHBenchmarkRunner::getQueryName(int query_number) const
 {
     return fmt::format("Q{:02d}", query_number);
-}
-
-// QueryParameterGenerator implementation
-std::vector<QueryParameterGenerator::Parameters> QueryParameterGenerator::generateParameters(int query_number,
-                                                                                             int stream_count)
-{
-    std::vector<Parameters> params_list;
-
-    for (int stream = 0; stream < stream_count; ++stream) {
-        Parameters params;
-        params.stream_id = stream;
-        params.query_number = query_number;
-        params.substitutions = getDefaultParameters(query_number);
-        params_list.push_back(params);
-    }
-
-    return params_list;
-}
-
-std::string QueryParameterGenerator::substituteParameters(const std::string& template_query, const Parameters& params)
-{
-    std::string result = template_query;
-
-    for (const auto& [placeholder, value] : params.substitutions) {
-        std::string pattern = "{" + placeholder + "}";
-        size_t pos = 0;
-        while ((pos = result.find(pattern, pos)) != std::string::npos) {
-            result.replace(pos, pattern.length(), value);
-            pos += value.length();
-        }
-    }
-
-    return result;
-}
-
-std::unordered_map<std::string, std::string> QueryParameterGenerator::getDefaultParameters(int query_number)
-{
-    std::unordered_map<std::string, std::string> params;
-
-    switch (query_number) {
-    case 1:
-        params["DELTA"] = "90";
-        break;
-    case 6:
-        params["DATE"] = "1994-01-01";
-        params["DISCOUNT_MIN"] = "0.05";
-        params["DISCOUNT_MAX"] = "0.07";
-        params["QUANTITY"] = "24";
-        break;
-    case 12:
-        params["SHIPMODE1"] = "MAIL";
-        params["SHIPMODE2"] = "SHIP";
-        params["DATE"] = "1994-01-01";
-        break;
-    default:
-        // No parameters for other queries yet
-        break;
-    }
-
-    return params;
 }
 
 } // namespace velodb::benchmark::tpch

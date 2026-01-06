@@ -48,7 +48,7 @@ public:
     std::optional<std::reference_wrapper<const Table>> getTable(const std::string& table_name) const;
 
     // Query execution
-    Result<QueryResult> executeQuery(const std::string& sql);
+    Result<QueryResult> executeQuery(const std::string& sql, QueryStatistics* stats = nullptr);
 
     // Catalog access (temporary for benchmarking)
     Catalog& getCatalog() { return catalog_; }

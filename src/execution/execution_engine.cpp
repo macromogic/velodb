@@ -45,28 +45,39 @@ ExecutionEngine& ExecutionEngine::operator=(ExecutionEngine&& other) noexcept
     return *this;
 }
 
-Result<QueryResult> ExecutionEngine::executeQuery(const std::string& sql)
+Result<QueryResult> ExecutionEngine::executeQuery(const std::string& sql, QueryStatistics* stats)
 {
     PROFILE_SCOPE("Execute Query (full)");
-    hsql::SQLParserResult result;
+    hsql::SQLParserResult sql_result;
     {
         PROFILE_SCOPE("SQL Parsing");
-        hsql::SQLParser::parse(sql, &result);
+        hsql::SQLParser::parse(sql, &sql_result);
     }
 
-    if (!result.isValid()) {
-        return Result<QueryResult>::failure("SQL parsing error: " + std::string(result.errorMsg()));
+    if (!sql_result.isValid()) {
+        return Result<QueryResult>::failure("SQL parsing error: " + std::string(sql_result.errorMsg()));
     }
-    if (result.size() != 1) {
+    if (sql_result.size() != 1) {
         return Result<QueryResult>::failure("Multiple statements not supported");
     }
 
-    auto* statement = result.getStatement(0);
+    auto* statement = sql_result.getStatement(0);
     if (statement->type() != hsql::kStmtSelect) {
         return Result<QueryResult>::failure("Non-select statements not supported");
     }
+    auto t0 = std::chrono::high_resolution_clock::now();
     auto plan = planner_.planSelect(static_cast<const hsql::SelectStatement*>(statement));
-    return executePlan(std::move(plan));
+    auto t1 = std::chrono::high_resolution_clock::now();
+    auto query_result = executePlan(std::move(plan));
+    auto t2 = std::chrono::high_resolution_clock::now();
+    if (stats) {
+        stats->planning_time = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0);
+        stats->execution_time = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1);
+        if (query_result) {
+            stats->rows_processed = query_result.value().getRowCount();
+        }
+    }
+    return query_result;
 }
 
 Result<QueryResult> ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNode> plan)

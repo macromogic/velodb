@@ -6,7 +6,7 @@ set -e
 # Configuration
 SCALE_FACTOR=${1:-0.01}
 VELODB_ROOT_DIR=$(readlink -f "$(dirname "$0")/..")
-DATA_DIR="$VELODB_ROOT_DIR/benchmark/data"
+DATA_DIR=$(readlink -f ${2:-"$VELODB_ROOT_DIR/benchmark/data"})
 TPCH_TOOLS_DIR="$VELODB_ROOT_DIR/thirdparty/tpch-dbgen"
 
 echo "VelODB TPC-H Data Generation Script"
@@ -41,7 +41,7 @@ if [ ! -f "$TPCH_TOOLS_DIR/dbgen" ]; then
         }
     fi
 
-    cd "$TPCH_TOOLS_DIR"
+    pushd "$TPCH_TOOLS_DIR"
     echo "Building TPC-H tools..."
     make || {
         echo "Error: Failed to build TPC-H tools"
@@ -54,14 +54,15 @@ if [ ! -f "$TPCH_TOOLS_DIR/dbgen" ]; then
         exit 1
     fi
 
-    cd - > /dev/null
+    popd > /dev/null
 fi
 
 # Generate TPC-H data
 echo "Generating TPC-H data (Scale Factor: $SCALE_FACTOR)..."
-cd "$TPCH_TOOLS_DIR"
+pushd "$TPCH_TOOLS_DIR" > /dev/null
 
 # Generate data files
+rm -f *.tbl
 ./dbgen -s "$SCALE_FACTOR" -f
 
 # Move generated files to data directory
@@ -69,7 +70,7 @@ echo "Moving data files to $DATA_DIR..."
 mv *.tbl "$DATA_DIR/"
 chmod 644 "$DATA_DIR"/*.tbl
 
-cd - > /dev/null
+popd > /dev/null
 
 # Verify generated files
 echo ""

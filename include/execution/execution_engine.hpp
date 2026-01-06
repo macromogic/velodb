@@ -26,7 +26,7 @@ public:
     ExecutionEngine& operator=(ExecutionEngine&& other) noexcept;
 
     // Main execution interface
-    Result<QueryResult> executeQuery(const std::string& sql);
+    Result<QueryResult> executeQuery(const std::string& sql, QueryStatistics* stats = nullptr);
 
     size_t getLastExecutionRowCount() const { return last_execution_row_count_; }
     double getLastExecutionTimeMs() const { return last_execution_time_ms_; }

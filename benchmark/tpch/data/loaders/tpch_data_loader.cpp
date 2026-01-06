@@ -117,16 +117,6 @@ Result<bool> TPCHDataLoader::validateLoadedData(double scale_factor) const
     return Result<bool>::success(true);
 }
 
-Result<void> TPCHDataLoader::generateData(double scale_factor, const std::string& output_dir)
-{
-    // TODO: Implement TPC-H data generation using dbgen
-    // For now, return a helpful error message
-    return Result<void>::failure(fmt::format("Data generation not yet implemented. Please provide TPC-H data files "
-                                             "for scale factor {} in directory: {}",
-                                             scale_factor,
-                                             output_dir));
-}
-
 bool TPCHDataLoader::dataFilesExist(const std::string& data_dir, [[maybe_unused]] double scale_factor)
 {
     std::vector<std::string> required_files = { "region.tbl", "nation.tbl",   "customer.tbl", "supplier.tbl",
@@ -239,9 +229,6 @@ Result<size_t> TPCHDataLoader::loadTableGeneric(const std::string& table_name,
         rows_loaded++;
     }
 
-    // Replace existing table
-    // TODO: Implement table replacement in Catalog
-    // For now, this will fail if table already exists with data
     auto table = std::move(builder).build();
     if (!catalog_.addTable(std::move(table))) {
         return Result<size_t>::failure(fmt::format("Failed to add table data"));

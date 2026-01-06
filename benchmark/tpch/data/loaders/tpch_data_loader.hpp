@@ -45,9 +45,6 @@ public:
     // Validate loaded data against expected counts
     Result<bool> validateLoadedData(double scale_factor) const;
 
-    // Generate TPC-H data using dbgen (if available)
-    static Result<void> generateData(double scale_factor, const std::string& output_dir);
-
     // Check if data files exist for given scale factor
     static bool dataFilesExist(const std::string& data_dir, double scale_factor);
 
