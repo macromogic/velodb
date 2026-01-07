@@ -2,6 +2,7 @@
 
 #include "common/copy_traits.hpp"
 #include "common/exception.hpp"
+#include "common/profiler.hpp"
 #include "cuda/compaction.hpp"
 #include "cuda/event.hpp"
 #include "cuda/helper.hpp"
@@ -120,6 +121,7 @@ public:
         VELODB_ASSERT_MSG(location != DataLocation::VIEW, "Cannot move data to VIEW");
         if (location_ != location) {
             if (location_ == DataLocation::CUDA) {
+                PROFILE_SCOPE("ValueVector D2H Transfer");
                 // Oblivious transfer: round up to next power of 2 to hide selectivity
                 size_t padded_capacity = nextPow2(capacity_);
                 VELODB_ASSERT_MSG(capacity_ >= padded_capacity, "Insufficient capacity for oblivious transfer");
@@ -136,11 +138,11 @@ public:
                 data_ = host_data;
                 capacity_ = padded_capacity;
             } else {
+                PROFILE_SCOPE("ValueVector H2D Transfer");
                 size_t padded_capacity = nextPow2(capacity_);
                 DType* device_data;
                 auto& stream = CudaStream::getH2DStream();
                 CHECKED_CALL_THROW(cudaMallocAsync(&device_data, padded_capacity * sizeof(DType), stream.get()));
-                stream.synchronize();
                 CHECKED_CALL_THROW(cudaMemcpyAsync(device_data,
                                                    data_,
                                                    capacity_ * sizeof(DType),
@@ -264,16 +266,15 @@ public:
                 std::move(data_ + size, data_ + size_, data_);
             }
         } else {
-            cudaMemcpy(split_vector.data_, data_, size * sizeof(DType), cudaMemcpyDeviceToDevice);
+            CHECKED_CALL_THROW(cudaMemcpy(split_vector.data_, data_, size * sizeof(DType), cudaMemcpyDeviceToDevice));
             // TODO: Use memmove semantics to handle overlapping regions
             if (remaining_size > 0) {
-                cudaMemcpy(data_, data_ + size, remaining_size * sizeof(DType), cudaMemcpyDeviceToDevice);
+                CHECKED_CALL_THROW(
+                    cudaMemcpy(data_, data_ + size, remaining_size * sizeof(DType), cudaMemcpyDeviceToDevice));
             }
         }
-        split_vector.null_mask_ = null_mask_.slice(0, size);
+        split_vector.null_mask_ = null_mask_.splitFront(size);
         split_vector.size_ = size;
-
-        null_mask_ = null_mask_.slice(size, size_);
         size_ = remaining_size;
 
         return split_vector;
@@ -328,13 +329,14 @@ public:
     {
         auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
             "Failed to acquire stream for reorder");
-        auto* new_data = reorderData(data_, indices, size_, stream_handle->get());
+        auto* new_data = reorderData(data_, indices, capacity_, size_, stream_handle->get());
         std::swap(data_, new_data);
         if (new_data != nullptr) {
             cudaFree(new_data);
         }
         null_mask_.to(DataLocation::CUDA);
-        auto* new_bitmap = reorderBitmap(null_mask_.data_, indices, size_, stream_handle->get());
+        auto* new_bitmap
+            = reorderBitmap(null_mask_.data_, indices, null_mask_.element_capacity_, size_, stream_handle->get());
         std::swap(null_mask_.data_, new_bitmap);
         null_mask_.to(DataLocation::HOST);
         if (new_bitmap != nullptr) {

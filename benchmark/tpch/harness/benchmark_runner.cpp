@@ -1,6 +1,7 @@
 #include "benchmark_runner.hpp"
 
 #include "common/fmt.hpp"
+#include "common/profiler.hpp"
 #include "execution/query_result.hpp"
 
 #include <fmt/chrono.h>
@@ -135,6 +136,10 @@ TPCHBenchmarkRunner::QueryResult TPCHBenchmarkRunner::runSingleQuery(int query_n
             result.error_message = query_result.error();
         }
 
+        fmt::println("  Query finished. Plan time: {:.3f}s, Execution time: {:.3f}s, Rows: {}",
+                     result.metrics.planning_time.count(),
+                     result.metrics.execution_time.count(),
+                     result.result_row_count);
     } catch (const std::exception& e) {
         result.success = false;
         result.error_message = fmt::format("Exception during query execution: {}", e.what());

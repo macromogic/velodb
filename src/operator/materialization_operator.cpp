@@ -18,6 +18,7 @@ std::pair<std::string, std::string> MaterializationOperator::splitName(const std
 
 Result<RowBatch> MaterializationOperator::next()
 {
+    PROFILE_SCOPE("MaterializationOperator::next");
     auto* child = getChild();
     if (!child) {
         return Result<RowBatch>::failure("MaterializationOperator requires a child operator");

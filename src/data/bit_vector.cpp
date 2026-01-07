@@ -1,6 +1,7 @@
 #include "data/bit_vector.hpp"
 
 #include "common/exception.hpp"
+#include "common/profiler.hpp"
 #include "cuda/event.hpp"
 #include "cuda/helper.hpp"
 #include "cuda/stream.hpp"
@@ -199,6 +200,31 @@ BitVector BitVector::slice(size_t start, size_t end) const
     return result;
 }
 
+BitVector BitVector::splitFront(size_t size)
+{
+    VELODB_ASSERT_MSG(size <= size_, "Split size exceeds BitVector size");
+    VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot split non-host BitVector");
+
+    BitVector split_part = slice(0, size);
+    size_t remaining_size = size_ - size;
+    // Shift the remaining bits to the front
+    size_t start_offset = size % ELEMENT_WIDTH;
+    size_t start_index = size / ELEMENT_WIDTH;
+    for (size_t i = 0; i < DIV_UP(remaining_size, ELEMENT_WIDTH); ++i) {
+        if (start_offset > 0 && i + start_index + 1 < DIV_UP(size_, ELEMENT_WIDTH)) {
+            data_[i] = (data_[i + start_index] >> start_offset)
+                | (data_[i + start_index + 1] << (ELEMENT_WIDTH - start_offset));
+        } else {
+            data_[i] = (data_[i + start_index] >> start_offset);
+        }
+    }
+    // Clear out the now-unused elements at the end
+    size_t new_element_count = DIV_UP(remaining_size, ELEMENT_WIDTH);
+    std::fill_n(data_ + new_element_count, element_capacity_ - new_element_count, Element(0));
+    size_ = remaining_size;
+    return split_part;
+}
+
 void BitVector::append(const BitVector& other)
 {
     size_t original_size = size_;
@@ -230,6 +256,7 @@ void BitVector::to(DataLocation location)
     VELODB_ASSERT_MSG(location != DataLocation::VIEW, "Cannot move data to VIEW");
     if (location_ != location) {
         if (location_ == DataLocation::CUDA) {
+            PROFILE_SCOPE("BitVector D2H Transfer");
             Element* host_data;
             auto& stream = CudaStream::getD2HStream();
             CHECKED_CALL_THROW(cudaMallocHost(&host_data, element_capacity_ * sizeof(Element)));
@@ -242,6 +269,7 @@ void BitVector::to(DataLocation location)
             cudaFree(data_);
             data_ = host_data;
         } else {
+            PROFILE_SCOPE("BitVector H2D Transfer");
             Element* device_data;
             auto& stream = CudaStream::getH2DStream();
             CHECKED_CALL_THROW(cudaMalloc(&device_data, element_capacity_ * sizeof(Element)));

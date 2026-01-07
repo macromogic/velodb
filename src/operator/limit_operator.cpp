@@ -17,6 +17,7 @@ LimitOperator::LimitOperator(ExecutionContext& context,
 
 Result<RowBatch> LimitOperator::next()
 {
+    PROFILE_SCOPE("LimitOperator::next");
     auto* child = getChild();
     if (!child) {
         return Result<RowBatch>::failure("LimitOperator requires a child operator");

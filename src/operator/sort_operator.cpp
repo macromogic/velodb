@@ -20,6 +20,7 @@ SortOperator::SortOperator(ExecutionContext& context,
 
 Result<RowBatch> SortOperator::next()
 {
+    PROFILE_SCOPE("SortOperator::next");
     if (!sorted_) {
         auto* child = getChild();
         if (!child) {

@@ -1,6 +1,7 @@
 #include "catalog/row_batch.hpp"
 
 #include "common/exception.hpp"
+#include "common/profiler.hpp"
 #include "cuda/join.hpp"
 #include "cuda/materialization.hpp"
 #include "cuda/sort.hpp"
@@ -65,6 +66,7 @@ void RowBatch::addRows(const RowBatch& other)
 
 void RowBatch::addFilteredRows(const RowBatch& other, const Column& mask)
 {
+    PROFILE_SCOPE("RowBatch::addFilteredRows");
     VELODB_ASSERT_MSG(other.getRowCount() == mask.size(), "Mask size must match the number of rows in the other batch");
     VELODB_ASSERT_MSG(columns_.size() == other.getColumnCount(), "Column count must match between batches");
     size_t num_columns = columns_.size();

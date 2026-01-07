@@ -1,5 +1,7 @@
 #include "common/profiler.hpp"
 
+#include <fmt/core.h>
+
 #include <algorithm>
 #include <iomanip>
 #include <iostream>
@@ -18,10 +20,15 @@ void Profiler::addTiming(const std::string& name, long long microseconds)
 void Profiler::printReport() const
 {
 #if VELODB_ENABLE_PROFILING
-    std::cout << "\n=== Performance Profile Report ===\n";
-    std::cout << std::left << std::setw(40) << "Operation" << std::setw(10) << "Calls" << std::setw(15) << "Total (ms)"
-              << std::setw(15) << "Avg (μs)" << std::setw(15) << "Min (μs)" << std::setw(15) << "Max (μs)" << "\n";
-    std::cout << std::string(110, '-') << "\n";
+    fmt::println("\n=== Performance Profile Report ===");
+    fmt::println("{:<40}{:>10}{:>15}{:>15}{:>15}{:>15}",
+                 "Operation",
+                 "Calls",
+                 "Total (ms)",
+                 "Avg (μs)",
+                 "Min (μs)",
+                 "Max (μs)");
+    fmt::println("{:-^110}", "");
 
     for (const auto& [name, times] : timings_) {
         auto total_ms = total_time_.at(name) / 1000.0;
@@ -29,11 +36,15 @@ void Profiler::printReport() const
         auto min_us = *std::min_element(times.begin(), times.end());
         auto max_us = *std::max_element(times.begin(), times.end());
 
-        std::cout << std::left << std::setw(40) << name << " " << std::setw(10) << call_count_.at(name) << std::setw(15)
-                  << std::fixed << std::setprecision(3) << total_ms << std::setw(15) << avg_us << std::setw(15)
-                  << min_us << std::setw(15) << max_us << "\n";
+        fmt::println("{:<40} {:>10}{:>15.3f}{:>15}{:>15}{:>15}",
+                     name,
+                     call_count_.at(name),
+                     total_ms,
+                     avg_us,
+                     min_us,
+                     max_us);
     }
-    std::cout << "================================\n\n";
+    fmt::println("================================\n");
 #endif // VELODB_ENABLE_PROFILING
 }
 

@@ -20,6 +20,7 @@ FilterCompactionOperator::FilterCompactionOperator(ExecutionContext& context,
 
 Result<RowBatch> FilterCompactionOperator::next()
 {
+    PROFILE_SCOPE("FilterCompactionOperator::next");
     auto* child = getChild();
     if (!child) {
         return Result<RowBatch>::failure("FilterCompactionOperator requires a child operator");

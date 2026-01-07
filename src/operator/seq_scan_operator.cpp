@@ -23,6 +23,7 @@ SeqScanOperator::SeqScanOperator(ExecutionContext& context,
 
 Result<RowBatch> SeqScanOperator::next()
 {
+    PROFILE_SCOPE("SeqScanOperator::next");
     size_t start_row_id = current_row_id_;
     size_t end_row_id = std::min(start_row_id + MAX_BATCH_SIZE, table_.getRowCount());
     size_t batch_size = end_row_id - start_row_id;

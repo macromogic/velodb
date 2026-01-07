@@ -98,6 +98,8 @@ int main(int argc, char* argv[])
 
     program.add_argument("--validate").help("Validate query results").default_value(true).implicit_value(true);
 
+    program.add_argument("--with-profiling").help("Enable profiling during benchmark").flag();
+
     // Quick benchmark presets
     program.add_argument("--quick").help("Run quick benchmark (SF=0.01, Q1,Q6, 1 iteration)").flag();
 
@@ -135,7 +137,7 @@ int main(int argc, char* argv[])
         config.results_directory = program.get<std::string>("--results-dir");
         config.validate_results = program.get<bool>("--validate");
         config.verbose = program.get<bool>("--verbose");
-
+        config.with_profiling = program.get<bool>("--with-profiling");
         if (config.verbose) {
             fmt::println("VelODB TPC-H Benchmark");
             fmt::println("======================");
@@ -199,6 +201,13 @@ int main(int argc, char* argv[])
                 fmt::println("Average Query Time: {:.3f}s", total_time / successful);
             }
             fmt::println("Total Benchmark Time: {:.3f}s", benchmark_results.total_benchmark_time.count());
+        }
+        if (config.with_profiling) {
+#ifdef VELODB_ENABLE_PROFILING
+            velodb::Profiler::getInstance().printReport();
+#else
+            fmt::println("Profiling is not enabled in this build.");
+#endif
         }
 
         return benchmark_results.success ? 0 : 1;

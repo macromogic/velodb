@@ -1,3 +1,4 @@
+#include "common/profiler.hpp"
 #include "cuda/compaction.hpp"
 #include "cuda/helper.hpp"
 #include "data/type_traits.hpp"
@@ -347,6 +348,7 @@ size_t filterCompact(T* dst_data,
                      cudaStream_t stream,
                      unsigned int block)
 {
+    PROFILE_FUNCTION();
     if (n == 0)
         return 0;
 

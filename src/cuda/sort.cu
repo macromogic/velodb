@@ -164,13 +164,13 @@ void sortIndices(int64_t* d_row_ids,
 }
 
 template <typename T>
-T* reorderData(T* d_data, const int64_t* d_indices, size_t n, cudaStream_t stream)
+T* reorderData(T* d_data, const int64_t* d_indices, size_t capacity, size_t n, cudaStream_t stream)
 {
     if (n == 0)
         return nullptr;
 
     T* d_out;
-    CHECKED_CALL_THROW(cudaMalloc(&d_out, n * sizeof(T)));
+    CHECKED_CALL_THROW(cudaMalloc(&d_out, capacity * sizeof(T)));
 
     // Launch kernel to reorder data
     int threads = 256;
@@ -180,14 +180,16 @@ T* reorderData(T* d_data, const int64_t* d_indices, size_t n, cudaStream_t strea
 }
 
 template <typename Elem>
-Elem* reorderBitmap(Elem* d_bitmap, const int64_t* d_indices, size_t n, cudaStream_t stream)
+Elem* reorderBitmap(Elem* d_bitmap, const int64_t* d_indices, size_t element_capacity, size_t n, cudaStream_t stream)
 {
     if (n == 0)
         return nullptr;
 
     Elem* d_out;
-    CHECKED_CALL_THROW(cudaMalloc(&d_out, n * sizeof(Elem)));
-    CHECKED_CALL_THROW(cudaMemsetAsync(d_out, 0, n * sizeof(Elem), stream));
+
+    constexpr auto ElemSize = sizeof(Elem) * 8;
+    CHECKED_CALL_THROW(cudaMalloc(&d_out, element_capacity * sizeof(Elem)));
+    CHECKED_CALL_THROW(cudaMemsetAsync(d_out, 0, DIV_UP(n, ElemSize) * sizeof(Elem), stream));
 
     // Launch kernel to reorder data
     int threads = 256;
@@ -197,12 +199,13 @@ Elem* reorderBitmap(Elem* d_bitmap, const int64_t* d_indices, size_t n, cudaStre
 }
 
 // Explicit template instantiations
-#define X(name, DT, VT) template DT* reorderData<DT>(DT*, const int64_t*, size_t, cudaStream_t);
+#define X(name, DT, VT) template DT* reorderData<DT>(DT*, const int64_t*, size_t, size_t, cudaStream_t);
 LIST_TYPES(X)
 #undef X
 
 template BitVector::Element* reorderBitmap<BitVector::Element>(BitVector::Element*,
                                                                const int64_t*,
+                                                               size_t,
                                                                size_t,
                                                                cudaStream_t);
 

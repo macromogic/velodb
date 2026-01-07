@@ -4,6 +4,7 @@
 #include "catalog/row_batch.hpp"
 #include "catalog/schema.hpp"
 #include "common/copy_traits.hpp"
+#include "common/profiler.hpp"
 #include "common/result.hpp"
 
 #include <memory>
@@ -24,7 +25,7 @@ public:
     virtual Result<RowBatch> next() = 0;
     virtual bool isUnary() const = 0;
 
-    static constexpr size_t MAX_BATCH_SIZE = 32;
+    static constexpr size_t MAX_BATCH_SIZE = 32768;
 
 protected:
     ExecutionContext& context_;

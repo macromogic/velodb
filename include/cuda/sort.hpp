@@ -28,17 +28,22 @@ void sortIndices(int64_t* d_row_ids,
                  bool reverse = false);
 
 template <typename T>
-T* reorderData(T* d_data, const int64_t* d_indices, size_t n, cudaStream_t stream = 0);
+T* reorderData(T* d_data, const int64_t* d_indices, size_t capacity, size_t n, cudaStream_t stream = 0);
 
 template <typename Elem>
-Elem* reorderBitmap(Elem* d_bitmap, const int64_t* d_indices, size_t n, cudaStream_t stream = 0);
+Elem* reorderBitmap(Elem* d_bitmap,
+                    const int64_t* d_indices,
+                    size_t element_capacity,
+                    size_t n,
+                    cudaStream_t stream = 0);
 
-#define X(name, DT, VT) extern template DT* reorderData<DT>(DT*, const int64_t*, size_t, cudaStream_t);
+#define X(name, DT, VT) extern template DT* reorderData<DT>(DT*, const int64_t*, size_t, size_t, cudaStream_t);
 LIST_TYPES(X)
 #undef X
 
 extern template BitVector::Element* reorderBitmap<BitVector::Element>(BitVector::Element*,
                                                                       const int64_t*,
+                                                                      size_t,
                                                                       size_t,
                                                                       cudaStream_t);
 

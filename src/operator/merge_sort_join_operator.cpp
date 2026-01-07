@@ -23,6 +23,7 @@ MergeSortJoinOperator::MergeSortJoinOperator(ExecutionContext& context,
 
 Result<RowBatch> MergeSortJoinOperator::next()
 {
+    PROFILE_SCOPE("MergeSortJoinOperator::next");
     // Simple single-pass INNER merge equi-join on first column (join key) of each side.
     // Assumptions:
     //  Left & Right inputs are individually sorted ascending by key (column 0).

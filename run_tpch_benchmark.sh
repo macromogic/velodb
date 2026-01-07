@@ -12,7 +12,7 @@ if [ -d "$BENCHMARK_DIR" ]; then
 fi
 mkdir -p "$BENCHMARK_DIR/data"
 echo "*" > "$BENCHMARK_DIR/data/.gitignore"
-for SF in 0.01 0.1 1 2 5 10; do
+for SF in 0.01 0.1 1 2 3 4 5 10; do
     DATA_DIR="$BENCHMARK_DIR/data/sf_$SF"
     if [ ! -d "$DATA_DIR" ]; then
         echo "Generating TPC-H data for scale factor $SF..."
@@ -21,5 +21,5 @@ for SF in 0.01 0.1 1 2 5 10; do
     else
         echo "TPC-H data for scale factor $SF already exists. Skipping generation."
     fi
-    $BUILD_DIR/benchmark/tpch_benchmark -v -s "$SF" -d "$DATA_DIR" -i "$ITERATIONS" -q "$QUERIES"
+    $BUILD_DIR/benchmark/tpch_benchmark -v -s "$SF" -d "$DATA_DIR" -i "$ITERATIONS" -q "$QUERIES" --export-format csv --results-dir "$BENCHMARK_DIR/results/sf_$SF"
 done

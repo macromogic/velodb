@@ -22,6 +22,7 @@ ProjectionOperator::ProjectionOperator(ExecutionContext& context,
 
 Result<RowBatch> ProjectionOperator::next()
 {
+    PROFILE_SCOPE("ProjectionOperator::next");
     auto* child = getChild();
     if (!child) {
         return Result<RowBatch>::failure("ProjectionOperator requires a child operator");

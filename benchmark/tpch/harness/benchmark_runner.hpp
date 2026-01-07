@@ -23,6 +23,7 @@ public:
         int iterations = 3;
         bool validate_results = true;
         bool verbose = true;
+        bool with_profiling = false;
         std::filesystem::path data_directory = "./benchmark/data";
         std::filesystem::path results_directory = "./benchmark/results";
     };

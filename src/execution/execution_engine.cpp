@@ -82,27 +82,36 @@ Result<QueryResult> ExecutionEngine::executeQuery(const std::string& sql, QueryS
 
 Result<QueryResult> ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNode> plan)
 {
-    PROFILE_SCOPE("Query Execution");
     if (!plan) {
         return Result<QueryResult>::failure("Cannot execute null plan");
     }
 
-    auto operator_tree = plan->createOperator(context_);
+    std::unique_ptr<AbstractOperator> operator_tree;
+    {
+        PROFILE_SCOPE("Create Operator Tree");
+        operator_tree = plan->createOperator(context_);
+    }
     if (!operator_tree) {
         return Result<QueryResult>::failure("Failed to create operator tree from plan");
     }
 
     QueryResult result(operator_tree->getOutputSchema().clone());
-    while (true) {
-        auto batch_result = operator_tree->next();
-        if (!batch_result) {
-            return Result<QueryResult>::failure(batch_result.error());
+    {
+        PROFILE_SCOPE("Execute Operator Tree");
+        while (true) {
+            auto batch_result = operator_tree->next();
+            if (!batch_result) {
+                return Result<QueryResult>::failure(batch_result.error());
+            }
+            auto batch = std::move(batch_result.value());
+            if (batch.getRowCount() == 0) {
+                break; // No more results
+            }
+            {
+                PROFILE_SCOPE("Append Batch to Result");
+                result.append(std::move(batch));
+            }
         }
-        auto batch = std::move(batch_result.value());
-        if (batch.getRowCount() == 0) {
-            break; // No more results
-        }
-        result.append(std::move(batch));
     }
     return Result<QueryResult>::success(std::move(result));
 }

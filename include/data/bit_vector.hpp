@@ -30,6 +30,7 @@ public:
     void resize(size_t new_size);
     void reserve(size_t new_capacity);
     BitVector slice(size_t start, size_t end) const;
+    BitVector splitFront(size_t size);
     void append(const BitVector& other);
     void to(DataLocation location);
 
