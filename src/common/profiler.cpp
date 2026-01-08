@@ -8,7 +8,7 @@
 
 namespace velodb {
 
-void Profiler::addTiming(const std::string& name, long long microseconds)
+void Profiler::addTiming([[maybe_unused]] const std::string& name, [[maybe_unused]] long long microseconds)
 {
 #if VELODB_ENABLE_PROFILING
     timings_[name].push_back(microseconds);
@@ -71,7 +71,7 @@ std::vector<std::pair<std::string, long long>> Profiler::getHotSpots() const
 #endif // VELODB_ENABLE_PROFILING
 }
 
-ScopedTimer::ScopedTimer(const std::string& name)
+ScopedTimer::ScopedTimer([[maybe_unused]] const std::string& name)
 #if VELODB_ENABLE_PROFILING
     : name_(name)
     , start_(std::chrono::high_resolution_clock::now())

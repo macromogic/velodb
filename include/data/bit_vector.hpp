@@ -35,6 +35,8 @@ public:
     void to(DataLocation location);
 
 private:
+    static void copyBits(Element* dest, size_t dest_offset, const Element* src, size_t src_offset, size_t num_bits);
+
     size_t size_;
     size_t element_capacity_;
     DataLocation location_;

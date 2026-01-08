@@ -63,6 +63,32 @@
                 "BUILD_TESTS": "ON",
                 "ENABLE_PROFILING": "OFF"
             }
+        },
+        {
+            "name": "relwithdebinfo",
+            "displayName": "RelWithDebInfo Build",
+            "description": "RelWithDebInfo build with tests and profiling enabled",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "CMAKE_CXX_STANDARD": "17",
+                "CMAKE_CUDA_STANDARD": "17",
+                "CMAKE_CUDA_ARCHITECTURES": "70;75;80;86;89;90",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+                "BUILD_TESTS": "ON",
+                "ENABLE_PROFILING": "ON",
+                "BUILD_BENCHMARKS": "ON"
+            }
+        },
+        {
+            "name": "relwithdebinfo-no-profiling",
+            "displayName": "RelWithDebInfo Build (No Profiling)",
+            "description": "RelWithDebInfo build with tests enabled, profiling disabled",
+            "inherits": "relwithdebinfo",
+            "cacheVariables": {
+                "ENABLE_PROFILING": "OFF"
+            }
         }
     ],
     "buildPresets": [
@@ -88,6 +114,18 @@
             "name": "release-no-profiling",
             "displayName": "Release Build (No Profiling)",
             "configurePreset": "release-no-profiling",
+            "jobs": 0
+        },
+        {
+            "name": "relwithdebinfo",
+            "displayName": "RelWithDebInfo Build",
+            "configurePreset": "relwithdebinfo",
+            "jobs": 0
+        },
+        {
+            "name": "relwithdebinfo-no-profiling",
+            "displayName": "RelWithDebInfo Build (No Profiling)",
+            "configurePreset": "relwithdebinfo-no-profiling",
             "jobs": 0
         }
     ],
@@ -134,6 +172,30 @@
             "name": "release-no-profiling",
             "displayName": "Release Tests (No Profiling)",
             "configurePreset": "release-no-profiling",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
+        },
+        {
+            "name": "relwithdebinfo",
+            "displayName": "RelWithDebInfo Tests",
+            "configurePreset": "relwithdebinfo",
+            "output": {
+                "outputOnFailure": true
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": false
+            }
+        },
+        {
+            "name": "relwithdebinfo-no-profiling",
+            "displayName": "RelWithDebInfo Tests (No Profiling)",
+            "configurePreset": "relwithdebinfo-no-profiling",
             "output": {
                 "outputOnFailure": true
             },

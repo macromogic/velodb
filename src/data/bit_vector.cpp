@@ -177,24 +177,8 @@ BitVector BitVector::slice(size_t start, size_t end) const
     size_t slice_bits = end - start;
     BitVector result(slice_bits);
 
-    size_t start_offset = start % ELEMENT_WIDTH;
-    size_t start_index = start / ELEMENT_WIDTH;
-    size_t n_elements = DIV_UP(slice_bits, ELEMENT_WIDTH);
-    size_t last_effective_bits = slice_bits % ELEMENT_WIDTH;
-
-    const Element* src_data = data_ + start_index;
-    Element* dest_data = result.data_;
-    // Copy full elements
-    for (size_t i = 0; i < n_elements; ++i) {
-        if (i > 0 && start_offset > 0) {
-            dest_data[i - 1] |= (src_data[i] << (ELEMENT_WIDTH - start_offset));
-        }
-        dest_data[i] = (src_data[i] >> start_offset);
-    }
-
-    // Mask out bits beyond the slice in the last element
-    if (last_effective_bits > 0) {
-        dest_data[n_elements - 1] &= (Element(1) << last_effective_bits) - 1;
+    if (slice_bits > 0) {
+        copyBits(result.data_, 0, data_, start, slice_bits);
     }
 
     return result;
@@ -207,20 +191,29 @@ BitVector BitVector::splitFront(size_t size)
 
     BitVector split_part = slice(0, size);
     size_t remaining_size = size_ - size;
+
     // Shift the remaining bits to the front
-    size_t start_offset = size % ELEMENT_WIDTH;
-    size_t start_index = size / ELEMENT_WIDTH;
-    for (size_t i = 0; i < DIV_UP(remaining_size, ELEMENT_WIDTH); ++i) {
-        if (start_offset > 0 && i + start_index + 1 < DIV_UP(size_, ELEMENT_WIDTH)) {
-            data_[i] = (data_[i + start_index] >> start_offset)
-                | (data_[i + start_index + 1] << (ELEMENT_WIDTH - start_offset));
-        } else {
-            data_[i] = (data_[i + start_index] >> start_offset);
-        }
+    if (remaining_size > 0) {
+        copyBits(data_, 0, data_, size, remaining_size);
     }
+
     // Clear out the now-unused elements at the end
-    size_t new_element_count = DIV_UP(remaining_size, ELEMENT_WIDTH);
-    std::fill_n(data_ + new_element_count, element_capacity_ - new_element_count, Element(0));
+    // Note: copyBits doesn't zero out bits beyond the copied range, so we must clean up manually.
+    // Calculate how many full elements are now valid
+    size_t valid_full_elements = remaining_size / ELEMENT_WIDTH;
+    size_t valid_bits_in_last = remaining_size % ELEMENT_WIDTH;
+
+    // 1. Mask the last valid element if it's partially used
+    if (valid_bits_in_last > 0) {
+        data_[valid_full_elements] &= (Element(1) << valid_bits_in_last) - 1;
+    }
+
+    // 2. Zero out rest of the elements
+    size_t elements_used = DIV_UP(remaining_size, ELEMENT_WIDTH);
+    if (elements_used < element_capacity_) {
+        std::fill_n(data_ + elements_used, element_capacity_ - elements_used, Element(0));
+    }
+
     size_ = remaining_size;
     return split_part;
 }
@@ -229,24 +222,66 @@ void BitVector::append(const BitVector& other)
 {
     size_t original_size = size_;
     resize(size_ + other.size_);
-    size_t start_offset = original_size % ELEMENT_WIDTH;
-    size_t start_index = original_size / ELEMENT_WIDTH;
-    size_t n_full_elements = other.size_ / ELEMENT_WIDTH;
-    size_t remaining_bits = other.size_ % ELEMENT_WIDTH;
 
-    const Element* src_data = other.data_;
-    Element* dest_data = data_ + start_index;
-    // Copy full elements
-    for (size_t i = 0; i < n_full_elements; ++i) {
-        dest_data[i] |= (src_data[i] << start_offset);
-        dest_data[i + 1] = (src_data[i] >> (ELEMENT_WIDTH - start_offset));
-    }
+    copyBits(data_, original_size, other.data_, 0, other.size_);
+}
 
-    // Copy the remaining bits in the last partial element
-    if (remaining_bits > 0) {
-        dest_data[n_full_elements] |= (src_data[n_full_elements] << start_offset);
-        if (start_offset + remaining_bits > ELEMENT_WIDTH) {
-            dest_data[n_full_elements + 1] = (src_data[n_full_elements] >> (ELEMENT_WIDTH - start_offset));
+void BitVector::copyBits(Element* dest, size_t dest_offset, const Element* src, size_t src_offset, size_t num_bits)
+{
+    if (num_bits == 0)
+        return;
+
+    size_t dest_idx = dest_offset / ELEMENT_WIDTH;
+    size_t dest_shift = dest_offset % ELEMENT_WIDTH;
+
+    size_t src_idx = src_offset / ELEMENT_WIDTH;
+    size_t src_shift = src_offset % ELEMENT_WIDTH;
+
+    size_t bits_remaining = num_bits;
+
+    while (bits_remaining > 0) {
+        // How many bits can we write to the current dest element?
+        size_t bits_to_write = std::min(bits_remaining, ELEMENT_WIDTH - dest_shift);
+
+        // Read up to bits_to_write bits from src
+        // Shift down so desired bits are at LSB
+        Element src_val = src[src_idx] >> src_shift;
+
+        // If the needed bits span across two src elements, get the rest from the next element
+        if (ELEMENT_WIDTH - src_shift < bits_to_write) {
+            src_val |= (src[src_idx + 1] << (ELEMENT_WIDTH - src_shift));
+        }
+
+        // Mask the bits we are interested in to avoid garbage
+        Element mask;
+        if (bits_to_write < ELEMENT_WIDTH) {
+            mask = (Element(1) << bits_to_write) - 1;
+            src_val &= mask;
+        } else {
+            mask = ~Element(0);
+        }
+
+        // Clear target bits in dest
+        dest[dest_idx] &= ~(mask << dest_shift);
+
+        // Write to dest: shift up to dest position
+        dest[dest_idx] |= (src_val << dest_shift);
+
+        // Advance
+        bits_remaining -= bits_to_write;
+
+        // Update dest pointers
+        dest_shift += bits_to_write;
+        if (dest_shift == ELEMENT_WIDTH) {
+            dest_shift = 0;
+            dest_idx++;
+        }
+
+        // Update src pointers
+        src_shift += bits_to_write;
+        if (src_shift >= ELEMENT_WIDTH) {
+            src_shift %= ELEMENT_WIDTH;
+            src_idx++;
         }
     }
 }
