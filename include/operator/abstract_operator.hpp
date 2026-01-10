@@ -25,7 +25,7 @@ public:
     virtual Result<RowBatch> next() = 0;
     virtual bool isUnary() const = 0;
 
-    static constexpr size_t MAX_BATCH_SIZE = 32768;
+    static constexpr size_t MAX_BATCH_SIZE = 1ul << 20; // 1M rows
 
 protected:
     ExecutionContext& context_;

@@ -6,6 +6,7 @@ add_library(
   sort.cu
   join.cu
   materialization.cu
+  persistent_kernel.cu
   stream.cpp
   stream_pool.cpp
   event.cpp
