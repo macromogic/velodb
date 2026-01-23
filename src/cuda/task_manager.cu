@@ -59,7 +59,7 @@ bool TaskManager::start()
                  shmem_size);
     CommandQueue queue = queue_ctrl_.getQueue();
     void* kernel_args[] = { &queue };
-    CHECKED_CALL_THROW(cudaLaunchCooperativeKernel(cuda::persistentKernel,
+    CHECKED_CALL_THROW(cudaLaunchCooperativeKernel((const void*)cuda::persistentKernel,
                                                    num_blocks,
                                                    block_size,
                                                    kernel_args,
