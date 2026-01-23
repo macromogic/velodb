@@ -90,10 +90,6 @@ done
 echo ""
 echo "Data generation complete!"
 echo ""
-echo "To run benchmarks:"
-echo "  ./bin/tpch_benchmark --quick                    # Quick test"
-echo "  ./bin/tpch_benchmark --scale-factor $SCALE_FACTOR  # Custom scale factor"
-echo ""
 
 # Create a simple validation script
 cat > "$DATA_DIR/validate_data.sh" << 'EOF'

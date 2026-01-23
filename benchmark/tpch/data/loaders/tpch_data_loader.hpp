@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace velodb::benchmark::tpch {
@@ -52,8 +53,8 @@ private:
     Catalog& catalog_;
 
     // File parsing methods
-    Result<std::vector<Value>> parseCSVLine(const std::string& line, const Schema& schema);
-    Result<Value> parseValue(const std::string& str_value, const DataType& type);
+    Result<std::vector<Value>> parseCSVLine(std::string_view line, const Schema& schema);
+    Result<Value> parseValue(std::string_view str_value, const DataType& type);
 
     // Generic table loader
     Result<size_t> loadTableGeneric(const std::string& table_name, const std::string& file_path, const Schema& schema);

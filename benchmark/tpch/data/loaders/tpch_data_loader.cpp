@@ -5,11 +5,13 @@
 #include <fmt/core.h>
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <string_view>
 #include <unordered_set>
 
 namespace velodb::benchmark::tpch {
@@ -132,30 +134,50 @@ bool TPCHDataLoader::dataFilesExist(const std::string& data_dir, [[maybe_unused]
     return true;
 }
 
-Result<std::vector<Value>> TPCHDataLoader::parseCSVLine(const std::string& line, const Schema& schema)
+Result<std::vector<Value>> TPCHDataLoader::parseCSVLine(std::string_view line, const Schema& schema)
 {
     std::vector<Value> values;
-    std::stringstream ss(line);
-    std::string field;
+    values.reserve(schema.getColumnCount());
 
+    size_t start = 0;
     size_t column_index = 0;
-    while (std::getline(ss, field, '|') && column_index < schema.getColumnCount()) {
+    size_t num_columns = schema.getColumnCount();
+
+    while (column_index < num_columns) {
+        size_t end = line.find('|', start);
+        std::string_view field;
+
+        if (end == std::string_view::npos) {
+            field = line.substr(start);
+        } else {
+            field = line.substr(start, end - start);
+        }
+
         // Trim whitespace
-        field.erase(0, field.find_first_not_of(" \t"));
-        field.erase(field.find_last_not_of(" \t") + 1);
+        size_t first = field.find_first_not_of(" \t");
+        if (first == std::string_view::npos) {
+            field = {};
+        } else {
+            size_t last = field.find_last_not_of(" \t");
+            field = field.substr(first, (last - first + 1));
+        }
 
         const auto& column_info = schema.getColumnInfo(column_index);
         auto value_result = parseValue(field, column_info.getType());
 
         if (!value_result) {
             return Result<std::vector<Value>>::failure(fmt::format("Failed to parse field {} in column {}: {}",
-                                                                   field,
+                                                                   std::string(field),
                                                                    column_info.getName(),
                                                                    value_result.error()));
         }
 
         values.push_back(std::move(value_result.value()));
         column_index++;
+
+        if (end == std::string_view::npos)
+            break;
+        start = end + 1;
     }
 
     if (column_index != schema.getColumnCount()) {
@@ -166,37 +188,46 @@ Result<std::vector<Value>> TPCHDataLoader::parseCSVLine(const std::string& line,
     return Result<std::vector<Value>>::success(std::move(values));
 }
 
-Result<Value> TPCHDataLoader::parseValue(const std::string& str_value, const DataType& type)
+Result<Value> TPCHDataLoader::parseValue(std::string_view str_value, const DataType& type)
 {
     try {
         switch (type.getTypeId()) {
         case DataTypeId::INTEGER: {
-            int32_t int_val = std::stoi(str_value);
-            return Result<Value>::success(Value::createInteger(int_val));
+            int32_t val;
+            auto [ptr, ec] = std::from_chars(str_value.data(), str_value.data() + str_value.size(), val);
+            if (ec == std::errc()) {
+                return Result<Value>::success(Value::createInteger(val));
+            }
+            return Result<Value>::failure(fmt::format("Parse error for INTEGER: '{}'", std::string(str_value)));
         }
         case DataTypeId::BIGINT: {
-            int64_t bigint_val = std::stoll(str_value);
-            return Result<Value>::success(Value::createBigInt(bigint_val));
+            int64_t val;
+            auto [ptr, ec] = std::from_chars(str_value.data(), str_value.data() + str_value.size(), val);
+            if (ec == std::errc()) {
+                return Result<Value>::success(Value::createBigInt(val));
+            }
+            return Result<Value>::failure(fmt::format("Parse error for BIGINT: '{}'", std::string(str_value)));
         }
         case DataTypeId::DOUBLE: {
-            double double_val = std::stod(str_value);
+            std::string temp(str_value);
+            double double_val = std::stod(temp);
             return Result<Value>::success(Value::createDouble(double_val));
         }
         case DataTypeId::VARCHAR: {
-            return Result<Value>::success(Value::createString(str_value));
+            return Result<Value>::success(Value::createString(std::string(str_value)));
         }
         case DataTypeId::BOOLEAN: {
             bool bool_val = (str_value == "true" || str_value == "1" || str_value == "t");
             return Result<Value>::success(Value::createBoolean(bool_val));
         }
         case DataTypeId::DATE: {
-            return Result<Value>::success(Value::createDate(str_value));
+            return Result<Value>::success(Value::createDate(std::string(str_value)));
         }
         default:
             return Result<Value>::failure(fmt::format("Unsupported type: {}", type.toString()));
         }
     } catch (const std::exception& e) {
-        return Result<Value>::failure(fmt::format("Parse error for value '{}': {}", str_value, e.what()));
+        return Result<Value>::failure(fmt::format("Parse error for value '{}': {}", std::string(str_value), e.what()));
     }
 }
 
