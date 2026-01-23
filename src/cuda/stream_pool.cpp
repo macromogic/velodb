@@ -14,6 +14,9 @@ StreamPool::StreamHandle::StreamHandle(StreamPool* pool, std::unique_ptr<CudaStr
 
 StreamPool::StreamHandle::~StreamHandle()
 {
+    if (stream_) {
+        stream_->synchronize();
+    }
     release();
 }
 

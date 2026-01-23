@@ -35,6 +35,10 @@ __device__ __forceinline__ void dispatchCommand(Command& cmd, cg::grid_group& gr
         executeSortMergeJoinCount(cmd.args.sort_merge_join_count, grid);
         break;
 
+    case OpCode::OP_SORT_MERGE_JOIN_PREPARE:
+        executeSortMergeJoinPrepare(cmd.args.sort_merge_join_prepare, grid);
+        break;
+
     case OpCode::OP_SORT_MERGE_JOIN_WRITE:
         executeSortMergeJoinWrite(cmd.args.sort_merge_join_write, grid);
         break;

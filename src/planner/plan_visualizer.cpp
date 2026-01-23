@@ -24,7 +24,7 @@ auto format_as(PlanType type)
         return "Nested Loop Join";
     case PlanType::HASH_JOIN:
         return "Hash Join";
-    case PlanType::sort_merge_join:
+    case PlanType::SORT_MERGE_JOIN:
         return "Merge Sort Join";
     case PlanType::SORT:
         return "Sort";
@@ -197,7 +197,7 @@ std::string PlanVisualizer::getNodeShape(PlanType type)
         return "ellipse";
     case PlanType::NESTED_LOOP_JOIN:
     case PlanType::HASH_JOIN:
-    case PlanType::sort_merge_join:
+    case PlanType::SORT_MERGE_JOIN:
         return "hexagon";
     case PlanType::SORT:
         return "parallelogram";
@@ -219,7 +219,7 @@ std::string PlanVisualizer::getNodeColor(PlanType type)
         return "lightgreen";
     case PlanType::NESTED_LOOP_JOIN:
     case PlanType::HASH_JOIN:
-    case PlanType::sort_merge_join:
+    case PlanType::SORT_MERGE_JOIN:
         return "orange";
     case PlanType::SORT:
         return "purple";

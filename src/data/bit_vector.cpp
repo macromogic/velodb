@@ -2,8 +2,8 @@
 
 #include "common/exception.hpp"
 #include "common/profiler.hpp"
-#include "cuda/allocator.hpp"
 #include "cuda/helper.hpp"
+#include "cuda/host_memory_pool.hpp"
 #include "cuda/stream.hpp"
 #include "cuda/stream_pool.hpp"
 #include "data/data_location.hpp"
@@ -19,37 +19,17 @@ BitVector::BitVector(size_t num_bits, DataLocation location)
     : size_(num_bits)
     , element_capacity_(std::max(nextPow2(num_bits), 1ul))
     , location_(location)
-    , data_(MemoryAllocator::allocate<Element>(location_, element_capacity_))
+    , data_(nullptr)
 {
     if (location_ == DataLocation::HOST) {
+        data_ = static_cast<Element*>(HostMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
         std::fill_n(data_, element_capacity_, Element(0));
     } else {
-        CHECKED_CALL_THROW(cudaMemset(data_, 0, element_capacity_ * sizeof(Element)));
+        auto stream_handle = StreamPool::getInstance().acquire().value();
+        CHECKED_CALL_THROW(cudaMallocAsync(&data_, element_capacity_ * sizeof(Element), stream_handle->get()));
+        CHECKED_CALL_THROW(cudaMemsetAsync(data_, 0, element_capacity_ * sizeof(Element), stream_handle->get()));
     }
 }
-
-// BitVector::BitVector(const BitVector& other)
-//     : size_(other.size_)
-//     , element_capacity_(other.element_capacity_)
-//     , location_(other.location_)
-//     , data_(nullptr)
-// {
-//     switch (location_) {
-//     case DataLocation::HOST:
-//         data_ = MemoryAllocator::allocate<Element>(DataLocation::HOST, element_capacity_);
-//         std::copy(other.data_, other.data_ + element_capacity_, data_);
-//         break;
-//     case DataLocation::CUDA:
-//         data_ = MemoryAllocator::allocate<Element>(DataLocation::CUDA, element_capacity_);
-//         CHECKED_CALL_THROW(cudaMemcpy(data_, other.data_, element_capacity_ * sizeof(Element),
-//         cudaMemcpyDeviceToDevice)); break;
-//     case DataLocation::VIEW:
-//         data_ = other.data_;
-//         break;
-//     default:
-//         __builtin_unreachable();
-//     }
-// }
 
 BitVector::BitVector(BitVector&& other) noexcept
     : size_(other.size_)
@@ -60,29 +40,6 @@ BitVector::BitVector(BitVector&& other) noexcept
     std::swap(data_, other.data_);
 }
 
-// BitVector& BitVector::operator=(const BitVector& other)
-// {
-//     size_ = other.size_;
-//     location_ = other.location_;
-//     element_capacity_ = other.element_capacity_;
-//     switch (location_) {
-//     case DataLocation::HOST:
-//         data_ = MemoryAllocator::allocate<Element>(DataLocation::HOST, element_capacity_);
-//         std::copy(other.data_, other.data_ + element_capacity_, data_);
-//         break;
-//     case DataLocation::CUDA:
-//         data_ = MemoryAllocator::allocate<Element>(DataLocation::CUDA, element_capacity_);
-//         CHECKED_CALL_THROW(cudaMemcpy(data_, other.data_, element_capacity_ * sizeof(Element),
-//         cudaMemcpyDeviceToDevice)); break;
-//     case DataLocation::VIEW:
-//         data_ = other.data_;
-//         break;
-//     default:
-//         __builtin_unreachable();
-//     }
-//     return *this;
-// }
-
 BitVector BitVector::cloneImpl() const
 {
     BitVector copy(size_, location_);
@@ -91,13 +48,13 @@ BitVector BitVector::cloneImpl() const
         std::copy(data_, data_ + element_capacity_, copy.data_);
         break;
     case DataLocation::CUDA: {
-        auto stream_handler = StreamPool::getInstance().acquire().value();
+        auto stream_handle = StreamPool::getInstance().acquire().value();
         CHECKED_CALL_THROW(cudaMemcpyAsync(copy.data_,
                                            data_,
                                            element_capacity_ * sizeof(Element),
                                            cudaMemcpyDeviceToDevice,
-                                           stream_handler->get()));
-        stream_handler->synchronize();
+                                           stream_handle->get()));
+        stream_handle->synchronize();
         break;
     }
     case DataLocation::VIEW:
@@ -123,9 +80,14 @@ BitVector::~BitVector()
 {
     switch (location_) {
     case DataLocation::HOST:
-    case DataLocation::CUDA:
-        MemoryAllocator::deallocate(data_);
+        HostMemoryPool::getInstance().deallocate(data_, element_capacity_ * sizeof(Element));
         break;
+    case DataLocation::CUDA: {
+        auto stream_handle = StreamPool::getInstance().acquire().value();
+        cudaFreeAsync(data_, stream_handle->get());
+        stream_handle->synchronize();
+        break;
+    }
     default:
         break;
     }
@@ -136,9 +98,9 @@ void BitVector::set(size_t index)
     VELODB_ASSERT_MSG(location_ != DataLocation::VIEW, "Cannot modify VIEW BitVector");
     VELODB_ASSERT_MSG(index < size_, "Invalid index");
     if (location_ == DataLocation::CUDA) {
-        auto stream_handler = StreamPool::getInstance().acquire().value();
-        CHECKED_CALL_THROW(cudaMemsetAsync(data_ + index, 1, sizeof(Element), stream_handler->get()));
-        stream_handler->synchronize();
+        auto stream_handle = StreamPool::getInstance().acquire().value();
+        CHECKED_CALL_THROW(cudaMemsetAsync(data_ + index, 1, sizeof(Element), stream_handle->get()));
+        stream_handle->synchronize();
     } else {
         data_[index] = 1;
     }
@@ -149,9 +111,9 @@ void BitVector::unset(size_t index)
     VELODB_ASSERT_MSG(location_ != DataLocation::VIEW, "Cannot modify VIEW BitVector");
     VELODB_ASSERT_MSG(index < size_, "Invalid index");
     if (location_ == DataLocation::CUDA) {
-        auto stream_handler = StreamPool::getInstance().acquire().value();
-        CHECKED_CALL_THROW(cudaMemsetAsync(data_ + index, 0, sizeof(Element), stream_handler->get()));
-        stream_handler->synchronize();
+        auto stream_handle = StreamPool::getInstance().acquire().value();
+        CHECKED_CALL_THROW(cudaMemsetAsync(data_ + index, 0, sizeof(Element), stream_handle->get()));
+        stream_handle->synchronize();
     } else {
         data_[index] = 0;
     }
@@ -161,11 +123,11 @@ bool BitVector::get(size_t index) const
 {
     VELODB_ASSERT_MSG(index < size_, "Invalid index");
     if (location_ == DataLocation::CUDA) {
-        auto stream_handler = StreamPool::getInstance().acquire().value();
+        auto stream_handle = StreamPool::getInstance().acquire().value();
         Element value;
         CHECKED_CALL_THROW(
-            cudaMemcpyAsync(&value, data_ + index, sizeof(Element), cudaMemcpyDeviceToHost, stream_handler->get()));
-        stream_handler->synchronize();
+            cudaMemcpyAsync(&value, data_ + index, sizeof(Element), cudaMemcpyDeviceToHost, stream_handle->get()));
+        stream_handle->synchronize();
         return value != 0;
     } else {
         return data_[index] != 0;
@@ -190,31 +152,30 @@ void BitVector::reserve(size_t new_capacity)
 
     if (new_element_capacity > element_capacity_) {
         Element* new_data;
-        auto stream_handler = StreamPool::getInstance().acquire().value();
         if (location_ == DataLocation::CUDA) {
-            new_data = MemoryAllocator::allocate<Element>(DataLocation::CUDA, new_element_capacity);
+            auto stream_handle = StreamPool::getInstance().acquire().value();
+            CHECKED_CALL_THROW(
+                cudaMallocAsync(&new_data, new_element_capacity * sizeof(Element), stream_handle->get()));
             CHECKED_CALL_THROW(cudaMemcpyAsync(new_data,
                                                data_,
                                                element_capacity_ * sizeof(Element),
                                                cudaMemcpyDeviceToDevice,
-                                               stream_handler->get()));
+                                               stream_handle->get()));
             CHECKED_CALL_THROW(cudaMemsetAsync(new_data + element_capacity_,
                                                0,
                                                (new_element_capacity - element_capacity_) * sizeof(Element),
-                                               stream_handler->get()));
-            stream_handler->synchronize();
+                                               stream_handle->get()));
+            CHECKED_CALL_THROW(cudaFreeAsync(data_, stream_handle->get()));
+            stream_handle->synchronize();
         } else {
-            new_data = MemoryAllocator::allocate<Element>(DataLocation::HOST, new_element_capacity);
-            stream_handler->synchronize();
+            auto& host_memory_pool = HostMemoryPool::getInstance();
+            new_data = static_cast<Element*>(host_memory_pool.allocate(new_element_capacity * sizeof(Element)));
             if (data_) {
                 std::copy(data_, data_ + size_, new_data);
             }
             // Initialize the rest (padding) just in case, though usually only size_ matters
             std::fill_n(new_data + size_, new_element_capacity - size_, Element(0));
-        }
-
-        if (data_) {
-            MemoryAllocator::deallocate(data_);
+            host_memory_pool.deallocate(data_, element_capacity_ * sizeof(Element));
         }
         data_ = new_data;
         element_capacity_ = new_element_capacity;
@@ -257,35 +218,34 @@ void BitVector::to(DataLocation location)
 {
     VELODB_ASSERT_MSG(location != DataLocation::VIEW, "Cannot move data to VIEW");
     if (location_ != location) {
-        auto stream_handler = StreamPool::getInstance().acquire().value();
+        auto stream_handle = StreamPool::getInstance().acquire().value();
         if (location_ == DataLocation::CUDA) {
             PROFILE_SCOPE("BitVector D2H Transfer");
             // For Byte Vector, capacity is bytes
-            Element* host_data = MemoryAllocator::allocate<Element>(DataLocation::HOST,
-                                                                    element_capacity_,
-                                                                    stream_handler->get());
+            Element* host_data = static_cast<Element*>(
+                HostMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
             CHECKED_CALL_THROW(cudaMemcpyAsync(host_data,
                                                data_,
                                                element_capacity_ * sizeof(Element),
                                                cudaMemcpyDeviceToHost,
-                                               stream_handler->get()));
-            MemoryAllocator::deallocate(data_, stream_handler->get());
-            stream_handler->synchronize();
+                                               stream_handle->get()));
+            CHECKED_CALL_THROW(cudaFreeAsync(data_, stream_handle->get()));
+            stream_handle->synchronize();
             data_ = host_data;
         } else {
             PROFILE_SCOPE("BitVector H2D Transfer");
-            Element* device_data = MemoryAllocator::allocate<Element>(DataLocation::CUDA,
-                                                                      element_capacity_,
-                                                                      stream_handler->get());
+            Element* device_data;
+            CHECKED_CALL_THROW(
+                cudaMallocAsync(&device_data, element_capacity_ * sizeof(Element), stream_handle->get()));
             CHECKED_CALL_THROW(cudaMemcpyAsync(device_data,
                                                data_,
                                                element_capacity_ * sizeof(Element),
                                                cudaMemcpyHostToDevice,
-                                               stream_handler->get()));
+                                               stream_handle->get()));
             if (location_ == DataLocation::HOST) {
-                MemoryAllocator::deallocate(data_, stream_handler->get());
+                HostMemoryPool::getInstance().deallocate(data_, element_capacity_ * sizeof(Element));
             }
-            stream_handler->synchronize();
+            stream_handle->synchronize();
             data_ = device_data;
         }
         location_ = location;

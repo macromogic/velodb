@@ -72,9 +72,9 @@ public:
     const void* rawData() const;
     BitVector::Element* rawBitmapData();
     const BitVector::Element* rawBitmapData() const;
-    void* getTemporaryBuffer() const;
-    BitVector::Element* getTemporaryBitmapBuffer() const;
-    void setFromBuffer(void* data, BitVector::Element* bitmap_data);
+    void* getDeviceBuffer() const;
+    BitVector::Element* getDeviceBitmapBuffer() const;
+    void setFromDeviceBuffers(void* data, BitVector::Element* bitmap_data);
 
     DataLocation location() const;
     void to(DataLocation location);

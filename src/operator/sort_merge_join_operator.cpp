@@ -12,12 +12,12 @@ SortMergeJoinOperator::SortMergeJoinOperator(ExecutionContext& context,
                                              Schema output_schema,
                                              std::unique_ptr<AbstractOperator> left_child,
                                              std::unique_ptr<AbstractOperator> right_child,
-                                             std::unique_ptr<AbstractExpression> left_key_expr,
-                                             std::unique_ptr<AbstractExpression> right_key_expr,
+                                             const Table& left_table,
+                                             const Table& right_table,
                                              JoinType join_type)
     : BinaryOperator(context, std::move(output_schema), std::move(left_child), std::move(right_child))
-    , left_key_expr_(std::move(left_key_expr))
-    , right_key_expr_(std::move(right_key_expr))
+    , left_table_(left_table)
+    , right_table_(right_table)
     , join_type_(join_type)
 {
 }
@@ -63,16 +63,17 @@ Result<RowBatch> SortMergeJoinOperator::next()
     auto& task_manager = context_.getTaskManager();
 
     // Scan-count phase to determine output size
-    auto stream_handler = StreamPool::getInstance().acquire().value();
+    auto stream_handle = StreamPool::getInstance().acquire().value();
     size_t max_join_blocks = left_batch.getRowCount(); // Allocation must cover worst-case fragmentation
-    MergeJoinBlock* d_join_blocks = MemoryAllocator::allocate<MergeJoinBlock>(DataLocation::CUDA,
-                                                                              max_join_blocks,
-                                                                              stream_handler->get());
-    size_t* d_join_block_count = MemoryAllocator::allocate<size_t>(DataLocation::CUDA, 1, stream_handler->get());
-    size_t* d_row_count = MemoryAllocator::allocate<size_t>(DataLocation::CUDA, 1, stream_handler->get());
-    CHECKED_CALL_THROW(cudaMemsetAsync(d_join_block_count, 0, sizeof(size_t), stream_handler->get()));
-    CHECKED_CALL_THROW(cudaMemsetAsync(d_row_count, 0, sizeof(size_t), stream_handler->get()));
-    stream_handler->synchronize();
+    MergeJoinBlock* d_join_blocks;
+    CHECKED_CALL_THROW(cudaMallocAsync(&d_join_blocks, max_join_blocks * sizeof(MergeJoinBlock), stream_handle->get()));
+    size_t* d_join_block_count;
+    CHECKED_CALL_THROW(cudaMallocAsync(&d_join_block_count, 1 * sizeof(size_t), stream_handle->get()));
+    size_t* d_row_count;
+    CHECKED_CALL_THROW(cudaMallocAsync(&d_row_count, 1 * sizeof(size_t), stream_handle->get()));
+    CHECKED_CALL_THROW(cudaMemsetAsync(d_join_block_count, 0, sizeof(size_t), stream_handle->get()));
+    CHECKED_CALL_THROW(cudaMemsetAsync(d_row_count, 0, sizeof(size_t), stream_handle->get()));
+    stream_handle->synchronize();
     Command cmd_count = {};
     cmd_count.opcode = OpCode::OP_SORT_MERGE_JOIN_COUNT;
     cmd_count.args = { .sort_merge_join_count = { .left = left_join_col,
@@ -84,14 +85,36 @@ Result<RowBatch> SortMergeJoinOperator::next()
     task_manager.waitCommand(task_manager.submitCommand(cmd_count));
     size_t h_row_count = 0;
     CHECKED_CALL_THROW(
-        cudaMemcpyAsync(&h_row_count, d_row_count, sizeof(size_t), cudaMemcpyDeviceToHost, stream_handler->get()));
-    stream_handler->synchronize();
+        cudaMemcpyAsync(&h_row_count, d_row_count, sizeof(size_t), cudaMemcpyDeviceToHost, stream_handle->get()));
+    stream_handle->synchronize();
     size_t h_padded_rows = std::max(MIN_PADDING_SIZE, nextPow2(h_row_count));
 
     // Join-write phase
-    int64_t* d_out_left = MemoryAllocator::allocate<int64_t>(DataLocation::CUDA, h_padded_rows, stream_handler->get());
-    int64_t* d_out_right = MemoryAllocator::allocate<int64_t>(DataLocation::CUDA, h_padded_rows, stream_handler->get());
-    stream_handler->synchronize();
+    int64_t* d_out_left;
+    CHECKED_CALL_THROW(cudaMallocAsync(&d_out_left, h_padded_rows * sizeof(int64_t), stream_handle->get()));
+    int64_t* d_out_right;
+    CHECKED_CALL_THROW(cudaMallocAsync(&d_out_right, h_padded_rows * sizeof(int64_t), stream_handle->get()));
+    stream_handle->synchronize();
+
+    Command cmd_join_left = {};
+    cmd_join_left.opcode = OpCode::OP_SORT_MERGE_JOIN_PREPARE;
+    cmd_join_left.args = { .sort_merge_join_prepare = {
+                               .rowids = d_out_left,
+                               .n = h_padded_rows,
+                               .n_rows = left_table_.get().getRowCount(),
+                               .seed = getSeed(),
+                           } };
+    task_manager.submitCommand(cmd_join_left);
+    Command cmd_join_right = {};
+    cmd_join_right.opcode = OpCode::OP_SORT_MERGE_JOIN_PREPARE;
+    cmd_join_right.args = { .sort_merge_join_prepare = {
+                                .rowids = d_out_right,
+                                .n = h_padded_rows,
+                                .n_rows = right_table_.get().getRowCount(),
+                                .seed = getSeed(),
+                            } };
+    task_manager.waitCommand(task_manager.submitCommand(cmd_join_right));
+
     Command cmd_join = {};
     cmd_join.opcode = OpCode::OP_SORT_MERGE_JOIN_WRITE;
     // TODO: write random indices for padding region
@@ -107,8 +130,8 @@ Result<RowBatch> SortMergeJoinOperator::next()
 
     Column left_rowid_col(DataType::createType(DataTypeId::BIGINT), h_padded_rows, DataLocation::CUDA);
     Column right_rowid_col(DataType::createType(DataTypeId::BIGINT), h_padded_rows, DataLocation::CUDA);
-    left_rowid_col.setFromBuffer(d_out_left, nullptr);
-    right_rowid_col.setFromBuffer(d_out_right, nullptr);
+    left_rowid_col.setFromDeviceBuffers(d_out_left, nullptr);
+    right_rowid_col.setFromDeviceBuffers(d_out_right, nullptr);
     std::vector<Column> result_cols;
     result_cols.reserve(2);
     result_cols.push_back(std::move(left_rowid_col));

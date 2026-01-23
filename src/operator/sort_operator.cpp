@@ -31,14 +31,13 @@ Result<RowBatch> SortOperator::next()
         size_t n_padded_rows = nextPow2(n_rows);
         size_t n_cols = gathered_batch.getColumnCount();
         auto& task_manager = context_.getTaskManager();
-        auto stream_handler = StreamPool::getInstance().acquire().value();
+        auto stream_handle = StreamPool::getInstance().acquire().value();
 
         // Perform sorting
         size_t n_sort_columns = order_indices_.size();
-        int32_t* d_indices = MemoryAllocator::allocate<int32_t>(DataLocation::CUDA,
-                                                                n_padded_rows,
-                                                                stream_handler->get());
-        stream_handler->synchronize();
+        int32_t* d_indices;
+        CHECKED_CALL_THROW(cudaMallocAsync(&d_indices, n_padded_rows * sizeof(int32_t), stream_handle->get()));
+        stream_handle->synchronize();
         std::vector<bool> sorted_cols(n_sort_columns, false);
         uint64_t last_id;
         Command sort_cmd;
@@ -73,8 +72,8 @@ Result<RowBatch> SortOperator::next()
             auto& col = gathered_batch.getColumn(i);
             auto* data_ptr = col.rawData();
             auto* bitmap_ptr = col.rawBitmapData();
-            auto* temp_buffer = col.getTemporaryBuffer();
-            auto* temp_bitmap_buffer = col.getTemporaryBitmapBuffer();
+            auto* temp_buffer = col.getDeviceBuffer();
+            auto* temp_bitmap_buffer = col.getDeviceBitmapBuffer();
             buffers[i] = temp_buffer;
             bitmap_buffers[i] = temp_bitmap_buffer;
 
@@ -107,9 +106,9 @@ Result<RowBatch> SortOperator::next()
                 continue;
             }
             auto& col = gathered_batch.getColumn(i);
-            col.setFromBuffer(buffers[i], bitmap_buffers[i]);
+            col.setFromDeviceBuffers(buffers[i], bitmap_buffers[i]);
         }
-        MemoryAllocator::deallocate(d_indices);
+        CHECKED_CALL_THROW(cudaFreeAsync(d_indices, stream_handle->get()));
         sorted_ = true;
         return Result<RowBatch>::success(std::move(gathered_batch));
     }

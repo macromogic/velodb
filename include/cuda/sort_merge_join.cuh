@@ -52,6 +52,14 @@ __device__ __forceinline__ size_t upperBound(const JoinColumn& col, KeyT target)
     return left;
 }
 
+__device__ __forceinline__ uint64_t splitMix64(uint64_t x)
+{
+    x += 0x9e3779b97f4a7c15;
+    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9;
+    x = (x ^ (x >> 27)) * 0x94d049bb133111eb;
+    return x ^ (x >> 31);
+}
+
 template <typename KeyT>
 __device__ __forceinline__ void mergeBlockCount(const JoinColumn& left,
                                                 size_t left_start,
@@ -86,9 +94,9 @@ __device__ __forceinline__ void mergeBlockCount(const JoinColumn& left,
             }
             size_t match_count = (l - left_match_start) * (r - right_match_start);
             size_t block_idx = atomicAdd((unsigned long long*)block_count, 1);
-            atomicAdd((unsigned long long*)n_rows, match_count);
+            size_t write_idx = atomicAdd((unsigned long long*)n_rows, match_count);
             out_blocks[block_idx]
-                = { left_match_start, l - left_match_start, right_match_start, r - right_match_start, match_count };
+                = { left_match_start, l - left_match_start, right_match_start, r - right_match_start, write_idx };
         }
     }
 }
@@ -182,7 +190,21 @@ __device__ void executeSortMergeJoinCount(const CommandArgs::SortMergeJoinCountA
     }
 }
 
-// Step 2: write matching rowids using precomputed blocks
+// Step 2: fill random rowids
+__device__ void executeSortMergeJoinPrepare(const CommandArgs::SortMergeJoinPrepareArgs& args, cg::grid_group& grid)
+{
+    int64_t* rowids = args.rowids;
+    size_t n = args.n;
+    size_t n_rows = args.n_rows;
+    uint64_t seed = args.seed;
+    size_t tid = grid.thread_rank();
+    size_t total_threads = grid.size();
+    for (size_t idx = tid; idx < n; idx += total_threads) {
+        rowids[idx] = static_cast<int64_t>(splitMix64(seed + idx) % n_rows);
+    }
+}
+
+// Step 3: write matching rowids using precomputed blocks
 __device__ void executeSortMergeJoinWrite(const CommandArgs::SortMergeJoinWriteArgs& args, cg::grid_group& grid)
 {
     sortMergeJoinWriteImpl(args.left, args.right, args.blocks, args.n_blocks, args.out_left, args.out_right, grid);

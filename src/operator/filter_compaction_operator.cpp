@@ -38,14 +38,15 @@ Result<RowBatch> FilterCompactionOperator::next()
     // We assume $_mask always exists
     auto mask_index = output_schema_.getColumnIndex("$_mask");
     auto& mask_column = batch.getColumn(mask_index);
-    auto stream_handler = StreamPool::getInstance().acquire().value();
+    auto stream_handle = StreamPool::getInstance().acquire().value();
     const uint8_t* mask_data = static_cast<const uint8_t*>(mask_column.rawData());
-    int32_t* scatter_indices = MemoryAllocator::allocate<int32_t>(DataLocation::CUDA,
-                                                                  batch.getRowCount(),
-                                                                  stream_handler->get());
-    size_t* scatter_count = MemoryAllocator::allocate<size_t>(DataLocation::CUDA, 1, stream_handler->get());
-    CHECKED_CALL_THROW(cudaMemsetAsync(scatter_count, 0, sizeof(size_t), stream_handler->get()));
-    stream_handler->synchronize();
+    int32_t* d_scatter_indices;
+    CHECKED_CALL_THROW(
+        cudaMallocAsync(&d_scatter_indices, batch.getRowCount() * sizeof(int32_t), stream_handle->get()));
+    size_t* d_scatter_count;
+    CHECKED_CALL_THROW(cudaMallocAsync(&d_scatter_count, 1 * sizeof(size_t), stream_handle->get()));
+    CHECKED_CALL_THROW(cudaMemsetAsync(d_scatter_count, 0, sizeof(size_t), stream_handle->get()));
+    stream_handle->synchronize();
 
     // Scatter command to compact rows based on mask
     uint64_t last_id;
@@ -53,8 +54,8 @@ Result<RowBatch> FilterCompactionOperator::next()
     scatter_cmd.opcode = OpCode::OP_SCATTER;
     scatter_cmd.args = {
             .scatter = {
-                .out_indices = scatter_indices,
-                .out_count = scatter_count,
+                .out_indices = d_scatter_indices,
+                .out_count = d_scatter_count,
                 .in_mask = mask_data,
                 .n = n_rows,
             },
@@ -70,8 +71,8 @@ Result<RowBatch> FilterCompactionOperator::next()
     for (auto& input_col : batch.getColumns()) {
         auto* data_ptr = input_col.rawData();
         auto* bitmap_ptr = input_col.rawBitmapData();
-        auto* temp_buffer = input_col.getTemporaryBuffer();
-        auto* temp_bitmap_buffer = input_col.getTemporaryBitmapBuffer();
+        auto* temp_buffer = input_col.getDeviceBuffer();
+        auto* temp_bitmap_buffer = input_col.getDeviceBitmapBuffer();
         buffers.push_back(temp_buffer);
         bitmap_buffers.push_back(temp_bitmap_buffer);
 
@@ -81,7 +82,7 @@ Result<RowBatch> FilterCompactionOperator::next()
             .gather = {
                 .out_data = static_cast<void*>(temp_buffer),
                 .in_data = static_cast<void*>(data_ptr),
-                .in_indices = scatter_indices,
+                .in_indices = d_scatter_indices,
                 .in_mask = mask_data,
                 .n = n_rows,
                 .type_id = input_col.getType().getTypeId(),
@@ -94,7 +95,7 @@ Result<RowBatch> FilterCompactionOperator::next()
         gather_bits_cmd.args = { .gather = {
                                      .out_data = static_cast<void*>(temp_bitmap_buffer),
                                      .in_data = static_cast<void*>(bitmap_ptr),
-                                     .in_indices = scatter_indices,
+                                     .in_indices = d_scatter_indices,
                                      .in_mask = mask_data,
                                      .n = n_rows,
                                      .type_id = DataTypeId::BOOLEAN,
@@ -105,19 +106,19 @@ Result<RowBatch> FilterCompactionOperator::next()
 
     size_t h_scatter_count = 0;
     CHECKED_CALL_THROW(cudaMemcpyAsync(&h_scatter_count,
-                                       scatter_count,
+                                       d_scatter_count,
                                        sizeof(size_t),
                                        cudaMemcpyDeviceToHost,
-                                       stream_handler->get()));
-    stream_handler->synchronize();
+                                       stream_handle->get()));
+    stream_handle->synchronize();
     for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
         auto& input_col = batch.getColumn(col_idx);
-        input_col.setFromBuffer(buffers[col_idx], bitmap_buffers[col_idx]);
+        input_col.setFromDeviceBuffers(buffers[col_idx], bitmap_buffers[col_idx]);
     }
     setNumRowsForBatch(batch, h_scatter_count);
 
-    MemoryAllocator::deallocate(scatter_indices);
-    MemoryAllocator::deallocate(scatter_count);
+    CHECKED_CALL_THROW(cudaFreeAsync(d_scatter_indices, stream_handle->get()));
+    CHECKED_CALL_THROW(cudaFreeAsync(d_scatter_count, stream_handle->get()));
     return Result<RowBatch>::success(std::move(batch));
 }
 

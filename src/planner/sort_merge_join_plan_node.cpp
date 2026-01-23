@@ -6,14 +6,13 @@
 
 namespace velodb {
 
-// SortMergeJoinPlanNode implementation
 SortMergeJoinPlanNode::SortMergeJoinPlanNode(Schema output_schema,
-                                             std::unique_ptr<AbstractExpression> left_key_expr,
-                                             std::unique_ptr<AbstractExpression> right_key_expr,
+                                             const Table& left_table,
+                                             const Table& right_table,
                                              JoinType join_type)
-    : AbstractPlanNode(PlanType::sort_merge_join, std::move(output_schema))
-    , left_key_expr_(std::move(left_key_expr))
-    , right_key_expr_(std::move(right_key_expr))
+    : AbstractPlanNode(PlanType::SORT_MERGE_JOIN, std::move(output_schema))
+    , left_table_(left_table)
+    , right_table_(right_table)
     , join_type_(join_type)
 {
 }
@@ -29,8 +28,8 @@ std::unique_ptr<AbstractOperator> SortMergeJoinPlanNode::createOperator(Executio
                                                    output_schema_.clone(),
                                                    std::move(left_operator),
                                                    std::move(right_operator),
-                                                   left_key_expr_->cloneUnique(),
-                                                   right_key_expr_->cloneUnique(),
+                                                   left_table_.get(),
+                                                   right_table_.get(),
                                                    join_type_);
 }
 

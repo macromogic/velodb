@@ -13,21 +13,19 @@ namespace velodb {
 class SortMergeJoinPlanNode : public AbstractPlanNode {
 public:
     SortMergeJoinPlanNode(Schema output_schema,
-                          std::unique_ptr<AbstractExpression> left_key_expr,
-                          std::unique_ptr<AbstractExpression> right_key_expr,
+                          const Table& left_table,
+                          const Table& right_table,
                           JoinType join_type = JoinType::INNER);
     ~SortMergeJoinPlanNode() override = default;
 
     std::unique_ptr<AbstractOperator> createOperator(ExecutionContext& context) const override;
     std::string toString() const override;
 
-    const AbstractExpression* getLeftKeyExpression() const { return left_key_expr_.get(); }
-    const AbstractExpression* getRightKeyExpression() const { return right_key_expr_.get(); }
     JoinType getJoinType() const { return join_type_; }
 
 private:
-    std::unique_ptr<AbstractExpression> left_key_expr_;
-    std::unique_ptr<AbstractExpression> right_key_expr_;
+    std::reference_wrapper<const Table> left_table_;
+    std::reference_wrapper<const Table> right_table_;
     JoinType join_type_;
 };
 

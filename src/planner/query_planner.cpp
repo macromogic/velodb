@@ -255,8 +255,8 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planEquiJoin(const hsql::TableRe
     }
 
     // Plan left and right table references with separated predicates
-    auto left_plan = planJoinSide(left_ref, left_key_expr->cloneUnique(), std::move(left_predicate));
-    auto right_plan = planJoinSide(right_ref, right_key_expr->cloneUnique(), std::move(right_predicate));
+    auto left_plan = planJoinSide(left_ref, std::move(left_key_expr), std::move(left_predicate));
+    auto right_plan = planJoinSide(right_ref, std::move(right_key_expr), std::move(right_predicate));
 
     // Infer the output schema for the join
     auto left_table = catalog_.get().getTable(left_ref->name);
@@ -267,10 +267,8 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planEquiJoin(const hsql::TableRe
     auto join_schema = inferJoinSchema(*left_table, *right_table);
 
     // Create a merge sort join plan node (we can make this configurable later)
-    auto join_plan_node = std::make_unique<SortMergeJoinPlanNode>(std::move(join_schema),
-                                                                  std::move(left_key_expr),
-                                                                  std::move(right_key_expr),
-                                                                  JoinType::INNER);
+    auto join_plan_node
+        = std::make_unique<SortMergeJoinPlanNode>(std::move(join_schema), *left_table, *right_table, JoinType::INNER);
     join_plan_node->addChild(std::move(left_plan));
     join_plan_node->addChild(std::move(right_plan));
 

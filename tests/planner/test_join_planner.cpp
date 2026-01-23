@@ -62,7 +62,7 @@ TEST_F(JoinPlannerTest, SelectStarJoinPlanContainsMaterialization)
         [&](const AbstractPlanNode* n) -> const AbstractPlanNode* {
         if (!n)
             return nullptr;
-        if (n->getPlanType() == PlanType::sort_merge_join)
+        if (n->getPlanType() == PlanType::SORT_MERGE_JOIN)
             return n;
         for (auto& c : n->getChildren()) {
             auto r = find_join(c.get());

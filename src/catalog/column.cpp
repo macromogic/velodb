@@ -145,55 +145,57 @@ const BitVector::Element* Column::rawBitmapData() const
     return std::visit([](auto&& vv) { return vv.null_mask_.data(); }, data_source_);
 }
 
-void* Column::getTemporaryBuffer() const
+void* Column::getDeviceBuffer() const
 {
     return std::visit(
         [](auto&& vv) {
             using DType = typename std::decay_t<decltype(vv)>::DType;
-            auto stream_handler = StreamPool::getInstance().acquire().value();
-            auto* ptr = MemoryAllocator::allocate<DType>(vv.location_, vv.capacity_, stream_handler->get());
-            stream_handler->synchronize();
+            VELODB_ASSERT_MSG(vv.location_ == DataLocation::CUDA,
+                              "Cannot get temporary buffer for non-device location");
+            DType* ptr;
+            auto stream_handle = StreamPool::getInstance().acquire().value();
+            CHECKED_CALL_THROW(cudaMallocAsync(&ptr, vv.capacity_ * sizeof(DType), stream_handle->get()));
             return static_cast<void*>(ptr);
         },
         data_source_);
 }
 
-BitVector::Element* Column::getTemporaryBitmapBuffer() const
+BitVector::Element* Column::getDeviceBitmapBuffer() const
 {
     return std::visit(
         [](auto&& vv) {
-            auto stream_handler = StreamPool::getInstance().acquire().value();
-            auto* ptr = MemoryAllocator::allocate<BitVector::Element>(vv.location_,
-                                                                      vv.null_mask_.element_capacity_,
-                                                                      stream_handler->get());
-            if (vv.location_ == DataLocation::CUDA) {
-                CHECKED_CALL_THROW(cudaMemsetAsync(ptr,
-                                                   0,
-                                                   vv.null_mask_.element_capacity_ * sizeof(BitVector::Element),
-                                                   stream_handler->get()));
-            } else {
-                std::fill_n(ptr, vv.null_mask_.element_capacity_, BitVector::Element(0));
-            }
-            stream_handler->synchronize();
+            VELODB_ASSERT_MSG(vv.location_ == DataLocation::CUDA,
+                              "Cannot get temporary bitmap buffer for non-device location");
+            BitVector::Element* ptr;
+            auto stream_handle = StreamPool::getInstance().acquire().value();
+            CHECKED_CALL_THROW(cudaMallocAsync(&ptr,
+                                               vv.null_mask_.element_capacity_ * sizeof(BitVector::Element),
+                                               stream_handle->get()));
+            CHECKED_CALL_THROW(cudaMemsetAsync(ptr,
+                                               0,
+                                               vv.null_mask_.element_capacity_ * sizeof(BitVector::Element),
+                                               stream_handle->get()));
             return ptr;
         },
         data_source_);
 }
 
-void Column::setFromBuffer(void* data, BitVector::Element* bitmap_data)
+void Column::setFromDeviceBuffers(void* data, BitVector::Element* bitmap_data)
 {
     std::visit(
         [&data, &bitmap_data](auto&& vv) {
             using DType = typename std::decay_t<decltype(vv)>::DType;
+            VELODB_ASSERT_MSG(vv.location_ == DataLocation::CUDA, "Cannot set data for non-device location");
+            auto stream_handle = StreamPool::getInstance().acquire().value();
             if (data) {
                 DType* old_data = vv.data_;
                 vv.data_ = static_cast<DType*>(data);
-                MemoryAllocator::deallocate(old_data);
+                CHECKED_CALL_THROW(cudaFreeAsync(old_data, stream_handle->get()));
             }
             if (bitmap_data) {
                 BitVector::Element* old_bitmap = vv.null_mask_.data_;
                 vv.null_mask_.data_ = bitmap_data;
-                MemoryAllocator::deallocate(old_bitmap);
+                CHECKED_CALL_THROW(cudaFreeAsync(old_bitmap, stream_handle->get()));
             }
         },
         data_source_);

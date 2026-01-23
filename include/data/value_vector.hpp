@@ -3,8 +3,8 @@
 #include "common/copy_traits.hpp"
 #include "common/exception.hpp"
 #include "common/profiler.hpp"
-#include "cuda/allocator.hpp"
 #include "cuda/helper.hpp"
+#include "cuda/host_memory_pool.hpp"
 #include "cuda/stream.hpp"
 #include "cuda/stream_pool.hpp"
 #include "data/bit_vector.hpp"
@@ -37,16 +37,16 @@ public:
         : data_(nullptr)
         , size_(0)
         , capacity_(location == DataLocation::CUDA ? nextPow2(capacity) : capacity)
-        , null_mask_(0, location)
+        , null_mask_(capacity_, location)
         , location_(location)
     {
-        null_mask_.reserve(capacity_);
         if (location == DataLocation::HOST) {
-            data_ = MemoryAllocator::allocate<DType>(DataLocation::HOST, capacity_);
+            data_ = static_cast<DType*>(HostMemoryPool::getInstance().allocate(capacity_ * sizeof(DType)));
+            std::fill_n(data_, capacity_, DType());
         } else if (location == DataLocation::CUDA) {
-            data_ = MemoryAllocator::allocate<DType>(DataLocation::CUDA, capacity_);
-            // Zero-initialize padding region to prevent data leaks during oblivious transfer
-            CHECKED_CALL_THROW(cudaMemset(data_, 0, capacity_ * sizeof(DType)));
+            auto stream_handle = StreamPool::getInstance().acquire().value();
+            CHECKED_CALL_THROW(cudaMallocAsync(&data_, capacity_ * sizeof(DType), stream_handle->get()));
+            CHECKED_CALL_THROW(cudaMemsetAsync(data_, 0, capacity_ * sizeof(DType), stream_handle->get()));
         } else {
             VELODB_THROW(ExecutionError, "Invalid data location");
         }
@@ -73,7 +73,12 @@ public:
         if (this != &other) {
             // Clean up current resources
             if (location_ != DataLocation::VIEW && data_ != nullptr) {
-                MemoryAllocator::deallocate(data_);
+                if (location_ == DataLocation::CUDA) {
+                    auto stream_handle = StreamPool::getInstance().acquire().value();
+                    cudaFreeAsync(data_, stream_handle->get());
+                } else {
+                    HostMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
+                }
             }
 
             // Move data from other
@@ -94,11 +99,15 @@ public:
 
     virtual ~ValueVectorBase()
     {
-        if (location_ == DataLocation::VIEW) {
-            return; // View mode does not possess ownership
+        if (data_ == nullptr) {
+            return;
         }
-        if (data_ != nullptr) {
-            MemoryAllocator::deallocate(data_);
+        if (location_ == DataLocation::CUDA) {
+            auto stream_handle = StreamPool::getInstance().acquire().value();
+            cudaFreeAsync(data_, stream_handle->get());
+            stream_handle->synchronize();
+        } else if (location_ == DataLocation::HOST) {
+            HostMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
         }
     }
 
@@ -109,39 +118,38 @@ public:
     {
         VELODB_ASSERT_MSG(location != DataLocation::VIEW, "Cannot move data to VIEW");
         if (location_ != location) {
-            auto stream_handler = StreamPool::getInstance().acquire().value();
+            auto stream_handle = StreamPool::getInstance().acquire().value();
             if (location_ == DataLocation::CUDA) {
                 PROFILE_SCOPE("ValueVector D2H Transfer");
                 // Oblivious transfer: round up to next power of 2 to hide selectivity
                 size_t padded_capacity = nextPow2(capacity_);
                 VELODB_ASSERT_MSG(capacity_ >= padded_capacity, "Insufficient capacity for oblivious transfer");
-                DType* host_data = MemoryAllocator::allocate<DType>(DataLocation::HOST,
-                                                                    padded_capacity,
-                                                                    stream_handler->get());
+                DType* host_data = static_cast<DType*>(
+                    HostMemoryPool::getInstance().allocate(padded_capacity * sizeof(DType)));
                 CHECKED_CALL_THROW(cudaMemcpyAsync(host_data,
                                                    data_,
                                                    padded_capacity * sizeof(DType),
                                                    cudaMemcpyDeviceToHost,
-                                                   stream_handler->get()));
-                MemoryAllocator::deallocate(data_, stream_handler->get());
-                stream_handler->synchronize();
+                                                   stream_handle->get()));
+                CHECKED_CALL_THROW(cudaFreeAsync(data_, stream_handle->get()));
+                stream_handle->synchronize();
                 data_ = host_data;
                 capacity_ = padded_capacity;
             } else {
                 PROFILE_SCOPE("ValueVector H2D Transfer");
                 size_t padded_capacity = nextPow2(capacity_);
-                DType* device_data = MemoryAllocator::allocate<DType>(DataLocation::CUDA,
-                                                                      padded_capacity,
-                                                                      stream_handler->get());
+                DType* device_data;
+                CHECKED_CALL_THROW(
+                    cudaMallocAsync(&device_data, padded_capacity * sizeof(DType), stream_handle->get()));
                 CHECKED_CALL_THROW(cudaMemcpyAsync(device_data,
                                                    data_,
                                                    capacity_ * sizeof(DType),
                                                    cudaMemcpyHostToDevice,
-                                                   stream_handler->get()));
+                                                   stream_handle->get()));
                 if (location_ == DataLocation::HOST) {
-                    MemoryAllocator::deallocate(data_, stream_handler->get());
+                    HostMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
                 }
-                stream_handler->synchronize();
+                stream_handle->synchronize();
                 data_ = device_data;
                 capacity_ = padded_capacity;
             }
@@ -178,37 +186,33 @@ public:
             new_capacity = nextPow2(new_capacity);
         }
         if (new_capacity > capacity_) {
-            auto stream_handler = StreamPool::getInstance().acquire().value();
+            auto stream_handle = StreamPool::getInstance().acquire().value();
             if (location_ == DataLocation::HOST) {
-                DType* new_data = MemoryAllocator::allocate<DType>(DataLocation::HOST,
-                                                                   new_capacity,
-                                                                   stream_handler->get());
-                stream_handler->synchronize();
+                auto& host_memory_pool = HostMemoryPool::getInstance();
+                DType* new_data = static_cast<DType*>(host_memory_pool.allocate(new_capacity * sizeof(DType)));
+                stream_handle->synchronize();
                 std::copy(data_, data_ + size_, new_data);
-                MemoryAllocator::deallocate(data_, stream_handler->get());
+                host_memory_pool.deallocate(data_, capacity_ * sizeof(DType));
                 data_ = new_data;
                 capacity_ = new_capacity;
             } else if (location_ == DataLocation::CUDA) {
-                DType* new_data = MemoryAllocator::allocate<DType>(DataLocation::CUDA,
-                                                                   new_capacity,
-                                                                   stream_handler->get());
+                DType* new_data;
+                CHECKED_CALL_THROW(cudaMallocAsync(&new_data, new_capacity * sizeof(DType), stream_handle->get()));
                 CHECKED_CALL_THROW(cudaMemcpyAsync(new_data,
                                                    data_,
                                                    size_ * sizeof(DType),
                                                    cudaMemcpyDeviceToDevice,
-                                                   stream_handler->get()));
+                                                   stream_handle->get()));
                 // Zero-initialize padding region to prevent data leaks
-                CHECKED_CALL_THROW(cudaMemsetAsync(new_data + size_,
-                                                   0,
-                                                   (new_capacity - size_) * sizeof(DType),
-                                                   stream_handler->get()));
-                MemoryAllocator::deallocate(data_, stream_handler->get());
+                CHECKED_CALL_THROW(
+                    cudaMemsetAsync(new_data + size_, 0, (new_capacity - size_) * sizeof(DType), stream_handle->get()));
+                CHECKED_CALL_THROW(cudaFreeAsync(data_, stream_handle->get()));
                 data_ = new_data;
                 capacity_ = new_capacity;
             } else {
                 VELODB_THROW(ExecutionError, "Cannot reserve data on VIEW");
             }
-            stream_handler->synchronize();
+            stream_handle->synchronize();
         }
     }
 
@@ -319,11 +323,11 @@ public:
             return Value::createNull(dTypeId<DType>);
         }
         if (location_ == DataLocation::CUDA) {
-            auto stream_handler = StreamPool::getInstance().acquire().value();
+            auto stream_handle = StreamPool::getInstance().acquire().value();
             DType value;
             CHECKED_CALL_THROW(
-                cudaMemcpyAsync(&value, data_ + index, sizeof(DType), cudaMemcpyDeviceToHost, stream_handler->get()));
-            stream_handler->synchronize();
+                cudaMemcpyAsync(&value, data_ + index, sizeof(DType), cudaMemcpyDeviceToHost, stream_handle->get()));
+            stream_handle->synchronize();
             return Value(dTypeId<DType>, VType(value));
         } else {
             return Value(dTypeId<DType>, VType(data_[index]));
@@ -412,14 +416,11 @@ public:
             return Value::createNull(dTypeId<DType>);
         }
         if (location_ == DataLocation::CUDA) {
-            auto stream_handler = StreamPool::getInstance().acquire().value();
+            auto stream_handle = StreamPool::getInstance().acquire().value();
             size_t ordinal;
-            CHECKED_CALL_THROW(cudaMemcpyAsync(&ordinal,
-                                               data_ + index,
-                                               sizeof(size_t),
-                                               cudaMemcpyDeviceToHost,
-                                               stream_handler->get()));
-            stream_handler->synchronize();
+            CHECKED_CALL_THROW(
+                cudaMemcpyAsync(&ordinal, data_ + index, sizeof(size_t), cudaMemcpyDeviceToHost, stream_handle->get()));
+            stream_handle->synchronize();
             return Value(dTypeId<DType>, VType(ordinal, std::string_view((*ordered_strings_)[ordinal])));
         } else {
             auto ordinal = data_[index];

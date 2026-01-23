@@ -19,6 +19,7 @@ enum class OpCode : uint32_t {
     OP_SORT,
     OP_PERMUTE,
     OP_SORT_MERGE_JOIN_COUNT,
+    OP_SORT_MERGE_JOIN_PREPARE,
     OP_SORT_MERGE_JOIN_WRITE,
     OP_TERMINATE = 0xFFFFFFFF
 };
@@ -80,6 +81,13 @@ union alignas(16) CommandArgs {
         size_t* out_row_count;
         DataTypeId type_id;
     } sort_merge_join_count;
+
+    struct SortMergeJoinPrepareArgs {
+        int64_t* rowids;
+        size_t n;
+        size_t n_rows;
+        int64_t seed;
+    } sort_merge_join_prepare;
 
     struct SortMergeJoinWriteArgs {
         JoinColumn left;

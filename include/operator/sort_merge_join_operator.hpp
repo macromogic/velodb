@@ -4,6 +4,7 @@
 #include "operator/join_type.hpp"
 
 #include <memory>
+#include <random>
 
 namespace velodb {
 
@@ -16,18 +17,25 @@ public:
                           Schema output_schema,
                           std::unique_ptr<AbstractOperator> left_child,
                           std::unique_ptr<AbstractOperator> right_child,
-                          std::unique_ptr<AbstractExpression> left_key_expr,
-                          std::unique_ptr<AbstractExpression> right_key_expr,
+                          const Table& left_table,
+                          const Table& right_table,
                           JoinType join_type = JoinType::INNER);
     ~SortMergeJoinOperator() override = default;
 
     Result<RowBatch> next() override;
 
 private:
-    std::unique_ptr<AbstractExpression> left_key_expr_;
-    std::unique_ptr<AbstractExpression> right_key_expr_;
+    int64_t getSeed()
+    {
+        uint64_t seed = (static_cast<uint64_t>(rd_()) << 32) | rd_();
+        return static_cast<int64_t>(seed);
+    }
+
+    std::reference_wrapper<const Table> left_table_;
+    std::reference_wrapper<const Table> right_table_;
     JoinType join_type_;
     bool joined_ { false };
+    std::random_device rd_ {};
 };
 
 } // namespace velodb

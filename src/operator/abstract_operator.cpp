@@ -42,7 +42,7 @@ RowBatch AbstractOperator::collectBatches(AbstractOperator& child)
     size_t n_cols = gathered_batch.getColumnCount();
     // auto& task_manager = context_.getTaskManager();
     if (!buffer.empty()) {
-        auto stream_handler = StreamPool::getInstance().acquire().value();
+        auto stream_handle = StreamPool::getInstance().acquire().value();
         // uint64_t last_id;
         size_t offset = 0;
         for (const auto& batch : buffer) {
@@ -58,7 +58,7 @@ RowBatch AbstractOperator::collectBatches(AbstractOperator& child)
                                                    src_data,
                                                    batch_rows * col_type.size(),
                                                    cudaMemcpyDeviceToDevice,
-                                                   stream_handler->get()));
+                                                   stream_handle->get()));
 
                 auto* dest_bitmap = dest_col.rawBitmapData();
                 auto* src_bitmap = src_col.rawBitmapData();
@@ -67,11 +67,11 @@ RowBatch AbstractOperator::collectBatches(AbstractOperator& child)
                                                    src_bitmap,
                                                    batch_rows * sizeof(BitVector::Element),
                                                    cudaMemcpyDeviceToDevice,
-                                                   stream_handler->get()));
+                                                   stream_handle->get()));
             }
             offset += batch_rows;
         }
-        stream_handler->synchronize();
+        stream_handle->synchronize();
         // task_manager.waitCommand(last_id);
     }
 

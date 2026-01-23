@@ -51,13 +51,13 @@ Result<RowBatch> LimitOperator::next()
         buffers.reserve(input_batch.getColumnCount());
         bitmap_buffers.reserve(input_batch.getColumnCount());
         // auto& task_manager = context_.getTaskManager();
-        auto stream_handler = StreamPool::getInstance().acquire().value();
+        auto stream_handle = StreamPool::getInstance().acquire().value();
         // uint64_t last_id;
         for (auto& col : input_batch.getColumns()) {
             auto* data_ptr = col.rawData();
             auto* bitmap_ptr = col.rawBitmapData();
-            auto* temp_buffer = col.getTemporaryBuffer();
-            auto* temp_bitmap_buffer = col.getTemporaryBitmapBuffer();
+            auto* temp_buffer = col.getDeviceBuffer();
+            auto* temp_bitmap_buffer = col.getDeviceBitmapBuffer();
             buffers.push_back(temp_buffer);
             bitmap_buffers.push_back(temp_bitmap_buffer);
 
@@ -66,21 +66,21 @@ Result<RowBatch> LimitOperator::next()
                                                static_cast<const uint8_t*>(data_ptr) + skip_count * data_size,
                                                rows_to_take * data_size,
                                                cudaMemcpyDeviceToDevice,
-                                               stream_handler->get()));
+                                               stream_handle->get()));
 
             CHECKED_CALL_THROW(
                 cudaMemcpyAsync(temp_bitmap_buffer,
                                 static_cast<const uint8_t*>(bitmap_ptr) + skip_count * sizeof(BitVector::Element),
                                 rows_to_take * sizeof(BitVector::Element),
                                 cudaMemcpyDeviceToDevice,
-                                stream_handler->get()));
+                                stream_handle->get()));
         }
-        stream_handler->synchronize();
+        stream_handle->synchronize();
         // task_manager.waitCommand(last_id);
 
         for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
             auto& col = input_batch.getColumn(col_idx);
-            col.setFromBuffer(buffers[col_idx], bitmap_buffers[col_idx]);
+            col.setFromDeviceBuffers(buffers[col_idx], bitmap_buffers[col_idx]);
         }
         setNumRowsForBatch(input_batch, rows_to_take);
         return Result<RowBatch>::success(std::move(input_batch));
