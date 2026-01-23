@@ -214,6 +214,7 @@ public:
             }
             stream_handle->synchronize();
         }
+        null_mask_.reserve(new_capacity);
     }
 
     void append(const DType& value)
