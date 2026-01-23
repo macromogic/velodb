@@ -4,7 +4,6 @@
 #include "catalog/table.hpp"
 #include "catalog/table_builder.hpp"
 #include "data/data_type.hpp"
-#include "execution/execution_engine.hpp"
 
 #include <SQLParser.h>
 
@@ -13,13 +12,6 @@
 using namespace velodb;
 
 class LimitOperatorTest : public test::VelODBTest {
-public:
-    LimitOperatorTest()
-        : catalog_()
-        , engine_(catalog_)
-    {
-    }
-
 protected:
     void SetUp() override
     {
@@ -46,9 +38,6 @@ protected:
     }
 
     void TearDown() override { test::VelODBTest::TearDown(); }
-
-    Catalog catalog_;
-    ExecutionEngine engine_;
 };
 
 TEST_F(LimitOperatorTest, LimitExecution)

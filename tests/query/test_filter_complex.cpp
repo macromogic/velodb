@@ -1,10 +1,8 @@
 #include "../common/test_warmup_utility.hpp"
-#include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "catalog/table_builder.hpp"
 #include "data/data_type.hpp"
-#include "execution/execution_engine.hpp"
 
 #include <SQLParser.h>
 
@@ -13,13 +11,6 @@
 using namespace velodb;
 
 class FilterComplexTest : public test::VelODBTest {
-public:
-    FilterComplexTest()
-        : catalog_()
-        , engine_(catalog_)
-    {
-    }
-
 protected:
     void SetUp() override
     {
@@ -109,10 +100,6 @@ protected:
 
         catalog_.addTable(std::move(builder).build());
     }
-
-protected:
-    Catalog catalog_;
-    ExecutionEngine engine_;
 };
 
 // === BOUNDARY VALUE TESTS ===

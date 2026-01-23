@@ -1,11 +1,9 @@
 #include "../common/test_warmup_utility.hpp"
-#include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "catalog/table_builder.hpp"
 #include "catalog/tuple.hpp"
 #include "data/data_type.hpp"
-#include "execution/execution_engine.hpp"
 
 #include <SQLParser.h>
 
@@ -16,9 +14,8 @@ using namespace velodb;
 class WhereClauseTest : public test::VelODBTest {
 public:
     WhereClauseTest()
-        : catalog_()
+        : test::VelODBTest()
         , planner_(catalog_)
-        , engine_(catalog_)
     {
     }
 
@@ -89,9 +86,7 @@ protected:
         builder.insertRow(values);
     }
 
-    Catalog catalog_;
     QueryPlanner planner_;
-    ExecutionEngine engine_;
 };
 
 // === NUMERIC RANGE TESTS ===

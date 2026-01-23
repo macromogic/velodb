@@ -12,3 +12,4 @@ set_property(TARGET test_data PROPERTY RUNTIME_OUTPUT_DIRECTORY
 target_compile_options(test_data PRIVATE -Wall -Wextra -g)
 
 add_test(NAME TestData COMMAND test_data)
+set_tests_properties(TestData PROPERTIES TIMEOUT 15)

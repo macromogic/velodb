@@ -10,3 +10,4 @@ compile_commands.json
 *.md
 !README.md
 *.dot
+*.log

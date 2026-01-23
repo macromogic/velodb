@@ -11,9 +11,6 @@ public:
     FilterCompactionOperator(ExecutionContext& context, Schema output_schema, std::unique_ptr<AbstractOperator> child);
     ~FilterCompactionOperator() = default;
     Result<RowBatch> next() override;
-
-private:
-    RowBatch buffer_;
 };
 
 } // namespace velodb

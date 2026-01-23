@@ -46,8 +46,6 @@ protected:
         test::VelODBTest::TearDown();
         // Cleanup code if needed
     }
-
-    Catalog catalog_; // Mock catalog for operator creation
 };
 
 TEST_F(OperatorTest, SeqScanOperatorCreation)
@@ -57,7 +55,7 @@ TEST_F(OperatorTest, SeqScanOperatorCreation)
     auto schema = test_table.getSchema().clone();
     schema.addColumnInfo({ "$_rowid", std::make_unique<BigIntType>(), false });
     schema.addColumnInfo({ "$_mask", std::make_unique<BooleanType>(), false });
-    auto context = ExecutionContext(catalog_);
+    auto context = ExecutionContext(catalog_, task_manager_);
     SeqScanOperator scan_op(context, test_table, std::move(schema), nullptr);
 
     EXPECT_EQ(scan_op.getOutputSchema().getColumnCount(), 4);
@@ -82,7 +80,7 @@ TEST_F(OperatorTest, SeqScanOperatorWithPredicate)
 
     auto table_opt = catalog_.getTable("test_table");
     auto& test_table = table_opt.value().get();
-    auto context = ExecutionContext(catalog_);
+    auto context = ExecutionContext(catalog_, task_manager_);
     auto schema = test_table.getSchema().clone();
     schema.addColumnInfo({ "$_rowid", std::make_unique<BigIntType>(), false });
     schema.addColumnInfo({ "$_mask", std::make_unique<BooleanType>(), false });

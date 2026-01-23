@@ -1,5 +1,6 @@
 #include "operator/seq_scan_operator.hpp"
 
+#include "common/constants.hpp"
 #include "common/fmt.hpp"
 #include "execution/execution_engine.hpp"
 #include "expression/expression.hpp"

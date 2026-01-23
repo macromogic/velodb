@@ -24,12 +24,12 @@ void QueryResult::append(RowBatch batch)
 Value QueryResult::getValue(size_t row, size_t column) const
 {
     // position 0 reserved for end iterator
+    if (row >= row_count_) {
+        VELODB_THROW(CatalogError, "Row index out of range");
+    }
     auto index = std::upper_bound(row_offsets_.begin(), row_offsets_.end(), row) - row_offsets_.begin();
     const auto& batch = batches_[index];
     size_t local_row = row - row_offsets_[index - 1];
-    if (local_row >= batch.getRowCount()) {
-        VELODB_THROW(CatalogError, "Row index out of range");
-    }
     if (column >= batch.getColumnCount()) {
         VELODB_THROW(CatalogError, "Column index out of range");
     }

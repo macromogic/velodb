@@ -3,7 +3,6 @@
 #include "operator/abstract_operator.hpp"
 
 #include <memory>
-#include <vector>
 
 namespace velodb {
 
@@ -25,7 +24,6 @@ public:
 private:
     std::vector<size_t> order_indices_;
     std::vector<bool> ascending_flags_;
-    RowBatch buffer_;
     bool sorted_ { false };
 };
 

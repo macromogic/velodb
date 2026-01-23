@@ -3,7 +3,7 @@ add_library(
   abstract_plan_node.cpp
   filter_compaction_plan_node.cpp
   limit_plan_node.cpp
-  merge_sort_join_plan_node.cpp
+  sort_merge_join_plan_node.cpp
   materialization_plan_node.cpp
   plan_visualizer.cpp
   projection_plan_node.cpp

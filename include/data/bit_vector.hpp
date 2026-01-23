@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/copy_traits.hpp"
 #include "data/data_location.hpp"
 
 #include <cstddef>
@@ -12,17 +13,18 @@ class ValueVector;
 template <typename DT, template <typename> class VecT>
 class ValueVectorBase;
 
-class BitVector {
+class BitVector : private NonCopyable, public Cloneable<BitVector> {
 public:
-    using Element = uint64_t;
-    static constexpr size_t ELEMENT_WIDTH = 8 * sizeof(Element);
+    using Element = uint8_t;
 
-    explicit BitVector(size_t num_bits);
-    BitVector(const BitVector&);
+    explicit BitVector(size_t num_bits, DataLocation location = DataLocation::HOST);
+    // BitVector(const BitVector&);
     BitVector(BitVector&&) noexcept;
-    BitVector& operator=(const BitVector&);
+    // BitVector& operator=(const BitVector&);
     BitVector& operator=(BitVector&&) noexcept;
     ~BitVector();
+
+    BitVector cloneImpl() const;
 
     void set(size_t index);
     void unset(size_t index);
@@ -30,9 +32,10 @@ public:
     void resize(size_t new_size);
     void reserve(size_t new_capacity);
     BitVector slice(size_t start, size_t end) const;
-    BitVector splitFront(size_t size);
     void append(const BitVector& other);
     void to(DataLocation location);
+    Element* data() { return data_; }
+    const Element* data() const { return data_; }
 
 private:
     static void copyBits(Element* dest, size_t dest_offset, const Element* src, size_t src_offset, size_t num_bits);
@@ -46,6 +49,7 @@ private:
     friend class ValueVector;
     template <typename DT, template <typename> class VecT>
     friend class ValueVectorBase;
+    friend class Column;
 };
 
 } // namespace velodb

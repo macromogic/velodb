@@ -14,8 +14,8 @@
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_CXX_STANDARD": "17",
-                "CMAKE_CUDA_STANDARD": "17",
+                "CMAKE_CXX_STANDARD": "20",
+                "CMAKE_CUDA_STANDARD": "20",
                 "CMAKE_CUDA_ARCHITECTURES": "70;75;80;86;89;90",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
                 "BUILD_TESTS": "ON",
@@ -40,8 +40,8 @@
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_CXX_STANDARD": "17",
-                "CMAKE_CUDA_STANDARD": "17",
+                "CMAKE_CXX_STANDARD": "20",
+                "CMAKE_CUDA_STANDARD": "20",
                 "CMAKE_CUDA_ARCHITECTURES": "70;75;80;86;89;90",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
                 "BUILD_TESTS": "ON",
@@ -56,8 +56,8 @@
             "inherits": "release",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
-                "CMAKE_CXX_STANDARD": "17",
-                "CMAKE_CUDA_STANDARD": "17",
+                "CMAKE_CXX_STANDARD": "20",
+                "CMAKE_CUDA_STANDARD": "20",
                 "CMAKE_CUDA_ARCHITECTURES": "70;75;80;86;89;90",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
                 "BUILD_TESTS": "ON",
@@ -72,8 +72,8 @@
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-                "CMAKE_CXX_STANDARD": "17",
-                "CMAKE_CUDA_STANDARD": "17",
+                "CMAKE_CXX_STANDARD": "20",
+                "CMAKE_CUDA_STANDARD": "20",
                 "CMAKE_CUDA_ARCHITECTURES": "70;75;80;86;89;90",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
                 "BUILD_TESTS": "ON",

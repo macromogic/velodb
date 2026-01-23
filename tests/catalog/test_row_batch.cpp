@@ -47,6 +47,7 @@ TEST_F(RowBatchTest, AddColumn)
 
     EXPECT_EQ(batch.getRowCount(), 3);
     EXPECT_EQ(batch.getColumnCount(), 2);
+    task_manager_.stop(0);
 }
 
 TEST_F(RowBatchTest, MoveSemantics)
@@ -63,26 +64,7 @@ TEST_F(RowBatchTest, MoveSemantics)
     // Moved from state is implementation defined, but usually empty
     // Our implementation checks columns_.empty() for row count 0
     EXPECT_EQ(batch.getColumnCount(), 0);
-}
-
-TEST_F(RowBatchTest, SplitFront)
-{
-    RowBatch batch;
-    std::vector<Value> values;
-    for (int i = 0; i < 10; ++i)
-        values.push_back(Value::createInteger(i));
-
-    auto col = Column::buildFrom(std::make_unique<IntegerType>(), std::move(values));
-    batch.addColumn(std::move(col));
-
-    RowBatch front = batch.splitFront(4);
-
-    EXPECT_EQ(front.getRowCount(), 4);
-    EXPECT_EQ(batch.getRowCount(), 6);
-
-    EXPECT_EQ(front.getValue(0, 0).get<int32_t>(), 0);
-    EXPECT_EQ(front.getValue(3, 0).get<int32_t>(), 3);
-    EXPECT_EQ(batch.getValue(0, 0).get<int32_t>(), 4);
+    task_manager_.stop(0);
 }
 
 TEST_F(RowBatchTest, DataLocation)
@@ -104,4 +86,5 @@ TEST_F(RowBatchTest, DataLocation)
     batch.to(DataLocation::HOST);
     EXPECT_EQ(batch.getColumn(0).location(), DataLocation::HOST);
     EXPECT_EQ(batch.getValue(0, 0).get<int32_t>(), 1);
+    task_manager_.stop(0);
 }

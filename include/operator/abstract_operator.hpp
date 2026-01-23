@@ -25,11 +25,14 @@ public:
     virtual Result<RowBatch> next() = 0;
     virtual bool isUnary() const = 0;
 
-    static constexpr size_t MAX_BATCH_SIZE = 1ul << 20; // 1M rows
-
 protected:
     ExecutionContext& context_;
     Schema output_schema_;
+
+    void setNumRowsForBatch(RowBatch& batch, size_t num_rows) { batch.setRowCount(num_rows); }
+    std::vector<Column> extractColumnsFromBatch(RowBatch&& batch) { return std::move(batch).columns_; }
+    RowBatch buildBatchFromColumns(std::vector<Column>&& columns) { return RowBatch(std::move(columns)); }
+    RowBatch collectBatches(AbstractOperator& child);
 };
 
 class UnaryOperator : public AbstractOperator {
@@ -38,9 +41,7 @@ public:
 
     bool isUnary() const override { return true; }
 
-    AbstractOperator* getChild() const { return child_.get(); }
-
-private:
+protected:
     std::unique_ptr<AbstractOperator> child_; // Child operator
 };
 
@@ -53,10 +54,7 @@ public:
 
     bool isUnary() const override { return false; }
 
-    AbstractOperator* getLeftChild() const { return left_child_.get(); }
-    AbstractOperator* getRightChild() const { return right_child_.get(); }
-
-private:
+protected:
     std::unique_ptr<AbstractOperator> left_child_;
     std::unique_ptr<AbstractOperator> right_child_;
 };

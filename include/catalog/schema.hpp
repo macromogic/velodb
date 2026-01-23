@@ -9,7 +9,6 @@
 
 namespace velodb {
 
-// Forward declaration
 class ColumnInfo;
 
 class Schema : private NonCopyable, public Cloneable<Schema> {

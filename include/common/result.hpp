@@ -11,7 +11,6 @@
 
 namespace velodb {
 
-// Forward declaration
 template <typename T, typename E>
 class Result;
 

@@ -1,5 +1,7 @@
 #include "operator/limit_operator.hpp"
 
+#include "common/constants.hpp"
+
 namespace velodb {
 
 // LimitOperator implementation
@@ -11,52 +13,77 @@ LimitOperator::LimitOperator(ExecutionContext& context,
     : UnaryOperator(context, std::move(output_schema), std::move(child))
     , limit_(limit)
     , offset_(offset)
-    , buffer_(RowBatch::createBuffered(output_schema_, MAX_BATCH_SIZE * 2, DataLocation::CUDA))
+    , current_count_(0)
+    , skipped_count_(0)
 {
 }
 
 Result<RowBatch> LimitOperator::next()
 {
     PROFILE_SCOPE("LimitOperator::next");
-    auto* child = getChild();
-    if (!child) {
-        return Result<RowBatch>::failure("LimitOperator requires a child operator");
-    }
     while (true) {
-        auto child_result = child->next();
+        auto child_result = child_->next();
         if (!child_result) {
             return child_result; // Propagate error from child
         }
-        auto& input_batch = child_result.value();
+        auto input_batch = std::move(child_result).value();
         auto input_row_count = input_batch.getRowCount();
+        auto n_cols = input_batch.getColumnCount();
         if (input_row_count == 0) {
-            // Produce the last (maybe incomplete) batch if we have any rows buffered
-            auto last_batch_size = std::min(MAX_BATCH_SIZE, std::min(buffer_.getRowCount(), limit_ - current_count_));
-            current_count_ += last_batch_size;
-            return Result<RowBatch>::success(std::move(buffer_.splitFront(last_batch_size)));
+            return child_result; // End of stream
         }
 
+        size_t skip_count = 0;
         if (skipped_count_ < offset_) {
-            size_t to_skip = std::min(offset_ - skipped_count_, input_row_count);
-            skipped_count_ += to_skip;
-            if (to_skip == input_row_count) {
-                continue; // Skip entire batch
-            }
-            // Adjust input batch to skip the rows
-            input_batch.splitFront(to_skip);
+            skip_count = std::min(offset_ - skipped_count_, input_row_count);
+            skipped_count_ += skip_count;
         }
-
-        // Discard batches beyond the limit
-        if (current_count_ < limit_) {
-            buffer_.addRows(input_batch);
-
-            // If we can produce a full batch, do so
-            if (std::min(buffer_.getRowCount(), limit_ - current_count_) >= MAX_BATCH_SIZE) {
-                auto output_batch = buffer_.splitFront(MAX_BATCH_SIZE);
-                current_count_ += MAX_BATCH_SIZE;
-                return Result<RowBatch>::success(std::move(output_batch));
-            }
+        size_t rows_to_take = input_row_count - skip_count;
+        if (current_count_ + rows_to_take > limit_) {
+            rows_to_take = limit_ - current_count_;
         }
+        current_count_ += rows_to_take;
+        if (rows_to_take == 0) {
+            return Result<RowBatch>::success(RowBatch()); // Limit reached
+        }
+        std::vector<void*> buffers;
+        std::vector<BitVector::Element*> bitmap_buffers;
+        buffers.reserve(input_batch.getColumnCount());
+        bitmap_buffers.reserve(input_batch.getColumnCount());
+        // auto& task_manager = context_.getTaskManager();
+        auto stream_handler = StreamPool::getInstance().acquire().value();
+        // uint64_t last_id;
+        for (auto& col : input_batch.getColumns()) {
+            auto* data_ptr = col.rawData();
+            auto* bitmap_ptr = col.rawBitmapData();
+            auto* temp_buffer = col.getTemporaryBuffer();
+            auto* temp_bitmap_buffer = col.getTemporaryBitmapBuffer();
+            buffers.push_back(temp_buffer);
+            bitmap_buffers.push_back(temp_bitmap_buffer);
+
+            auto data_size = col.getType().size();
+            CHECKED_CALL_THROW(cudaMemcpyAsync(temp_buffer,
+                                               static_cast<const uint8_t*>(data_ptr) + skip_count * data_size,
+                                               rows_to_take * data_size,
+                                               cudaMemcpyDeviceToDevice,
+                                               stream_handler->get()));
+
+            CHECKED_CALL_THROW(
+                cudaMemcpyAsync(temp_bitmap_buffer,
+                                static_cast<const uint8_t*>(bitmap_ptr) + skip_count * sizeof(BitVector::Element),
+                                rows_to_take * sizeof(BitVector::Element),
+                                cudaMemcpyDeviceToDevice,
+                                stream_handler->get()));
+        }
+        stream_handler->synchronize();
+        // task_manager.waitCommand(last_id);
+
+        for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
+            auto& col = input_batch.getColumn(col_idx);
+            col.setFromBuffer(buffers[col_idx], bitmap_buffers[col_idx]);
+        }
+        setNumRowsForBatch(input_batch, rows_to_take);
+        return Result<RowBatch>::success(std::move(input_batch));
     }
 }
 

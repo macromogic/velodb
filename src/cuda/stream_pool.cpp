@@ -168,7 +168,7 @@ void StreamPool::clear()
     total_count_ = 0;
 }
 
-StreamPool& StreamPool::instance()
+StreamPool& StreamPool::getInstance()
 {
     static StreamPool global_pool;
     return global_pool;

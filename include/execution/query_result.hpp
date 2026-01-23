@@ -10,7 +10,7 @@
 
 namespace velodb {
 
-class QueryResultIterator; // Forward declaration
+class QueryResultIterator;
 
 class QueryResult : public NonCopyable {
 public:

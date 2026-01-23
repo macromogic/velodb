@@ -3,11 +3,8 @@
 #include "common/copy_traits.hpp"
 #include "common/exception.hpp"
 #include "common/profiler.hpp"
-#include "cuda/compaction.hpp"
-#include "cuda/event.hpp"
+#include "cuda/allocator.hpp"
 #include "cuda/helper.hpp"
-#include "cuda/materialization.hpp"
-#include "cuda/sort.hpp"
 #include "cuda/stream.hpp"
 #include "cuda/stream_pool.hpp"
 #include "data/bit_vector.hpp"
@@ -24,7 +21,6 @@
 
 namespace velodb {
 
-// Forward declaration
 template <typename VT>
 class ValueVector;
 
@@ -41,14 +37,14 @@ public:
         : data_(nullptr)
         , size_(0)
         , capacity_(location == DataLocation::CUDA ? nextPow2(capacity) : capacity)
-        , null_mask_(0)
+        , null_mask_(0, location)
         , location_(location)
     {
         null_mask_.reserve(capacity_);
         if (location == DataLocation::HOST) {
-            CHECKED_CALL_THROW(cudaMallocHost(&data_, capacity_ * sizeof(DType)));
+            data_ = MemoryAllocator::allocate<DType>(DataLocation::HOST, capacity_);
         } else if (location == DataLocation::CUDA) {
-            CHECKED_CALL_THROW(cudaMalloc(&data_, capacity_ * sizeof(DType)));
+            data_ = MemoryAllocator::allocate<DType>(DataLocation::CUDA, capacity_);
             // Zero-initialize padding region to prevent data leaks during oblivious transfer
             CHECKED_CALL_THROW(cudaMemset(data_, 0, capacity_ * sizeof(DType)));
         } else {
@@ -77,11 +73,7 @@ public:
         if (this != &other) {
             // Clean up current resources
             if (location_ != DataLocation::VIEW && data_ != nullptr) {
-                if (location_ == DataLocation::HOST) {
-                    cudaFreeHost(data_);
-                } else {
-                    cudaFree(data_);
-                }
+                MemoryAllocator::deallocate(data_);
             }
 
             // Move data from other
@@ -106,57 +98,56 @@ public:
             return; // View mode does not possess ownership
         }
         if (data_ != nullptr) {
-            if (location_ == DataLocation::HOST) {
-                cudaFreeHost(data_);
-            } else {
-                cudaFree(data_);
-            }
+            MemoryAllocator::deallocate(data_);
         }
     }
 
     size_t size() const { return size_; }
+    size_t capacity() const { return capacity_; }
 
     void to(DataLocation location)
     {
         VELODB_ASSERT_MSG(location != DataLocation::VIEW, "Cannot move data to VIEW");
         if (location_ != location) {
+            auto stream_handler = StreamPool::getInstance().acquire().value();
             if (location_ == DataLocation::CUDA) {
                 PROFILE_SCOPE("ValueVector D2H Transfer");
                 // Oblivious transfer: round up to next power of 2 to hide selectivity
                 size_t padded_capacity = nextPow2(capacity_);
                 VELODB_ASSERT_MSG(capacity_ >= padded_capacity, "Insufficient capacity for oblivious transfer");
-                DType* host_data;
-                auto& stream = CudaStream::getD2HStream();
-                CHECKED_CALL_THROW(cudaMallocHost(&host_data, padded_capacity * sizeof(DType)));
+                DType* host_data = MemoryAllocator::allocate<DType>(DataLocation::HOST,
+                                                                    padded_capacity,
+                                                                    stream_handler->get());
                 CHECKED_CALL_THROW(cudaMemcpyAsync(host_data,
                                                    data_,
                                                    padded_capacity * sizeof(DType),
                                                    cudaMemcpyDeviceToHost,
-                                                   stream.get()));
-                stream.synchronize();
-                cudaFree(data_);
+                                                   stream_handler->get()));
+                MemoryAllocator::deallocate(data_, stream_handler->get());
+                stream_handler->synchronize();
                 data_ = host_data;
                 capacity_ = padded_capacity;
             } else {
                 PROFILE_SCOPE("ValueVector H2D Transfer");
                 size_t padded_capacity = nextPow2(capacity_);
-                DType* device_data;
-                auto& stream = CudaStream::getH2DStream();
-                CHECKED_CALL_THROW(cudaMallocAsync(&device_data, padded_capacity * sizeof(DType), stream.get()));
+                DType* device_data = MemoryAllocator::allocate<DType>(DataLocation::CUDA,
+                                                                      padded_capacity,
+                                                                      stream_handler->get());
                 CHECKED_CALL_THROW(cudaMemcpyAsync(device_data,
                                                    data_,
                                                    capacity_ * sizeof(DType),
                                                    cudaMemcpyHostToDevice,
-                                                   stream.get()));
-                stream.synchronize();
+                                                   stream_handler->get()));
                 if (location_ == DataLocation::HOST) {
-                    cudaFreeHost(data_);
+                    MemoryAllocator::deallocate(data_, stream_handler->get());
                 }
+                stream_handler->synchronize();
                 data_ = device_data;
                 capacity_ = padded_capacity;
             }
             location_ = location;
         }
+        null_mask_.to(location);
     }
 
     DataLocation location() const { return location_; }
@@ -187,25 +178,37 @@ public:
             new_capacity = nextPow2(new_capacity);
         }
         if (new_capacity > capacity_) {
+            auto stream_handler = StreamPool::getInstance().acquire().value();
             if (location_ == DataLocation::HOST) {
-                DType* new_data;
-                CHECKED_CALL_THROW(cudaMallocHost(&new_data, new_capacity * sizeof(DType)));
+                DType* new_data = MemoryAllocator::allocate<DType>(DataLocation::HOST,
+                                                                   new_capacity,
+                                                                   stream_handler->get());
+                stream_handler->synchronize();
                 std::copy(data_, data_ + size_, new_data);
-                cudaFreeHost(data_);
+                MemoryAllocator::deallocate(data_, stream_handler->get());
                 data_ = new_data;
                 capacity_ = new_capacity;
             } else if (location_ == DataLocation::CUDA) {
-                DType* new_data;
-                CHECKED_CALL_THROW(cudaMalloc(&new_data, new_capacity * sizeof(DType)));
-                CHECKED_CALL_THROW(cudaMemcpy(new_data, data_, size_ * sizeof(DType), cudaMemcpyDeviceToDevice));
+                DType* new_data = MemoryAllocator::allocate<DType>(DataLocation::CUDA,
+                                                                   new_capacity,
+                                                                   stream_handler->get());
+                CHECKED_CALL_THROW(cudaMemcpyAsync(new_data,
+                                                   data_,
+                                                   size_ * sizeof(DType),
+                                                   cudaMemcpyDeviceToDevice,
+                                                   stream_handler->get()));
                 // Zero-initialize padding region to prevent data leaks
-                CHECKED_CALL_THROW(cudaMemset(new_data + size_, 0, (new_capacity - size_) * sizeof(DType)));
-                cudaFree(data_);
+                CHECKED_CALL_THROW(cudaMemsetAsync(new_data + size_,
+                                                   0,
+                                                   (new_capacity - size_) * sizeof(DType),
+                                                   stream_handler->get()));
+                MemoryAllocator::deallocate(data_, stream_handler->get());
                 data_ = new_data;
                 capacity_ = new_capacity;
             } else {
                 VELODB_THROW(ExecutionError, "Cannot reserve data on VIEW");
             }
+            stream_handler->synchronize();
         }
     }
 
@@ -240,7 +243,7 @@ public:
 
     ConcreteVector tryOwn()
     {
-        auto ret = ConcreteVector(data_, size_, capacity_, null_mask_);
+        auto ret = ConcreteVector(data_, size_, capacity_, null_mask_.clone());
         if (location_ != DataLocation::VIEW) {
             // Transfer ownership
             ret.location_ = location_;
@@ -249,101 +252,24 @@ public:
         return ret;
     }
 
-    ConcreteVector splitFront(size_t size)
+    ConcreteVector gather(const IntVector& rowids) const
     {
-        VELODB_ASSERT_MSG(location_ != DataLocation::VIEW, "Cannot split a VIEW data source");
-
-        // Create a new ValueVector for the second portion with correct capacity
-        if (size > size_) {
-            size = size_;
-        }
-        size_t remaining_size = size_ - size;
-        ConcreteVector split_vector(/* capacity = */ size, location_);
-
-        if (location_ == DataLocation::HOST) {
-            std::move(data_, data_ + size, split_vector.data_);
-            if (remaining_size > 0) {
-                std::move(data_ + size, data_ + size_, data_);
-            }
-        } else {
-            CHECKED_CALL_THROW(cudaMemcpy(split_vector.data_, data_, size * sizeof(DType), cudaMemcpyDeviceToDevice));
-            // TODO: Use memmove semantics to handle overlapping regions
-            if (remaining_size > 0) {
-                CHECKED_CALL_THROW(
-                    cudaMemcpy(data_, data_ + size, remaining_size * sizeof(DType), cudaMemcpyDeviceToDevice));
+        VELODB_ASSERT_MSG(location_ == DataLocation::HOST && rowids.location() == DataLocation::HOST,
+                          "Materialization gather must happen on HOST");
+        ConcreteVector vec(nextPow2(rowids.capacity()), DataLocation::HOST);
+        const auto* rowid_data = rowids.data();
+        for (size_t i = 0; i < rowids.capacity(); ++i) {
+            auto rowid = static_cast<size_t>(rowid_data[i]);
+            VELODB_ASSERT_MSG(rowid < size_, "Rowid out of range");
+            if (null_mask_.get(rowid)) {
+                vec.null_mask_.set(i);
+            } else {
+                vec.data_[i] = data_[rowid];
             }
         }
-        split_vector.null_mask_ = null_mask_.splitFront(size);
-        split_vector.size_ = size;
-        size_ = remaining_size;
-
-        return split_vector;
-    }
-
-    void appendMaskedMultiple(const ConcreteVector& other, const MaskVector& mask)
-    {
-        VELODB_ASSERT_MSG(location_ == DataLocation::CUDA && other.location_ == DataLocation::CUDA
-                              && mask.location() == DataLocation::CUDA,
-                          "Filter compaction must happen on CUDA");
-        if (size_ + other.size_ > capacity_) {
-            reserve(capacity_ + other.capacity_);
-            null_mask_.reserve(null_mask_.element_capacity_ + other.null_mask_.element_capacity_);
-        }
-        auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
-            "Failed to acquire stream for filter compaction");
-        auto mask_elements = size_ / BitVector::ELEMENT_WIDTH;
-        auto bit_offset = size_ % BitVector::ELEMENT_WIDTH;
-        null_mask_.to(DataLocation::CUDA);
-        auto num_added = filterCompact(data_ + size_,
-                                       null_mask_.data_ + mask_elements,
-                                       other.data_,
-                                       other.null_mask_.data_,
-                                       mask.data(),
-                                       other.size_,
-                                       bit_offset,
-                                       stream_handle->get());
-        null_mask_.to(DataLocation::HOST);
-        size_ += num_added;
-        null_mask_.size_ += num_added;
-        stream_handle.release();
-    }
-
-    void appendMultiple(const ConcreteVector& other)
-    {
-        VELODB_ASSERT_MSG(location_ == other.location_ && location_ != DataLocation::VIEW,
-                          fmt::format("Incompatible data locations: {} vs {}", location_, other.location_));
-        if (size_ + other.size_ > capacity_) {
-            reserve(DIV_UP(size_ + other.capacity_, capacity_) * capacity_);
-        }
-        if (location_ == DataLocation::HOST) {
-            std::copy(other.data_, other.data_ + other.size_, data_ + size_);
-        } else {
-            CHECKED_CALL_THROW(
-                cudaMemcpy(data_ + size_, other.data_, other.size_ * sizeof(DType), cudaMemcpyDeviceToDevice));
-        }
-        null_mask_.append(other.null_mask_);
-        size_ += other.size_;
-    }
-
-    void reorder(const int64_t* indices)
-    {
-        auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
-            "Failed to acquire stream for reorder");
-        auto* new_data = reorderData(data_, indices, capacity_, size_, stream_handle->get());
-        std::swap(data_, new_data);
-        if (new_data != nullptr) {
-            cudaFree(new_data);
-        }
-        null_mask_.to(DataLocation::CUDA);
-        auto* new_bitmap
-            = reorderBitmap(null_mask_.data_, indices, null_mask_.element_capacity_, size_, stream_handle->get());
-        std::swap(null_mask_.data_, new_bitmap);
-        null_mask_.to(DataLocation::HOST);
-        if (new_bitmap != nullptr) {
-            cudaFree(new_bitmap);
-        }
-        stream_handle->synchronize();
-        stream_handle.release();
+        vec.size_ = rowids.size();
+        vec.null_mask_.size_ = rowids.size();
+        return vec;
     }
 
 protected:
@@ -357,7 +283,7 @@ protected:
     ValueVectorBase(DType* data,
                     size_t size,
                     size_t capacity,
-                    BitVector null_mask,
+                    BitVector&& null_mask,
                     DataLocation location = DataLocation::VIEW)
         : data_(data)
         , size_(size)
@@ -366,6 +292,13 @@ protected:
         , location_(location)
     {
     }
+
+    void setSize(size_t new_size)
+    {
+        size_ = new_size;
+        null_mask_.size_ = new_size;
+    }
+    friend class Column;
 };
 
 template <typename VT>
@@ -381,12 +314,20 @@ public:
 
     Value get(size_t index) const
     {
-        VELODB_ASSERT_MSG(location_ != DataLocation::CUDA, "Cannot access data on device");
         VELODB_ASSERT_MSG(index < size_, "Index out of range");
         if (null_mask_.get(index)) {
             return Value::createNull(dTypeId<DType>);
         }
-        return Value(dTypeId<DType>, VType(data_[index]));
+        if (location_ == DataLocation::CUDA) {
+            auto stream_handler = StreamPool::getInstance().acquire().value();
+            DType value;
+            CHECKED_CALL_THROW(
+                cudaMemcpyAsync(&value, data_ + index, sizeof(DType), cudaMemcpyDeviceToHost, stream_handler->get()));
+            stream_handler->synchronize();
+            return Value(dTypeId<DType>, VType(value));
+        } else {
+            return Value(dTypeId<DType>, VType(data_[index]));
+        }
     }
 
     static ValueVector buildFrom(std::vector<Value>&& data, DataLocation location = DataLocation::HOST)
@@ -422,27 +363,6 @@ public:
         return vec;
     }
 
-    static ValueVector materializeFrom(const ValueVector& source, const IntVector& rowids)
-    {
-        VELODB_ASSERT_MSG(source.location() == DataLocation::CUDA && rowids.location() == DataLocation::CUDA,
-                          "Materialization must happen on CUDA");
-        ValueVector vec(nextPow2(rowids.size()), DataLocation::CUDA);
-        auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
-            "Failed to acquire stream for filter compaction");
-        materializeArray<DType>(vec.data_,
-                                vec.null_mask_.data_,
-                                source.data_,
-                                source.null_mask_.data_,
-                                rowids.data(),
-                                rowids.size(),
-                                stream_handle->get());
-        stream_handle->synchronize();
-        vec.size_ = rowids.size();
-        vec.null_mask_.size_ = rowids.size();
-        stream_handle.release();
-        return vec;
-    }
-
 private:
     using Base::capacity_;
     using Base::data_;
@@ -451,6 +371,7 @@ private:
     using Base::size_;
 
     friend class ValueVectorBase<DTypeOfV<VT>, ValueVector>;
+    friend class Column;
 };
 
 template <>
@@ -486,13 +407,24 @@ public:
 
     Value get(size_t index) const
     {
-        VELODB_ASSERT_MSG(location_ != DataLocation::CUDA, "Cannot access data on device");
         VELODB_ASSERT_MSG(index < size_, "Index out of range");
         if (null_mask_.get(index)) {
             return Value::createNull(dTypeId<DType>);
         }
-        auto ordinal = data_[index];
-        return Value(dTypeId<DType>, VType(ordinal, std::string_view((*ordered_strings_)[ordinal])));
+        if (location_ == DataLocation::CUDA) {
+            auto stream_handler = StreamPool::getInstance().acquire().value();
+            size_t ordinal;
+            CHECKED_CALL_THROW(cudaMemcpyAsync(&ordinal,
+                                               data_ + index,
+                                               sizeof(size_t),
+                                               cudaMemcpyDeviceToHost,
+                                               stream_handler->get()));
+            stream_handler->synchronize();
+            return Value(dTypeId<DType>, VType(ordinal, std::string_view((*ordered_strings_)[ordinal])));
+        } else {
+            auto ordinal = data_[index];
+            return Value(dTypeId<DType>, VType(ordinal, std::string_view((*ordered_strings_)[ordinal])));
+        }
     }
 
     void ensureOrdinal(VType& data, ComparisonType comp) const
@@ -545,7 +477,7 @@ public:
 
     ConcreteVector tryOwn()
     {
-        auto ret = ConcreteVector(data_, size_, capacity_, null_mask_, ordered_strings_);
+        auto ret = ConcreteVector(data_, size_, capacity_, null_mask_.clone(), ordered_strings_);
         if (location_ != DataLocation::VIEW) {
             ret.location_ = location_;
             location_ = DataLocation::VIEW;
@@ -553,27 +485,11 @@ public:
         return ret;
     }
 
-    ConcreteVector splitFront(size_t size)
+    ConcreteVector gather(const IntVector& rowids) const
     {
-        auto split_vector = Base::splitFront(size);
-        split_vector.ordered_strings_ = ordered_strings_;
-        return split_vector;
-    }
-
-    void appendMaskedMultiple(const ConcreteVector& other, const MaskVector& mask)
-    {
-        Base::appendMaskedMultiple(other, mask);
-        if (ordered_strings_ != other.ordered_strings_) {
-            ordered_strings_ = other.ordered_strings_;
-        }
-    }
-
-    void appendMultiple(const ConcreteVector& other)
-    {
-        Base::appendMultiple(other);
-        if (ordered_strings_ != other.ordered_strings_) {
-            ordered_strings_ = other.ordered_strings_;
-        }
+        auto vec = Base::gather(rowids);
+        vec.ordered_strings_ = ordered_strings_;
+        return vec;
     }
 
     static ValueVector buildFrom(std::vector<Value>&& data, DataLocation location = DataLocation::HOST)
@@ -607,28 +523,6 @@ public:
         return vec;
     }
 
-    static ValueVector materializeFrom(const ValueVector& source, const IntVector& rowids)
-    {
-        VELODB_ASSERT_MSG(source.location() == DataLocation::CUDA && rowids.location() == DataLocation::CUDA,
-                          "Materialization must happen on CUDA");
-        ValueVector vec(nextPow2(rowids.size()), DataLocation::CUDA);
-        auto stream_handle = StreamPool::instance().acquire().value_or_throw<ExecutionError>(
-            "Failed to acquire stream for filter compaction");
-        materializeArray<DType>(vec.data_,
-                                vec.null_mask_.data_,
-                                source.data_,
-                                source.null_mask_.data_,
-                                rowids.data(),
-                                rowids.size(),
-                                stream_handle->get());
-        stream_handle->synchronize();
-        vec.size_ = rowids.size();
-        vec.null_mask_.size_ = rowids.size();
-        vec.ordered_strings_ = source.ordered_strings_;
-        stream_handle.release();
-        return vec;
-    }
-
 private:
     std::shared_ptr<std::vector<std::string>> ordered_strings_;
 
@@ -642,6 +536,8 @@ private:
         , ordered_strings_(ordered_strings)
     {
     }
+
+    friend class Column;
 };
 
 } // namespace velodb

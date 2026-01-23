@@ -1,11 +1,9 @@
 #include "../common/test_warmup_utility.hpp"
-#include "catalog/catalog.hpp"
 #include "catalog/execution_context.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "catalog/table_builder.hpp"
 #include "data/data_type.hpp"
-#include "execution/execution_engine.hpp"
 
 #include <SQLParser.h>
 
@@ -14,13 +12,6 @@
 using namespace velodb;
 
 class OrderByTest : public test::VelODBTest {
-public:
-    OrderByTest()
-        : catalog_()
-        , engine_(catalog_)
-    {
-    }
-
 protected:
     void SetUp() override
     {
@@ -100,9 +91,6 @@ protected:
     }
 
     void TearDown() override { test::VelODBTest::TearDown(); }
-
-    Catalog catalog_;
-    ExecutionEngine engine_;
 };
 
 // Test basic ORDER BY with integer column, ascending order (default)

@@ -86,24 +86,6 @@ Column Column::buildFrom(std::unique_ptr<DataType> type, std::vector<Value>&& va
     }
 }
 
-Column Column::materializeFrom(const Column& source, const Column& rowids)
-{
-    PROFILE_SCOPE("Column::materializeFrom");
-    return std::visit(
-        [&](auto&& src_vv, auto&& rowid_vv) -> Column {
-            using SrcType = std::decay_t<decltype(src_vv)>;
-            using RowidType = std::decay_t<decltype(rowid_vv)>;
-            if constexpr (std::is_same_v<typename RowidType::VType, int64_t>) {
-                auto vec = SrcType::materializeFrom(src_vv, rowid_vv);
-                return Column(source.type_->cloneUnique(), std::move(vec));
-            } else {
-                VELODB_THROW(ExecutionError, "Rowid column must be of type BIGINT for materialization");
-            }
-        },
-        source.data_source_,
-        rowids.data_source_);
-}
-
 const DataType& Column::getType() const
 {
     return *type_;
@@ -138,6 +120,80 @@ void Column::ensureOrdinal(Value& value, ComparisonType comp) const
             } else {
                 // For non-string types, no action needed
                 (void)vec; // Suppress unused variable warning
+            }
+        },
+        data_source_);
+}
+
+void* Column::rawData()
+{
+    return std::visit([](auto&& vv) { return static_cast<void*>(vv.data()); }, data_source_);
+}
+
+const void* Column::rawData() const
+{
+    return std::visit([](auto&& vv) { return static_cast<const void*>(vv.data()); }, data_source_);
+}
+
+BitVector::Element* Column::rawBitmapData()
+{
+    return std::visit([](auto&& vv) { return vv.null_mask_.data(); }, data_source_);
+}
+
+const BitVector::Element* Column::rawBitmapData() const
+{
+    return std::visit([](auto&& vv) { return vv.null_mask_.data(); }, data_source_);
+}
+
+void* Column::getTemporaryBuffer() const
+{
+    return std::visit(
+        [](auto&& vv) {
+            using DType = typename std::decay_t<decltype(vv)>::DType;
+            auto stream_handler = StreamPool::getInstance().acquire().value();
+            auto* ptr = MemoryAllocator::allocate<DType>(vv.location_, vv.capacity_, stream_handler->get());
+            stream_handler->synchronize();
+            return static_cast<void*>(ptr);
+        },
+        data_source_);
+}
+
+BitVector::Element* Column::getTemporaryBitmapBuffer() const
+{
+    return std::visit(
+        [](auto&& vv) {
+            auto stream_handler = StreamPool::getInstance().acquire().value();
+            auto* ptr = MemoryAllocator::allocate<BitVector::Element>(vv.location_,
+                                                                      vv.null_mask_.element_capacity_,
+                                                                      stream_handler->get());
+            if (vv.location_ == DataLocation::CUDA) {
+                CHECKED_CALL_THROW(cudaMemsetAsync(ptr,
+                                                   0,
+                                                   vv.null_mask_.element_capacity_ * sizeof(BitVector::Element),
+                                                   stream_handler->get()));
+            } else {
+                std::fill_n(ptr, vv.null_mask_.element_capacity_, BitVector::Element(0));
+            }
+            stream_handler->synchronize();
+            return ptr;
+        },
+        data_source_);
+}
+
+void Column::setFromBuffer(void* data, BitVector::Element* bitmap_data)
+{
+    std::visit(
+        [&data, &bitmap_data](auto&& vv) {
+            using DType = typename std::decay_t<decltype(vv)>::DType;
+            if (data) {
+                DType* old_data = vv.data_;
+                vv.data_ = static_cast<DType*>(data);
+                MemoryAllocator::deallocate(old_data);
+            }
+            if (bitmap_data) {
+                BitVector::Element* old_bitmap = vv.null_mask_.data_;
+                vv.null_mask_.data_ = bitmap_data;
+                MemoryAllocator::deallocate(old_bitmap);
             }
         },
         data_source_);
@@ -203,58 +259,60 @@ Column Column::slice(size_t start, size_t end) const
         data_source_);
 }
 
+Column Column::gather(const Column& rowids) const
+{
+    return std::visit(
+        [this](auto&& src_vv, auto&& rowid_vv) -> Column {
+            using RowidType = std::decay_t<decltype(rowid_vv)>;
+            if constexpr (std::is_same_v<typename RowidType::VType, int64_t>) {
+                auto vec = src_vv.gather(rowid_vv);
+                return Column(type_->cloneUnique(), std::move(vec));
+            } else {
+                VELODB_THROW(ExecutionError, "Rowid column must be of type BIGINT for gather");
+            }
+        },
+        data_source_,
+        rowids.data_source_);
+}
+
 Column Column::tryOwn()
 {
     return std::visit([this](auto&& vv) -> Column { return Column(type_->cloneUnique(), vv.tryOwn()); }, data_source_);
 }
 
-Column Column::splitFront(size_t size)
+void Column::setSize(size_t new_size)
 {
-    return std::visit(
-        [this, size](auto&& vv) -> Column {
-            auto splitted = vv.splitFront(size);
-            return Column(type_->cloneUnique(), std::move(splitted));
+    std::visit([new_size](auto&& vv) { vv.setSize(new_size); }, data_source_);
+}
+
+void Column::debug() const
+{
+    std::visit(
+        [](auto&& vv) {
+            fmt::print("Column debug (size={}, capacity={}, location={}): ", vv.size(), vv.capacity(), vv.location());
+            for (size_t i = 0; i < vv.size(); ++i) {
+                fmt::print("{} ", vv.get(i));
+            }
+            fmt::println("");
         },
         data_source_);
 }
 
-void Column::reorder(const int64_t* indices)
-{
-    std::visit([&](auto&& vv) { vv.reorder(indices); }, data_source_);
-}
-
-void Column::appendMaskedMultiple(const Column& other, const Column& mask)
+void Column::debug(size_t max_elements) const
 {
     std::visit(
-        [](auto&& dst, auto&& src, auto&& mask) {
-            using DstType = std::decay_t<decltype(dst)>;
-            using SrcType = std::decay_t<decltype(src)>;
-            using MaskType = std::decay_t<decltype(mask)>;
-            if constexpr (std::is_same_v<DstType, SrcType> && std::is_same_v<typename MaskType::VType, bool>) {
-                dst.appendMaskedMultiple(src, mask);
-            } else {
-                VELODB_THROW(ExecutionError, "Invalid types for compaction");
+        [max_elements](auto&& vv) {
+            fmt::print("Column debug (size={}, capacity={}, location={}): ", vv.size(), vv.capacity(), vv.location());
+            size_t limit = std::min(vv.size(), max_elements);
+            for (size_t i = 0; i < limit; ++i) {
+                fmt::print("{} ", vv.get(i));
             }
-        },
-        data_source_,
-        other.data_source_,
-        mask.data_source_);
-}
-
-void Column::appendMultiple(const Column& other)
-{
-    std::visit(
-        [](auto&& dst, auto&& src) {
-            using DstType = std::decay_t<decltype(dst)>;
-            using SrcType = std::decay_t<decltype(src)>;
-            if constexpr (std::is_same_v<DstType, SrcType>) {
-                dst.appendMultiple(src);
-            } else {
-                VELODB_THROW(ExecutionError, "Invalid types for append");
+            if (vv.size() > max_elements) {
+                fmt::print("... ({} more elements)", vv.size() - max_elements);
             }
+            fmt::println("");
         },
-        data_source_,
-        other.data_source_);
+        data_source_);
 }
 
 } // namespace velodb

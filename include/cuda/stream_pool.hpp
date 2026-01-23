@@ -10,7 +10,7 @@
 
 namespace velodb {
 
-class CudaStream; // Forward declaration
+class CudaStream;
 
 class StreamPool {
 public:
@@ -58,7 +58,7 @@ public:
     Result<void> synchronizeAll();
     void clear();
 
-    static StreamPool& instance();
+    static StreamPool& getInstance();
 
 private:
     friend class StreamHandle;
@@ -75,7 +75,7 @@ private:
 
 class StreamGuard {
 public:
-    explicit StreamGuard(StreamPool& pool = StreamPool::instance());
+    explicit StreamGuard(StreamPool& pool = StreamPool::getInstance());
     ~StreamGuard();
 
     // Non-copyable but movable

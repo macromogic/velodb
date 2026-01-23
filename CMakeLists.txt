@@ -21,10 +21,10 @@ project(
 find_package(CUDAToolkit REQUIRED)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 # Generate compile_commands.json for IntelliSense
@@ -46,8 +46,8 @@ set(CMAKE_CUDA_FLAGS_RELWITHDEBINFO
     "-O2 -g --generate-line-info --use_fast_math")
 
 # Generate version header from template
-configure_file("${CMAKE_SOURCE_DIR}/include/velodb_version.hpp.in"
-               "${CMAKE_BINARY_DIR}/include/velodb_version.hpp" @ONLY)
+configure_file("${CMAKE_SOURCE_DIR}/include/common/constants.hpp.in"
+               "${CMAKE_BINARY_DIR}/include/common/constants.hpp" @ONLY)
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)

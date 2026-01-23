@@ -2,15 +2,11 @@ add_library(
   velodb_cuda OBJECT
   ${OPERATOR_SOURCES}
   warmup.cu
-  compaction.cu
-  sort.cu
-  join.cu
-  materialization.cu
+  commands.cpp
   persistent_kernel.cu
+  task_manager.cu
   stream.cpp
-  stream_pool.cpp
-  event.cpp
-  event_pool.cpp)
+  stream_pool.cpp)
 
 target_link_libraries(velodb_cuda ${DEPENDENCY_LIBS})
 

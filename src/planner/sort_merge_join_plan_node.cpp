@@ -1,4 +1,4 @@
-#include "planner/merge_sort_join_plan_node.hpp"
+#include "planner/sort_merge_join_plan_node.hpp"
 
 #include "common/exception.hpp"
 
@@ -6,26 +6,26 @@
 
 namespace velodb {
 
-// MergeSortJoinPlanNode implementation
-MergeSortJoinPlanNode::MergeSortJoinPlanNode(Schema output_schema,
+// SortMergeJoinPlanNode implementation
+SortMergeJoinPlanNode::SortMergeJoinPlanNode(Schema output_schema,
                                              std::unique_ptr<AbstractExpression> left_key_expr,
                                              std::unique_ptr<AbstractExpression> right_key_expr,
                                              JoinType join_type)
-    : AbstractPlanNode(PlanType::MERGE_SORT_JOIN, std::move(output_schema))
+    : AbstractPlanNode(PlanType::sort_merge_join, std::move(output_schema))
     , left_key_expr_(std::move(left_key_expr))
     , right_key_expr_(std::move(right_key_expr))
     , join_type_(join_type)
 {
 }
 
-std::unique_ptr<AbstractOperator> MergeSortJoinPlanNode::createOperator(ExecutionContext& context) const
+std::unique_ptr<AbstractOperator> SortMergeJoinPlanNode::createOperator(ExecutionContext& context) const
 {
-    VELODB_ASSERT_MSG(children_.size() == 2, "MergeSortJoinPlanNode must have exactly two children");
+    VELODB_ASSERT_MSG(children_.size() == 2, "SortMergeJoinPlanNode must have exactly two children");
 
     auto left_operator = children_[0]->createOperator(context);
     auto right_operator = children_[1]->createOperator(context);
 
-    return std::make_unique<MergeSortJoinOperator>(context,
+    return std::make_unique<SortMergeJoinOperator>(context,
                                                    output_schema_.clone(),
                                                    std::move(left_operator),
                                                    std::move(right_operator),
@@ -34,9 +34,9 @@ std::unique_ptr<AbstractOperator> MergeSortJoinPlanNode::createOperator(Executio
                                                    join_type_);
 }
 
-std::string MergeSortJoinPlanNode::toString() const
+std::string SortMergeJoinPlanNode::toString() const
 {
-    return "MergeSortJoin(...)";
+    return "SortMergeJoin(...)";
 }
 
 } // namespace velodb

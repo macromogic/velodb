@@ -4,6 +4,7 @@
 #include "catalog/column.hpp"
 #include "catalog/execution_context.hpp"
 #include "catalog/schema.hpp"
+#include "common/constants.hpp"
 #include "common/exception.hpp"
 #include "common/profiler.hpp"
 #include "data/data_type.hpp"
@@ -18,9 +19,9 @@
 #include "planner/filter_compaction_plan_node.hpp"
 #include "planner/limit_plan_node.hpp"
 #include "planner/materialization_plan_node.hpp"
-#include "planner/merge_sort_join_plan_node.hpp"
 #include "planner/projection_plan_node.hpp"
 #include "planner/seq_scan_plan_node.hpp"
+#include "planner/sort_merge_join_plan_node.hpp"
 #include "planner/sort_plan_node.hpp"
 
 #include <SQLParser.h>
@@ -266,7 +267,7 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planEquiJoin(const hsql::TableRe
     auto join_schema = inferJoinSchema(*left_table, *right_table);
 
     // Create a merge sort join plan node (we can make this configurable later)
-    auto join_plan_node = std::make_unique<MergeSortJoinPlanNode>(std::move(join_schema),
+    auto join_plan_node = std::make_unique<SortMergeJoinPlanNode>(std::move(join_schema),
                                                                   std::move(left_key_expr),
                                                                   std::move(right_key_expr),
                                                                   JoinType::INNER);
@@ -289,6 +290,8 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planOrderBy(std::unique_ptr<Abst
         order_indices.push_back(col_index);
         ascending_flags.push_back(order_desc->type == hsql::kOrderAsc);
     }
+    VELODB_ASSERT_MSG(order_indices.size() <= MAX_SORT_COLUMNS,
+                      fmt::format("ORDER BY with more than {} columns not supported", MAX_SORT_COLUMNS));
     auto sort_plan = std::make_unique<SortPlanNode>(plan->getOutputSchema().clone(),
                                                     std::move(order_indices),
                                                     std::move(ascending_flags));

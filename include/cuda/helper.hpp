@@ -8,6 +8,13 @@
 
 #include <cuda_runtime.h>
 
+#ifdef __CUDACC__
+#include <cooperative_groups.h>
+#include <cuda/std/limits>
+
+namespace cg = cooperative_groups;
+#endif
+
 namespace velodb {
 
 constexpr unsigned int WARP_SIZE = 32;

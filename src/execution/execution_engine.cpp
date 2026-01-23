@@ -12,15 +12,17 @@
 namespace velodb {
 
 // ExecutionEngine implementation
-ExecutionEngine::ExecutionEngine(Catalog& catalog)
+ExecutionEngine::ExecutionEngine(Catalog& catalog, TaskManager& task_manager)
     : catalog_(catalog)
+    , task_manager_(task_manager)
     , planner_(catalog)
-    , context_(catalog)
+    , context_(catalog, task_manager)
 {
 }
 
 ExecutionEngine::ExecutionEngine(ExecutionEngine&& other) noexcept
     : catalog_(other.catalog_)
+    , task_manager_(other.task_manager_)
     , planner_(std::move(other.planner_))
     , context_(std::move(other.context_))
     , last_execution_row_count_(other.last_execution_row_count_)
@@ -34,6 +36,7 @@ ExecutionEngine& ExecutionEngine::operator=(ExecutionEngine&& other) noexcept
 {
     if (this != &other) {
         catalog_ = std::move(other.catalog_);
+        task_manager_ = std::move(other.task_manager_);
         planner_ = std::move(other.planner_);
         context_ = std::move(other.context_);
         last_execution_row_count_ = other.last_execution_row_count_;

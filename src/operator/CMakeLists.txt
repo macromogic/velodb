@@ -3,7 +3,7 @@ add_library(
   abstract_operator.cpp
   filter_compaction_operator.cpp
   limit_operator.cpp
-  merge_sort_join_operator.cpp
+  sort_merge_join_operator.cpp
   materialization_operator.cpp
   projection_operator.cpp
   seq_scan_operator.cpp

@@ -23,11 +23,7 @@ ProjectionOperator::ProjectionOperator(ExecutionContext& context,
 Result<RowBatch> ProjectionOperator::next()
 {
     PROFILE_SCOPE("ProjectionOperator::next");
-    auto* child = getChild();
-    if (!child) {
-        return Result<RowBatch>::failure("ProjectionOperator requires a child operator");
-    }
-    auto child_result = child->next();
+    auto child_result = child_->next();
     if (!child_result) {
         return child_result; // Propagate error from child
     }
@@ -42,12 +38,13 @@ Result<RowBatch> ProjectionOperator::next()
         RowBatch batch;
         ViewTuple dummy_tuple(child_batch, 0);
         size_t batch_size = child_batch.getRowCount();
+        auto columns = extractColumnsFromBatch(std::move(child_batch));
         for (const auto& expr : expressions_) {
             switch (expr->getExpressionType()) {
             case ExpressionType::COLUMN_REF: {
                 const auto* column_ref = static_cast<ColumnRefExpression*>(expr.get());
                 auto column_index = input_schema_.getColumnIndex(column_ref->getColumnName());
-                batch.addColumn(child_batch.getColumn(column_index).tryOwn());
+                batch.addColumn(std::move(columns[column_index]));
                 break;
             }
             case ExpressionType::CONSTANT: {
@@ -61,6 +58,7 @@ Result<RowBatch> ProjectionOperator::next()
                 break;
             }
         }
+        setNumRowsForBatch(batch, batch_size);
         return Result<RowBatch>::success(std::move(batch));
     }
 }

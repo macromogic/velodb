@@ -35,12 +35,6 @@ const Value ValueTuple::getValue(size_t column_index) const
     return values_[column_index];
 }
 
-// const Value ValueTuple::getValue(const std::string& column_name) const
-// {
-//     size_t const index = schema_.get().getColumnIndex(column_name);
-//     return values_[index];
-// }
-
 std::string ValueTuple::toString() const
 {
     return fmt::format("({})", fmt::join(values_, ", "));
@@ -67,12 +61,6 @@ const Value ViewTuple::getValue(size_t column_index) const
     }
     return batch_->getValue(row_id_, column_index);
 }
-
-// const Value ViewTuple::getValue(const std::string& column_name) const
-// {
-//     size_t const index = batch_.get().getSchema().getColumnIndex(column_name);
-//     return getValue(index);
-// }
 
 size_t ViewTuple::getColumnCount() const
 {

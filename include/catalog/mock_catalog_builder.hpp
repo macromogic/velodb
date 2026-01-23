@@ -11,7 +11,6 @@
 #include <string>
 #include <vector>
 
-// Forward declaration for SQL parser
 namespace hsql {
 struct SQLStatement;
 struct SelectStatement;

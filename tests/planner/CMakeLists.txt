@@ -12,3 +12,4 @@ set_property(TARGET test_planner PROPERTY RUNTIME_OUTPUT_DIRECTORY
 target_compile_options(test_planner PRIVATE -Wall -Wextra -g)
 
 add_test(NAME TestPlanner COMMAND test_planner)
+set_tests_properties(TestPlanner PROPERTIES TIMEOUT 15)
