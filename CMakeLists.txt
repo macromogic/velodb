@@ -9,22 +9,22 @@ if(NOT CMAKE_CUDA_COMPILER)
     NO_DEFAULT_PATH)
 endif()
 
-set(CMAKE_CUDA_ARCHITECTURES "70;75;80;86;89;90")
+set(CMAKE_CUDA_ARCHITECTURES "75;80;86;89;90")
 
 # Project configuration
 project(
   velodb
   VERSION 0.0.1
-  DESCRIPTION "GPU-accelerated Object Database"
+  DESCRIPTION "GPU-accelerated Oblivious Relational Database"
   LANGUAGES CXX CUDA)
 
 find_package(CUDAToolkit REQUIRED)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
 # Generate compile_commands.json for IntelliSense
@@ -38,13 +38,16 @@ endif()
 # Compiler flags
 set(CMAKE_CXX_FLAGS_DEBUG "-g3 -Wall -Wextra -Werror")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG")
 set(CMAKE_CUDA_FLAGS_DEBUG
     "-g3 -G -Xcompiler -Wall -Xcompiler -Wextra -Xcompiler -Werror")
 set(CMAKE_CUDA_FLAGS_RELEASE "-O3 --use_fast_math")
+set(CMAKE_CUDA_FLAGS_RELWITHDEBINFO
+    "-O2 -g --generate-line-info --use_fast_math")
 
 # Generate version header from template
-configure_file("${CMAKE_SOURCE_DIR}/include/velodb_version.hpp.in"
-               "${CMAKE_BINARY_DIR}/include/velodb_version.hpp" @ONLY)
+configure_file("${CMAKE_SOURCE_DIR}/include/common/constants.hpp.in"
+               "${CMAKE_BINARY_DIR}/include/common/constants.hpp" @ONLY)
 
 # Include directories
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -94,9 +97,7 @@ option(ENABLE_PROFILING "Enable performance profiling" ON)
 option(BUILD_BENCHMARKS "Build benchmark programs" OFF)
 
 if(BUILD_BENCHMARKS)
-  set(ENABLE_PROFILING OFF) # Disable profiling for benchmarks to avoid overhead
-  message(
-    STATUS "Building benchmarks: ENABLED (profiling disabled for benchmarks)")
+  message(STATUS "Building benchmarks: ENABLED")
 else()
   message(STATUS "Building benchmarks: DISABLED")
 endif()

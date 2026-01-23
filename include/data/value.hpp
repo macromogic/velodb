@@ -23,7 +23,8 @@ using ValueData = std::variant<
     int64_t,
     float,
     double,
-    OrdinalString>;
+    OrdinalString,
+    uint32_t>;
 // clang-format on
 
 class Value {
@@ -84,6 +85,7 @@ public:
     static Value createFloat(float value);
     static Value createDouble(double value);
     static Value createString(const std::string& value);
+    static Value createDate(const std::string& value);
     static Value createNull(DataTypeId type_id);
 
 private:

@@ -22,7 +22,7 @@ enum class PlanType {
     PROJECTION,
     NESTED_LOOP_JOIN,
     HASH_JOIN,
-    MERGE_SORT_JOIN,
+    sort_merge_join,
     SORT,
     LIMIT,
     AGGREGATE

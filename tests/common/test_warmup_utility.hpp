@@ -1,7 +1,9 @@
 #pragma once
 
 #include "common/profiler.hpp"
+#include "cuda/task_manager.hpp"
 #include "cuda/warmup.hpp"
+#include "execution/execution_engine.hpp"
 
 #include <gtest/gtest.h>
 
@@ -36,6 +38,15 @@ namespace test {
     };
 
     class VelODBTest : public ::testing::Test {
+    public:
+        VelODBTest()
+            : catalog_()
+            , task_manager_()
+            , engine_(catalog_, task_manager_)
+        {
+            VELODB_ASSERT_MSG(task_manager_.start(), "Failed to start TaskManager in test setup");
+        }
+
     protected:
         static void SetUpTestSuite()
         {
@@ -54,7 +65,12 @@ namespace test {
             // Optional: Print profile report after each test
             // Uncomment if you want detailed profiling for each test
             Profiler::getInstance().printReport();
+            task_manager_.stop(0);
         }
+
+        Catalog catalog_;
+        TaskManager task_manager_;
+        ExecutionEngine engine_;
     };
 
 } // namespace test

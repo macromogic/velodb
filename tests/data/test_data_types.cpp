@@ -45,7 +45,7 @@ TEST_F(DataTypeTest, VarcharTypeCreation)
     auto varchar_type = std::make_unique<VarcharType>(255);
 
     EXPECT_EQ(varchar_type->getTypeId(), DataTypeId::VARCHAR);
-    EXPECT_EQ(varchar_type->size(), 255);
+    EXPECT_EQ(varchar_type->size(), sizeof(size_t));
     EXPECT_FALSE(varchar_type->isNumeric());
     EXPECT_EQ(varchar_type->toString(), "VARCHAR(255)");
 }
@@ -80,7 +80,7 @@ TEST_F(DataTypeTest, CreateTypeFactory)
 
     auto varchar_type = DataType::createType(DataTypeId::VARCHAR, 100);
     EXPECT_EQ(varchar_type->getTypeId(), DataTypeId::VARCHAR);
-    EXPECT_EQ(varchar_type->size(), 100);
+    EXPECT_EQ(varchar_type->size(), sizeof(size_t));
 
     auto bool_type = DataType::createType(DataTypeId::BOOLEAN);
     EXPECT_EQ(bool_type->getTypeId(), DataTypeId::BOOLEAN);

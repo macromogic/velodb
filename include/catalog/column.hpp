@@ -10,7 +10,6 @@
 
 namespace velodb {
 
-// Forward declaration
 class RowBatch;
 
 class ColumnInfo : private NonCopyable, public Cloneable<ColumnInfo> {
@@ -49,7 +48,8 @@ public:
                                     ValueVector<int64_t>,
                                     ValueVector<float>,
                                     ValueVector<double>,
-                                    ValueVector<OrdinalString>>;
+                                    ValueVector<OrdinalString>,
+                                    ValueVector<uint32_t>>;
 
     explicit Column(std::unique_ptr<DataType> type,
                     size_t initial_capacity = 16,
@@ -61,13 +61,20 @@ public:
     static Column buildFrom(std::unique_ptr<DataType> type,
                             std::vector<Value>&& values,
                             DataLocation location = DataLocation::HOST);
-    static Column materializeFrom(const Column& source, const Column& rowids);
 
     const DataType& getType() const;
     size_t size() const;
     Value get(size_t index) const;
     Value operator[](size_t index) const;
     void ensureOrdinal(Value& value, ComparisonType comp) const;
+
+    void* rawData();
+    const void* rawData() const;
+    BitVector::Element* rawBitmapData();
+    const BitVector::Element* rawBitmapData() const;
+    void* getTemporaryBuffer() const;
+    BitVector::Element* getTemporaryBitmapBuffer() const;
+    void setFromBuffer(void* data, BitVector::Element* bitmap_data);
 
     DataLocation location() const;
     void to(DataLocation location);
@@ -77,9 +84,11 @@ public:
     void append(Value&& value);
 
     Column slice(size_t begin, size_t end) const;
+    Column gather(const Column& rowids) const;
     Column tryOwn();
-    Column splitFront(size_t size);
-    void reorder(const int64_t* indices);
+
+    void debug() const;
+    void debug(size_t max_elements) const;
 
 private:
     std::unique_ptr<DataType> type_;
@@ -91,8 +100,7 @@ private:
     {
     }
 
-    void appendMaskedMultiple(const Column& other, const Column& mask);
-    void appendMultiple(const Column& other);
+    void setSize(size_t new_size);
 
     friend class RowBatch;
 };

@@ -39,6 +39,7 @@ TEST_F(TableTest, CreateTable)
     EXPECT_EQ(table.getColumnName(0), "id");
     EXPECT_EQ(table.getColumnName(1), "name");
     EXPECT_EQ(table.getRowCount(), 0);
+    task_manager_.stop(0);
 }
 
 TEST_F(TableTest, InsertAndRetrieveTuple)
@@ -64,6 +65,7 @@ TEST_F(TableTest, InsertAndRetrieveTuple)
     // Retrieve values using column-based access
     EXPECT_EQ(table.getValue(0, 0).getInteger(), 1);
     EXPECT_EQ(table.getValue(0, 1).getString(), "Alice");
+    task_manager_.stop(0);
 }
 
 // TODO: Add more comprehensive table tests when table operations are

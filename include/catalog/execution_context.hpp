@@ -3,6 +3,7 @@
 #include "catalog/catalog.hpp"
 #include "catalog/column.hpp"
 #include "common/copy_traits.hpp"
+#include "cuda/task_manager.hpp"
 
 namespace velodb {
 
@@ -12,7 +13,7 @@ class Catalog;
 // Execution context for operators
 class ExecutionContext : private NonCopyable {
 public:
-    explicit ExecutionContext(Catalog& catalog);
+    ExecutionContext(Catalog& catalog, TaskManager& task_manager);
     ~ExecutionContext() = default;
 
     // Add move constructor and assignment
@@ -20,10 +21,11 @@ public:
     ExecutionContext& operator=(ExecutionContext&& other) noexcept = default;
 
     Catalog& getCatalog() const { return catalog_; }
+    TaskManager& getTaskManager() const { return task_manager_; }
 
 private:
     std::reference_wrapper<Catalog> catalog_;
-    std::vector<std::unique_ptr<Column>> temporary_columns_;
+    std::reference_wrapper<TaskManager> task_manager_;
 };
 
 } // namespace velodb

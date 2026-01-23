@@ -5,6 +5,8 @@
 #include "expression/expression.hpp"
 #include "planner/abstract_plan_node.hpp"
 
+#include <SQLParser.h>
+
 #include <memory>
 
 // Forward declarations for SQL parser
@@ -26,7 +28,6 @@ public:
     explicit QueryPlanner(Catalog& catalog);
     ~QueryPlanner() = default;
 
-    // Add move constructor and assignment
     QueryPlanner(QueryPlanner&& other) noexcept = default;
     QueryPlanner& operator=(QueryPlanner&& other) noexcept = default;
 
@@ -37,26 +38,37 @@ private:
     // Helper methods for planning
     std::unique_ptr<AbstractPlanNode> planTableRef(const hsql::TableRef* table_ref,
                                                    std::unique_ptr<AbstractExpression> predicate = nullptr);
-    std::unique_ptr<AbstractPlanNode> planJoin(const hsql::TableRef* left_ref,
-                                               const hsql::TableRef* right_ref,
-                                               const hsql::Expr* join_expr);
-    std::unique_ptr<AbstractExpression> planExpression(const hsql::TableRef* table_ref, const hsql::Expr* expr);
+    std::unique_ptr<AbstractPlanNode> planEquiJoin(const hsql::TableRef* left_ref,
+                                                   const hsql::TableRef* right_ref,
+                                                   std::unique_ptr<AbstractExpression> left_key_expr,
+                                                   std::unique_ptr<AbstractExpression> right_key_expr,
+                                                   std::unique_ptr<AbstractExpression> predicate = nullptr);
+    std::unique_ptr<AbstractPlanNode> planOrderBy(std::unique_ptr<AbstractPlanNode>&& plan,
+                                                  const std::vector<hsql::OrderDescription*>* orders);
+    std::unique_ptr<AbstractPlanNode> planLimitOffset(std::unique_ptr<AbstractPlanNode>&& plan,
+                                                      const hsql::LimitDescription* limit_desc);
+    std::unique_ptr<AbstractPlanNode> planJoinSide(const hsql::TableRef* table_ref,
+                                                   std::unique_ptr<AbstractExpression> join_key_expr,
+                                                   std::unique_ptr<AbstractExpression> predicate = nullptr);
 
-    std::vector<std::unique_ptr<AbstractExpression>> planSelectList(const hsql::TableRef* table_ref,
-                                                                    const std::vector<hsql::Expr*>* select_list);
     Schema inferSeqScanSchema(const Table& table);
-    Schema inferProjectionSchema(const std::vector<std::unique_ptr<AbstractExpression>>& expressions,
-                                 const Schema& input_schema);
+    Schema inferSelectSchema(const std::vector<std::unique_ptr<AbstractExpression>>& expressions);
     Schema inferJoinSchema(const Table& left_table, const Table& right_table);
 
-    // Expression planning helpers
-    std::unique_ptr<AbstractExpression> planColumnRef(const hsql::TableRef* table_ref, const hsql::Expr* expr);
-    std::unique_ptr<AbstractExpression> planOperator(const hsql::TableRef* table_ref, const hsql::Expr* expr);
-    std::unique_ptr<AbstractExpression> planComparisonOperator(ComparisonType type,
-                                                               std::unique_ptr<AbstractExpression> left,
-                                                               std::unique_ptr<AbstractExpression> right);
+    std::vector<std::unique_ptr<AbstractExpression>> parseSelectList(const hsql::TableRef* table_ref,
+                                                                     const std::vector<hsql::Expr*>* select_list);
+    std::unique_ptr<AbstractExpression> parseExpression(const hsql::TableRef* table_ref, const hsql::Expr* expr);
+    std::unique_ptr<AbstractExpression> parseColumnRef(const hsql::TableRef* table_ref, const hsql::Expr* expr);
+    std::unique_ptr<AbstractExpression> parseOperator(const hsql::TableRef* table_ref, const hsql::Expr* expr);
+    std::unique_ptr<AbstractExpression> createComparisonOperator(ComparisonType type,
+                                                                 std::unique_ptr<AbstractExpression> left,
+                                                                 std::unique_ptr<AbstractExpression> right);
 
-    std::reference_wrapper<Catalog> catalog_;
+    // Helper methods for predicate decomposition
+    void extractConjuncts(const AbstractExpression* expr, std::vector<const AbstractExpression*>& conjuncts);
+    bool expressionReferencesOnlyTable(const AbstractExpression* expr, const std::string_view table_name);
+
+    std::reference_wrapper<Catalog> catalog_; // Wrap to allow move semantics
 };
 
 } // namespace velodb

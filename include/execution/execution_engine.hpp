@@ -2,6 +2,7 @@
 
 #include "catalog/catalog.hpp"
 #include "common/copy_traits.hpp"
+#include "cuda/task_manager.hpp"
 #include "execution/query_result.hpp"
 #include "expression/expression.hpp"
 #include "planner/abstract_plan_node.hpp"
@@ -18,7 +19,7 @@ namespace velodb {
 // Main execution engine
 class ExecutionEngine : private NonCopyable {
 public:
-    explicit ExecutionEngine(Catalog& catalog);
+    ExecutionEngine(Catalog& catalog, TaskManager& task_manager);
     ~ExecutionEngine() = default;
 
     // Add move constructor and assignment
@@ -26,7 +27,7 @@ public:
     ExecutionEngine& operator=(ExecutionEngine&& other) noexcept;
 
     // Main execution interface
-    Result<QueryResult> executeQuery(const std::string& sql);
+    Result<QueryResult> executeQuery(const std::string& sql, QueryStatistics* stats = nullptr);
 
     size_t getLastExecutionRowCount() const { return last_execution_row_count_; }
     double getLastExecutionTimeMs() const { return last_execution_time_ms_; }
@@ -35,6 +36,7 @@ private:
     Result<QueryResult> executePlan(std::unique_ptr<AbstractPlanNode> plan);
 
     Catalog& catalog_;
+    TaskManager& task_manager_;
     QueryPlanner planner_;
     ExecutionContext context_;
 

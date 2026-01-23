@@ -3,5 +3,5 @@
 ## Dependencies
 
 ``` bash
-sudo apt install cmake ninja-build libgtest-dev bison flex
+sudo apt install cmake ninja-build libgtest-dev bison flex elfutils libdw-dev
 ```

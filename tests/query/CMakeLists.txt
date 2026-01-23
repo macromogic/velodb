@@ -13,3 +13,4 @@ set_property(TARGET test_query PROPERTY RUNTIME_OUTPUT_DIRECTORY
 target_compile_options(test_query PRIVATE -Wall -Wextra -g)
 
 add_test(NAME TestQuery COMMAND test_query)
+set_tests_properties(TestQuery PROPERTIES TIMEOUT 15)

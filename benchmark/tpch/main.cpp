@@ -87,13 +87,6 @@ int main(int argc, char* argv[])
         .default_value(std::string("./benchmark/results"))
         .metavar("DIR");
 
-    // Test type
-    program.add_argument("--test-type", "-t")
-        .help("Type of test to run")
-        .default_value(std::string("power"))
-        .choices("power", "throughput", "full")
-        .metavar("TYPE");
-
     // Output options
     program.add_argument("--verbose", "-v").help("Enable verbose output").flag();
 
@@ -105,10 +98,12 @@ int main(int argc, char* argv[])
 
     program.add_argument("--validate").help("Validate query results").default_value(true).implicit_value(true);
 
+    program.add_argument("--with-profiling").help("Enable profiling during benchmark").flag();
+
     // Quick benchmark presets
     program.add_argument("--quick").help("Run quick benchmark (SF=0.01, Q1,Q6, 1 iteration)").flag();
 
-    program.add_argument("--standard").help("Run standard benchmark (SF=0.1, Q1,Q3,Q6,Q12, 3 iterations)").flag();
+    program.add_argument("--standard").help("Run standard benchmark (SF=0.1, Q1,Q6,Q12,Q14, 3 iterations)").flag();
 
     try {
         program.parse_args(argc, argv);
@@ -129,7 +124,7 @@ int main(int argc, char* argv[])
             config.iterations = 1;
         } else if (program.get<bool>("--standard")) {
             config.scale_factors = { 0.1 };
-            config.query_numbers = { 1, 3, 6, 12 };
+            config.query_numbers = { 1, 6, 12, 14 };
             config.iterations = 3;
         } else {
             // Parse individual arguments
@@ -142,25 +137,21 @@ int main(int argc, char* argv[])
         config.results_directory = program.get<std::string>("--results-dir");
         config.validate_results = program.get<bool>("--validate");
         config.verbose = program.get<bool>("--verbose");
-
-        std::string test_type = program.get<std::string>("--test-type");
-        config.measure_power_test = (test_type == "power" || test_type == "full");
-        config.measure_throughput_test = (test_type == "throughput" || test_type == "full");
-
+        config.with_profiling = program.get<bool>("--with-profiling");
         if (config.verbose) {
             fmt::println("VelODB TPC-H Benchmark");
             fmt::println("======================");
             fmt::println("Scale Factors: {}", fmt::join(config.scale_factors, ", "));
             fmt::println("Queries: {}", fmt::join(config.query_numbers, ", "));
             fmt::println("Iterations: {}", config.iterations);
-            fmt::println("Data Directory: {}", config.data_directory);
-            fmt::println("Results Directory: {}\n", config.results_directory);
+            fmt::println("Data Directory: {}", std::string(config.data_directory));
+            fmt::println("Results Directory: {}\n", std::string(config.results_directory));
         }
 
         // Create and run benchmark
         TPCHBenchmarkRunner runner;
 
-        auto result = runner.runFullBenchmark(config);
+        auto result = runner.runPowerTest(config);
         if (!result) {
             fmt::println(stderr, "Benchmark failed: {}", result.error());
             return 1;
@@ -180,7 +171,7 @@ int main(int argc, char* argv[])
         if (!summary_result) {
             fmt::println(stderr, "Warning: Failed to export summary report: {}", summary_result.error());
         } else if (config.verbose) {
-            fmt::println("Results exported to: {}", config.results_directory);
+            fmt::println("Results exported to: {}", std::string(config.results_directory));
         }
 
         // Print summary to console
@@ -197,14 +188,26 @@ int main(int argc, char* argv[])
 
             fmt::println("\nBenchmark Summary:");
             fmt::println("------------------");
+            fmt::println("Benchmark ID: {}", benchmark_results.benchmark_id);
+            fmt::println("Benchmark Success: {}", benchmark_results.success ? "Yes" : "No");
+            if (!benchmark_results.success) {
+                fmt::println("Error Message: {}", benchmark_results.error_message);
+            }
             fmt::println("Total Queries: {}", benchmark_results.query_results.size());
-            fmt::println("Successful: {} ({:.1f}%)",
+            fmt::println("Successful queries: {} ({:.1f}%)",
                          successful,
                          100.0 * successful / benchmark_results.query_results.size());
             if (successful > 0) {
                 fmt::println("Average Query Time: {:.3f}s", total_time / successful);
             }
             fmt::println("Total Benchmark Time: {:.3f}s", benchmark_results.total_benchmark_time.count());
+        }
+        if (config.with_profiling) {
+#ifdef VELODB_ENABLE_PROFILING
+            velodb::Profiler::getInstance().printReport();
+#else
+            fmt::println("Profiling is not enabled in this build.");
+#endif
         }
 
         return benchmark_results.success ? 0 : 1;

@@ -2,9 +2,9 @@
 
 namespace velodb {
 
-// ExecutionContext implementation
-ExecutionContext::ExecutionContext(Catalog& catalog)
+ExecutionContext::ExecutionContext(Catalog& catalog, TaskManager& task_manager)
     : catalog_(catalog)
+    , task_manager_(task_manager)
 {
 }
 

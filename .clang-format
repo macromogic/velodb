@@ -9,14 +9,16 @@ IncludeCategories:
     Priority: 1
   - Regex: '^".*\.hpp"$'
     Priority: 2
-  - Regex: '^<(argparse/.*|fmt/.*|backward.*|SQLParser\.h|util/sqlhelper\.h)>$'
+  - Regex: '^".*\.cuh"$'
     Priority: 3
-  - Regex: '^<gtest/.*>$'
+  - Regex: '^<(argparse/.*|fmt/.*|backward.*|SQLParser\.h|util/sqlhelper\.h)>$'
     Priority: 4
-  - Regex: '^<[a-z_]+>$'
+  - Regex: '^<gtest/.*>$'
     Priority: 5
-  - Regex: '^<.*>$'
+  - Regex: '^<[a-z_]+>$'
     Priority: 6
+  - Regex: '^<.*>$'
+    Priority: 7
 
 # Code formatting
 ColumnLimit: 120

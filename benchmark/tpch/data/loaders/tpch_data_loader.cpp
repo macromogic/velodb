@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <unordered_set>
 
 namespace velodb::benchmark::tpch {
 
@@ -41,7 +42,7 @@ Result<TPCHDataLoader::LoadStatistics> TPCHDataLoader::loadAllTables(const LoadC
         }
 
         auto table_end = std::chrono::steady_clock::now();
-        auto table_time = table_end - table_start;
+        std::chrono::duration<double> table_time = table_end - table_start;
 
         size_t rows_loaded = result.value();
         stats.total_rows_loaded += rows_loaded;
@@ -83,38 +84,22 @@ Result<size_t> TPCHDataLoader::loadTable(const std::string& table_name, const Lo
         return Result<size_t>::failure(fmt::format("Data file not found: {}", file_path));
     }
 
-    // Create table schema if it doesn't exist
-    if (!catalog_.hasTable(table_name)) {
+    // Get schema from catalog if table exists, otherwise create it
+    if (catalog_.hasTable(table_name)) {
+        auto table_opt = catalog_.getTable(table_name);
+        if (table_opt) {
+            return loadTableGeneric(table_name, file_path, table_opt->get().getSchema());
+        } else {
+            return Result<size_t>::failure(fmt::format("Failed to access existing table: {}", table_name));
+        }
+    } else {
         try {
-            Schema schema = TPCHSchemas::createSchemaByName(table_name);
-            auto builder = TableBuilder(table_name, std::move(schema));
-            if (!catalog_.addTable(std::move(builder).build())) {
-                return Result<size_t>::failure(fmt::format("Failed to create table: {}", table_name));
-            }
+            auto schema = TPCHSchemas::createSchemaByName(table_name);
+            return loadTableGeneric(table_name, file_path, schema);
         } catch (const std::exception& e) {
             return Result<size_t>::failure(fmt::format("Failed to create schema for {}: {}", table_name, e.what()));
         }
     }
-
-    // Load data using specific table loader
-    if (table_name == "customer")
-        return loadCustomerTable(file_path);
-    if (table_name == "orders")
-        return loadOrdersTable(file_path);
-    if (table_name == "lineitem")
-        return loadLineitemTable(file_path);
-    if (table_name == "part")
-        return loadPartTable(file_path);
-    if (table_name == "partsupp")
-        return loadPartsuppTable(file_path);
-    if (table_name == "supplier")
-        return loadSupplierTable(file_path);
-    if (table_name == "nation")
-        return loadNationTable(file_path);
-    if (table_name == "region")
-        return loadRegionTable(file_path);
-
-    return Result<size_t>::failure(fmt::format("Unknown table name: {}", table_name));
 }
 
 Result<bool> TPCHDataLoader::validateLoadedData(double scale_factor) const
@@ -130,16 +115,6 @@ Result<bool> TPCHDataLoader::validateLoadedData(double scale_factor) const
     }
 
     return Result<bool>::success(true);
-}
-
-Result<void> TPCHDataLoader::generateData(double scale_factor, const std::string& output_dir)
-{
-    // TODO: Implement TPC-H data generation using dbgen
-    // For now, return a helpful error message
-    return Result<void>::failure(fmt::format("Data generation not yet implemented. Please provide TPC-H data files "
-                                             "for scale factor {} in directory: {}",
-                                             scale_factor,
-                                             output_dir));
 }
 
 bool TPCHDataLoader::dataFilesExist(const std::string& data_dir, [[maybe_unused]] double scale_factor)
@@ -214,6 +189,9 @@ Result<Value> TPCHDataLoader::parseValue(const std::string& str_value, const Dat
             bool bool_val = (str_value == "true" || str_value == "1" || str_value == "t");
             return Result<Value>::success(Value::createBoolean(bool_val));
         }
+        case DataTypeId::DATE: {
+            return Result<Value>::success(Value::createDate(str_value));
+        }
         default:
             return Result<Value>::failure(fmt::format("Unsupported type: {}", type.toString()));
         }
@@ -223,15 +201,16 @@ Result<Value> TPCHDataLoader::parseValue(const std::string& str_value, const Dat
 }
 
 // Specific table loader implementations (simplified for brevity)
-Result<size_t> TPCHDataLoader::loadCustomerTable(const std::string& file_path)
+Result<size_t> TPCHDataLoader::loadTableGeneric(const std::string& table_name,
+                                                const std::string& file_path,
+                                                const Schema& schema)
 {
     std::ifstream file(file_path);
     if (!file.is_open()) {
         return Result<size_t>::failure(fmt::format("Cannot open file: {}", file_path));
     }
 
-    Schema schema = TPCHSchemas::createCustomerSchema();
-    TableBuilder builder("customer", schema.clone()); // Clone for builder
+    TableBuilder builder(table_name, schema.clone());
 
     std::string line;
     size_t rows_loaded = 0;
@@ -240,7 +219,7 @@ Result<size_t> TPCHDataLoader::loadCustomerTable(const std::string& file_path)
         if (line.empty())
             continue;
 
-        auto values_result = parseCSVLine(line, schema); // Use original schema
+        auto values_result = parseCSVLine(line, schema);
         if (!values_result) {
             return Result<size_t>::failure(
                 fmt::format("Failed to parse line {}: {}", rows_loaded + 1, values_result.error()));
@@ -250,58 +229,12 @@ Result<size_t> TPCHDataLoader::loadCustomerTable(const std::string& file_path)
         rows_loaded++;
     }
 
-    // Replace existing table
-    // TODO: Implement table replacement in Catalog
-    // For now, this will fail if table already exists with data
     auto table = std::move(builder).build();
     if (!catalog_.addTable(std::move(table))) {
         return Result<size_t>::failure(fmt::format("Failed to add table data"));
     }
 
     return Result<size_t>::success(rows_loaded);
-}
-
-// Similar implementations for other tables (abbreviated for space)
-Result<size_t> TPCHDataLoader::loadOrdersTable([[maybe_unused]] const std::string& file_path)
-{
-    // TODO: Implement similar to loadCustomerTable
-    return Result<size_t>::failure("Orders table loading not yet implemented");
-}
-
-Result<size_t> TPCHDataLoader::loadLineitemTable([[maybe_unused]] const std::string& file_path)
-{
-    // TODO: Implement similar to loadCustomerTable
-    return Result<size_t>::failure("Lineitem table loading not yet implemented");
-}
-
-Result<size_t> TPCHDataLoader::loadPartTable([[maybe_unused]] const std::string& file_path)
-{
-    // TODO: Implement similar to loadCustomerTable
-    return Result<size_t>::failure("Part table loading not yet implemented");
-}
-
-Result<size_t> TPCHDataLoader::loadPartsuppTable([[maybe_unused]] const std::string& file_path)
-{
-    // TODO: Implement similar to loadCustomerTable
-    return Result<size_t>::failure("Partsupp table loading not yet implemented");
-}
-
-Result<size_t> TPCHDataLoader::loadSupplierTable([[maybe_unused]] const std::string& file_path)
-{
-    // TODO: Implement similar to loadCustomerTable
-    return Result<size_t>::failure("Supplier table loading not yet implemented");
-}
-
-Result<size_t> TPCHDataLoader::loadNationTable([[maybe_unused]] const std::string& file_path)
-{
-    // TODO: Implement similar to loadCustomerTable
-    return Result<size_t>::failure("Nation table loading not yet implemented");
-}
-
-Result<size_t> TPCHDataLoader::loadRegionTable([[maybe_unused]] const std::string& file_path)
-{
-    // TODO: Implement similar to loadCustomerTable
-    return Result<size_t>::failure("Region table loading not yet implemented");
 }
 
 std::string TPCHDataLoader::getTableFileName(const std::string& table_name) const
@@ -391,13 +324,71 @@ TPCHValidator::ValidationResult TPCHValidator::validateTableSchema(const Catalog
     return result;
 }
 
-TPCHValidator::ValidationResult TPCHValidator::validateForeignKeys([[maybe_unused]] const Catalog& catalog)
+TPCHValidator::ValidationResult TPCHValidator::validateForeignKeys(const Catalog& catalog)
 {
     ValidationResult result;
-
-    // TODO: Implement foreign key validation
-    // For now, just return success
     result.passed = true;
+
+    auto checkFK = [&](const std::string& from_table,
+                       const std::string& from_col,
+                       const std::string& to_table,
+                       const std::string& to_col) {
+        if (!result.passed)
+            return;
+
+        if (!catalog.hasTable(from_table) || !catalog.hasTable(to_table)) {
+            return;
+        }
+
+        const auto& table_from = catalog.getTable(from_table)->get();
+        const auto& table_to = catalog.getTable(to_table)->get();
+
+        size_t col_idx_from = table_from.getColumnIndex(from_col);
+        size_t col_idx_to = table_to.getColumnIndex(to_col);
+
+        std::unordered_set<int64_t> keys;
+        size_t to_rows = table_to.getRowCount();
+        for (size_t i = 0; i < to_rows; ++i) {
+            Value val = table_to.getValue(i, col_idx_to);
+            if (!val.isNull()) {
+                if (val.getTypeId() == DataTypeId::INTEGER) {
+                    keys.insert(val.getInteger());
+                } else if (val.getTypeId() == DataTypeId::BIGINT) {
+                    keys.insert(val.getBigInt());
+                }
+            }
+        }
+
+        size_t from_rows = table_from.getRowCount();
+        for (size_t i = 0; i < from_rows; ++i) {
+            Value val = table_from.getValue(i, col_idx_from);
+            if (!val.isNull()) {
+                int64_t key_val = 0;
+                if (val.getTypeId() == DataTypeId::INTEGER) {
+                    key_val = val.getInteger();
+                } else if (val.getTypeId() == DataTypeId::BIGINT) {
+                    key_val = val.getBigInt();
+                }
+
+                if (keys.find(key_val) == keys.end()) {
+                    result.passed = false;
+                    result.errors.push_back(fmt::format("FK violation: {}.{} -> {}.{} (key: {})",
+                                                        from_table,
+                                                        from_col,
+                                                        to_table,
+                                                        to_col,
+                                                        key_val));
+                    return;
+                }
+            }
+        }
+    };
+
+    checkFK("orders", "o_custkey", "customer", "c_custkey");
+    checkFK("lineitem", "l_orderkey", "orders", "o_orderkey");
+    checkFK("customer", "c_nationkey", "nation", "n_nationkey");
+    checkFK("supplier", "s_nationkey", "nation", "n_nationkey");
+    checkFK("nation", "n_regionkey", "region", "r_regionkey");
 
     return result;
 }

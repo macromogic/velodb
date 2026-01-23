@@ -1,6 +1,7 @@
 #include "operator/sort_operator.hpp"
 
 #include "catalog/row_batch.hpp"
+#include "common/constants.hpp"
 #include "expression/expression.hpp"
 
 namespace velodb {
@@ -14,35 +15,105 @@ SortOperator::SortOperator(ExecutionContext& context,
     : UnaryOperator(context, std::move(output_schema), std::move(child))
     , order_indices_(std::move(order_indices))
     , ascending_flags_(std::move(ascending_flags))
-    , buffer_(RowBatch::createBuffered(output_schema_, MAX_BATCH_SIZE * 2, DataLocation::CUDA))
 {
 }
 
 Result<RowBatch> SortOperator::next()
 {
+    PROFILE_SCOPE("SortOperator::next");
     if (!sorted_) {
-        auto* child = getChild();
-        if (!child) {
-            return Result<RowBatch>::failure("FilterCompactionOperator requires a child operator");
+        RowBatch gathered_batch = collectBatches(*child_);
+        if (gathered_batch.getRowCount() == 0) {
+            return Result<RowBatch>::success(RowBatch()); // End of stream
         }
-        bool reverse = false;
-        while (true) {
-            auto child_result = child->next();
-            if (!child_result) {
-                return child_result;
-            }
-            auto& batch = child_result.value();
-            if (batch.getRowCount() == 0) {
-                break;
-            }
-            batch.sort(order_indices_, ascending_flags_, 1, reverse);
-            buffer_.addRows(batch);
-            reverse = !reverse;
+        gathered_batch.to(DataLocation::CUDA);
+        size_t n_rows = gathered_batch.getRowCount();
+        size_t n_padded_rows = nextPow2(n_rows);
+        size_t n_cols = gathered_batch.getColumnCount();
+        auto& task_manager = context_.getTaskManager();
+        auto stream_handler = StreamPool::getInstance().acquire().value();
+
+        // Perform sorting
+        size_t n_sort_columns = order_indices_.size();
+        int32_t* d_indices = MemoryAllocator::allocate<int32_t>(DataLocation::CUDA,
+                                                                n_padded_rows,
+                                                                stream_handler->get());
+        stream_handler->synchronize();
+        std::vector<bool> sorted_cols(n_sort_columns, false);
+        uint64_t last_id;
+        Command sort_cmd;
+        sort_cmd.opcode = OpCode::OP_SORT;
+        sort_cmd.args = { .sort = {
+                              .sort_cols = {},
+                              .indices = d_indices,
+                              .n_sort_columns = n_sort_columns,
+                              .n_rows = n_rows,
+                              .n_padded_rows = n_padded_rows,
+                              .col_types = {},
+                              .ascending_flags = {},
+                          } };
+        for (size_t i = 0; i < n_sort_columns; ++i) {
+            size_t col_idx = order_indices_[i];
+            auto& col = gathered_batch.getColumn(col_idx);
+            sorted_cols[col_idx] = true;
+            sort_cmd.args.sort.sort_cols[i] = col.rawData();
+            sort_cmd.args.sort.col_types[i] = col.getType().getTypeId();
+            sort_cmd.args.sort.ascending_flags[i] = ascending_flags_[i];
         }
-        buffer_.sort(order_indices_, ascending_flags_, MAX_BATCH_SIZE);
+        last_id = task_manager.submitCommand(sort_cmd);
+        task_manager.waitCommand(last_id);
+
+        // Permute unsorted columns
+        std::vector<void*> buffers(n_cols, nullptr);
+        std::vector<BitVector::Element*> bitmap_buffers(n_cols, nullptr);
+        for (size_t i = 0; i < n_cols; ++i) {
+            if (sorted_cols[i]) {
+                continue; // Already sorted
+            }
+            auto& col = gathered_batch.getColumn(i);
+            auto* data_ptr = col.rawData();
+            auto* bitmap_ptr = col.rawBitmapData();
+            auto* temp_buffer = col.getTemporaryBuffer();
+            auto* temp_bitmap_buffer = col.getTemporaryBitmapBuffer();
+            buffers[i] = temp_buffer;
+            bitmap_buffers[i] = temp_bitmap_buffer;
+
+            Command gather_cmd;
+            gather_cmd.opcode = OpCode::OP_PERMUTE;
+            gather_cmd.args = { .permute = {
+                                    .out_data = static_cast<void*>(temp_buffer),
+                                    .in_data = static_cast<void*>(data_ptr),
+                                    .in_indices = d_indices,
+                                    .n = n_rows,
+                                    .type_id = col.getType().getTypeId(),
+                                } };
+            task_manager.submitCommand(gather_cmd);
+
+            Command gather_bits_cmd;
+            gather_bits_cmd.opcode = OpCode::OP_PERMUTE;
+            gather_bits_cmd.args = { .permute = {
+                                         .out_data = static_cast<void*>(temp_bitmap_buffer),
+                                         .in_data = static_cast<void*>(bitmap_ptr),
+                                         .in_indices = d_indices,
+                                         .n = n_rows,
+                                         .type_id = DataTypeId::BOOLEAN,
+                                     } };
+            last_id = task_manager.submitCommand(gather_bits_cmd);
+        }
+        task_manager.waitCommand(last_id);
+
+        for (size_t i = 0; i < n_cols; ++i) {
+            if (buffers[i] == nullptr) {
+                continue;
+            }
+            auto& col = gathered_batch.getColumn(i);
+            col.setFromBuffer(buffers[i], bitmap_buffers[i]);
+        }
+        MemoryAllocator::deallocate(d_indices);
         sorted_ = true;
+        return Result<RowBatch>::success(std::move(gathered_batch));
     }
-    return Result<RowBatch>::success(buffer_.splitFront(MAX_BATCH_SIZE));
+    return Result<RowBatch>::success(RowBatch());
 }
 
 } // namespace velodb

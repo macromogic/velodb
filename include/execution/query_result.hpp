@@ -5,11 +5,12 @@
 #include "catalog/tuple.hpp"
 #include "common/copy_traits.hpp"
 
+#include <chrono>
 #include <optional>
 
 namespace velodb {
 
-class QueryResultIterator; // Forward declaration
+class QueryResultIterator;
 
 class QueryResult : public NonCopyable {
 public:
@@ -63,6 +64,12 @@ private:
     const QueryResult& result_;
     size_t view_idx_;
     ViewTuple current_tuple_;
+};
+
+struct QueryStatistics {
+    size_t rows_processed = 0;
+    std::chrono::nanoseconds planning_time { 0 };
+    std::chrono::nanoseconds execution_time { 0 };
 };
 
 } // namespace velodb

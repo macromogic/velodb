@@ -20,28 +20,18 @@ public:
     void addColumn(Column&& column);
     Column& getColumn(size_t index);
     const Column& getColumn(size_t index) const;
+    std::vector<Column>& getColumns() { return columns_; }
+    const std::vector<Column>& getColumns() const { return columns_; }
     size_t getColumnCount() const { return columns_.size(); }
     size_t getRowCount() const { return num_rows_; }
     Value getValue(size_t row_id, size_t column_index) const;
     void to(DataLocation location);
-    void addRows(const RowBatch& other);
-    void addFilteredRows(const RowBatch& other, const Column& mask);
-    RowBatch splitFront(size_t size);
-    void sort(const std::vector<size_t>& order_indices,
-              const std::vector<bool>& ascending_flags,
-              size_t min_block_size = 1,
-              bool reverse = false);
 
     BatchIterator begin() const;
     BatchIterator end() const;
 
-    static RowBatch createBuffered(const Schema& schema, size_t initial_capacity, DataLocation location);
-    static RowBatch materializeColumns(const std::vector<std::reference_wrapper<Column>>& columns,
-                                       const std::vector<std::reference_wrapper<const Column>>& rowids);
-    static RowBatch sortMergeJoinBatches(const RowBatch& left,
-                                         size_t left_key_index,
-                                         const RowBatch& right,
-                                         size_t right_key_index);
+    void debug() const;
+    void debug(size_t max_rows) const;
 
 private:
     std::vector<Column> columns_;
@@ -52,6 +42,9 @@ private:
         , num_rows_(columns_.empty() ? 0 : columns_.front().size())
     {
     }
+    void setRowCount(size_t row_count);
+
+    friend class AbstractOperator;
 };
 
 // Iterator for table scanning

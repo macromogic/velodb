@@ -1,8 +1,7 @@
 #include "../common/test_warmup_utility.hpp"
-#include "catalog/catalog.hpp"
-#include "catalog/execution_context.hpp"
 #include "catalog/table_builder.hpp"
 #include "operator/operator.hpp"
+#include "planner/plan_visualizer.hpp"
 #include "planner/query_planner.hpp"
 
 #include <SQLParser.h>
@@ -40,7 +39,6 @@ protected:
         catalog_.addTable(std::move(tb).build());
         planner_ = std::make_unique<QueryPlanner>(catalog_);
     }
-    Catalog catalog_;
     std::unique_ptr<QueryPlanner> planner_;
 };
 
@@ -54,7 +52,8 @@ TEST_F(JoinExecutionTest, BasicInnerJoinSelectStar)
     ASSERT_EQ(stmt->type(), hsql::kStmtSelect);
     auto* select = static_cast<const hsql::SelectStatement*>(stmt);
     auto plan = planner_->planSelect(select);
-    ExecutionContext ctx(catalog_);
+    fmt::println("Execution Plan:\n{}", PlanVisualizer::visualizeDetailed(plan));
+    ExecutionContext ctx(catalog_, task_manager_);
     auto root_op = plan->createOperator(ctx);
     auto batch_result = root_op->next();
     ASSERT_TRUE(batch_result) << batch_result.error();

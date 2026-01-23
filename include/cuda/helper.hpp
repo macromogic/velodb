@@ -8,6 +8,13 @@
 
 #include <cuda_runtime.h>
 
+#ifdef __CUDACC__
+#include <cooperative_groups.h>
+#include <cuda/std/limits>
+
+namespace cg = cooperative_groups;
+#endif
+
 namespace velodb {
 
 constexpr unsigned int WARP_SIZE = 32;
@@ -39,5 +46,19 @@ constexpr int WARP_BITS = 5;
             VELODB_THROW(ExecutionError, fmt::format("CUDA error: {}", cudaGetErrorString(err)));                      \
         }                                                                                                              \
     } while (0)
+
+constexpr size_t nextPow2(size_t x)
+{
+    if (x <= 1)
+        return 1;
+    x--;
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    x |= x >> 32;
+    return x + 1;
+}
 
 } // namespace velodb

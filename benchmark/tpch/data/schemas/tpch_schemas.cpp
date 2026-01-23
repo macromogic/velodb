@@ -354,8 +354,7 @@ std::unique_ptr<DataType> TPCHTypes::createStringType(size_t max_len)
 
 std::unique_ptr<DataType> TPCHTypes::createDateType()
 {
-    // TODO: real date type?
-    return std::make_unique<VarcharType>(DATE_LENGTH);
+    return std::make_unique<DateType>();
 }
 
 } // namespace velodb::benchmark::tpch

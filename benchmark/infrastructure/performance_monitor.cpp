@@ -16,9 +16,7 @@
 #include <unistd.h>
 #endif
 
-#ifdef CUDA_ENABLED
 #include <cuda_runtime.h>
-#endif
 
 namespace velodb::benchmark {
 
@@ -27,12 +25,9 @@ PerformanceMonitor::PerformanceMonitor()
 {
 }
 
-PerformanceMonitor::~PerformanceMonitor() = default;
-
 void PerformanceMonitor::startQuery(const std::string& query_name)
 {
     current_query_ = query_name;
-    query_start_time_ = std::chrono::steady_clock::now();
     baseline_memory_ = getMemorySnapshot();
     peak_memory_usage_ = baseline_memory_.resident_set_size;
 
@@ -40,16 +35,16 @@ void PerformanceMonitor::startQuery(const std::string& query_name)
     metrics_[query_name] = QueryMetrics {};
 }
 
-PerformanceMonitor::QueryMetrics PerformanceMonitor::finishQuery()
+PerformanceMonitor::QueryMetrics PerformanceMonitor::finishQuery(const velodb::QueryStatistics& stats)
 {
     if (current_query_.empty()) {
         return QueryMetrics {};
     }
 
-    auto end_time = std::chrono::steady_clock::now();
     auto& metric = metrics_[current_query_];
 
-    metric.execution_time = end_time - query_start_time_;
+    metric.planning_time = stats.planning_time;
+    metric.execution_time = stats.execution_time;
     metric.memory_usage_peak = peak_memory_usage_ - baseline_memory_.resident_set_size;
     metric.gpu_memory_usage = getGpuMemoryUsage();
     metric.success = true;
@@ -58,13 +53,6 @@ PerformanceMonitor::QueryMetrics PerformanceMonitor::finishQuery()
     current_query_.clear();
 
     return metric;
-}
-
-void PerformanceMonitor::recordPlanningTime(std::chrono::duration<double> time)
-{
-    if (!current_query_.empty()) {
-        metrics_[current_query_].planning_time = time;
-    }
 }
 
 void PerformanceMonitor::recordMemoryUsage(size_t bytes)
@@ -76,13 +64,6 @@ void PerformanceMonitor::recordRowsProcessed(size_t rows)
 {
     if (!current_query_.empty()) {
         metrics_[current_query_].rows_processed = rows;
-    }
-}
-
-void PerformanceMonitor::recordLateMaterialization(bool used)
-{
-    if (!current_query_.empty()) {
-        metrics_[current_query_].used_late_materialization = used;
     }
 }
 
@@ -123,7 +104,6 @@ PerformanceMonitor::SystemInfo PerformanceMonitor::getSystemInfo() const
     }
 #endif
 
-#ifdef CUDA_ENABLED
     // Get GPU info
     int device_count = 0;
     cudaGetDeviceCount(&device_count);
@@ -132,7 +112,6 @@ PerformanceMonitor::SystemInfo PerformanceMonitor::getSystemInfo() const
         cudaGetDeviceProperties(&prop, 0);
         info.gpu_info = fmt::format("{} (Compute Capability {}.{})", prop.name, prop.major, prop.minor);
     }
-#endif
 
     return info;
 }
@@ -206,14 +185,10 @@ PerformanceMonitor::MemorySnapshot PerformanceMonitor::getMemorySnapshot() const
 
 size_t PerformanceMonitor::getGpuMemoryUsage() const
 {
-#ifdef CUDA_ENABLED
     size_t free_bytes = 0;
     size_t total_bytes = 0;
     cudaMemGetInfo(&free_bytes, &total_bytes);
     return total_bytes - free_bytes;
-#else
-    return 0;
-#endif
 }
 
 std::string PerformanceMonitor::formatMetricsAsJson() const
@@ -244,7 +219,6 @@ std::string PerformanceMonitor::formatMetricsAsJson() const
         json << "      \"gpu_memory\": " << metric.gpu_memory_usage << ",\n";
         json << "      \"rows_processed\": " << metric.rows_processed << ",\n";
         json << "      \"bytes_processed\": " << metric.bytes_processed << ",\n";
-        json << "      \"late_materialization\": " << (metric.used_late_materialization ? "true" : "false") << ",\n";
         json << "      \"success\": " << (metric.success ? "true" : "false");
         if (!metric.error_message.empty()) {
             json << ",\n      \"error\": \"" << metric.error_message << "\"";
@@ -263,15 +237,14 @@ std::string PerformanceMonitor::formatMetricsAsCsv() const
     std::ostringstream csv;
 
     // Header
-    csv << "Query,ExecutionTime,PlanningTime,MemoryPeak,GpuMemory,RowsProcessed,BytesProcessed,LateMaterialization,"
+    csv << "Query,ExecutionTime,PlanningTime,MemoryPeak,GpuMemory,RowsProcessed,BytesProcessed,"
            "Success,Error\n";
 
     // Data rows
     for (const auto& [query_name, metric] : metrics_) {
         csv << query_name << "," << metric.execution_time.count() << "," << metric.planning_time.count() << ","
             << metric.memory_usage_peak << "," << metric.gpu_memory_usage << "," << metric.rows_processed << ","
-            << metric.bytes_processed << "," << (metric.used_late_materialization ? "true" : "false") << ","
-            << (metric.success ? "true" : "false") << ","
+            << metric.bytes_processed << "," << (metric.success ? "true" : "false") << ","
             << "\"" << metric.error_message << "\"\n";
     }
 
@@ -301,9 +274,6 @@ std::string PerformanceMonitor::formatSummary() const
         if (metric.success) {
             successful_queries++;
             total_time += metric.execution_time.count();
-            if (metric.used_late_materialization) {
-                late_mat_queries++;
-            }
 
             summary << fmt::format("{:>8}: {:>8.3f}s  {:>8.3f}s  {:>8} MB  {:>8} rows",
                                    query_name,
@@ -312,9 +282,6 @@ std::string PerformanceMonitor::formatSummary() const
                                    metric.memory_usage_peak / (1024 * 1024),
                                    metric.rows_processed);
 
-            if (metric.used_late_materialization) {
-                summary << "  [LM]";
-            }
             summary << "\n";
         } else {
             summary << fmt::format("{:>8}: FAILED - {}\n", query_name, metric.error_message);

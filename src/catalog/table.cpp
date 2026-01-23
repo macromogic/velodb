@@ -71,6 +71,11 @@ const Column& Table::getColumn(size_t column_index) const
     return columns_[column_index];
 }
 
+bool Table::hasColumn(const std::string& name) const
+{
+    return schema_.hasColumn(name);
+}
+
 // Efficient column-based access for late materialization
 const Value Table::getValue(size_t row_id, size_t column_index) const
 {

@@ -9,7 +9,7 @@
 
 namespace velodb {
 
-enum class DataTypeId {
+enum class DataTypeId : uint32_t {
     INVALID = 0,
     BOOLEAN,
     TINYINT,
@@ -137,21 +137,29 @@ public:
 class CharType : public DataType {
 public:
     explicit CharType(size_t length)
-        : DataType(DataTypeId::CHAR, length)
+        : DataType(DataTypeId::CHAR, sizeof(size_t))
+        , length_(length)
     {
     }
-    std::string toString() const override { return fmt::format("CHAR({})", size_); }
+    std::string toString() const override { return fmt::format("CHAR({})", length_); }
     bool isString() const override { return true; }
+
+private:
+    size_t length_;
 };
 
 class VarcharType : public DataType {
 public:
     explicit VarcharType(size_t max_length)
-        : DataType(DataTypeId::VARCHAR, max_length)
+        : DataType(DataTypeId::VARCHAR, sizeof(size_t))
+        , max_length_(max_length)
     {
     }
-    std::string toString() const override { return fmt::format("VARCHAR({})", size_); }
+    std::string toString() const override { return fmt::format("VARCHAR({})", max_length_); }
     bool isString() const override { return true; }
+
+private:
+    size_t max_length_;
 };
 
 class DateType : public DataType {

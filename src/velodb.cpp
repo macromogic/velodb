@@ -1,7 +1,6 @@
 #include "velodb.hpp"
 
 #include "catalog/table_builder.hpp"
-#include "common/fmt.hpp"
 #include "cuda/warmup.hpp"
 
 #include <fmt/core.h>
@@ -13,13 +12,15 @@ namespace velodb {
 // Database implementation
 Database::Database()
     : catalog_()
-    , execution_engine_(catalog_)
+    , task_manager_()
+    , execution_engine_(catalog_, task_manager_)
 {
 }
 
 Database::Database(Database&& other) noexcept
     : catalog_(std::move(other.catalog_))
-    , execution_engine_(catalog_) // Re-bind to new catalog reference
+    , task_manager_(std::move(other.task_manager_))
+    , execution_engine_(catalog_, task_manager_)
     , initialized_(other.initialized_)
 {
     other.initialized_ = false; // Leave other in valid but uninitialized state
@@ -35,7 +36,8 @@ Database& Database::operator=(Database&& other) noexcept
 
         // Move resources
         catalog_ = std::move(other.catalog_);
-        execution_engine_ = ExecutionEngine { catalog_ }; // Reconstruct with new catalog
+        task_manager_ = std::move(other.task_manager_);
+        execution_engine_ = ExecutionEngine { catalog_, task_manager_ }; // Re-bind to new catalog and task manager
         initialized_ = other.initialized_;
 
         // Leave other in valid state
@@ -47,14 +49,14 @@ Database& Database::operator=(Database&& other) noexcept
 void Database::initialize()
 {
     auto result = runtime_warmup();
-    if (!result) {
-        throw std::runtime_error(fmt::format("Failed to initialize database: {}", result.error()));
-    }
+    VELODB_ASSERT_MSG(result, fmt::format("Runtime warmup failed: {}", result.error()));
+    VELODB_ASSERT_MSG(task_manager_.start(), "Cannot start task manager for database");
     initialized_ = true;
 }
 
 void Database::shutdown()
 {
+    task_manager_.stop();
     initialized_ = false;
 }
 
@@ -80,12 +82,12 @@ std::optional<std::reference_wrapper<const Table>> Database::getTable(const std:
     return catalog_.getTable(table_name);
 }
 
-Result<QueryResult> Database::executeQuery(const std::string& sql)
+Result<QueryResult> Database::executeQuery(const std::string& sql, QueryStatistics* stats)
 {
     if (!initialized_) {
         return Result<QueryResult>::failure("Database not initialized");
     }
-    return execution_engine_.executeQuery(sql);
+    return execution_engine_.executeQuery(sql, stats);
 }
 
 size_t Database::getTableCount() const

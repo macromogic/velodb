@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/constants.hpp"
 #include "common/copy_traits.hpp"
 
 // Core type system
@@ -12,15 +13,13 @@
 #include "catalog/table.hpp"
 
 // Execution system
+#include "cuda/task_manager.hpp"
 #include "execution/execution_engine.hpp"
 #include "expression/expression.hpp"
 #include "operator/operator.hpp"
 
 // Query planning
 #include "planner/query_planner.hpp"
-
-// Version information (generated from CMakeLists.txt)
-#include "velodb_version.hpp"
 
 // SQL Parser integration
 #include <SQLParser.h>
@@ -48,7 +47,7 @@ public:
     std::optional<std::reference_wrapper<const Table>> getTable(const std::string& table_name) const;
 
     // Query execution
-    Result<QueryResult> executeQuery(const std::string& sql);
+    Result<QueryResult> executeQuery(const std::string& sql, QueryStatistics* stats = nullptr);
 
     // Catalog access (temporary for benchmarking)
     Catalog& getCatalog() { return catalog_; }
@@ -61,6 +60,7 @@ public:
 
 private:
     Catalog catalog_;
+    TaskManager task_manager_;
     ExecutionEngine execution_engine_;
     bool initialized_ = false;
 };

@@ -1,10 +1,8 @@
 #include "../common/test_warmup_utility.hpp"
-#include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "catalog/table_builder.hpp"
 #include "data/data_type.hpp"
-#include "execution/execution_engine.hpp"
 
 #include <SQLParser.h>
 
@@ -13,13 +11,6 @@
 using namespace velodb;
 
 class FilterComplexTest : public test::VelODBTest {
-public:
-    FilterComplexTest()
-        : catalog_()
-        , engine_(catalog_)
-    {
-    }
-
 protected:
     void SetUp() override
     {
@@ -109,10 +100,6 @@ protected:
 
         catalog_.addTable(std::move(builder).build());
     }
-
-protected:
-    Catalog catalog_;
-    ExecutionEngine engine_;
 };
 
 // === BOUNDARY VALUE TESTS ===
@@ -345,11 +332,10 @@ TEST_F(FilterComplexTest, ComplexProjectionWithFilter)
     ASSERT_TRUE(static_cast<bool>(result)) << result.error();
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Records 1, 4, 6, 8
-    // TODO: temporarily include $_rowid and $_mask in count
-    EXPECT_EQ(view.getSchema().getColumnCount(), 5); // Only id, category, score
+    EXPECT_EQ(view.getSchema().getColumnCount(), 3); // Only id, category, score
 
     for (const auto& tuple : view) {
-        EXPECT_EQ(tuple.getColumnCount(), 5);
+        EXPECT_EQ(tuple.getColumnCount(), 3);
         // Verify the filter condition was applied correctly
         // Note: We can't directly check score/priority from projected tuple,
         // but we trust the filter worked based on expected count
@@ -372,10 +358,10 @@ TEST_F(FilterComplexTest, SelectiveProjectionComplexFilter)
     ASSERT_TRUE(static_cast<bool>(result)) << result.error();
     auto& view = result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Records 1, 3, 7, 8
-    EXPECT_EQ(view.getSchema().getColumnCount(), 4); // Only tag, active
+    EXPECT_EQ(view.getSchema().getColumnCount(), 2); // Only tag, active
 
     for (const auto& tuple : view) {
-        EXPECT_EQ(tuple.getColumnCount(), 4);
+        EXPECT_EQ(tuple.getColumnCount(), 2);
     }
 }
 

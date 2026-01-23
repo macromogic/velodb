@@ -1,11 +1,9 @@
 #include "../common/test_warmup_utility.hpp"
-#include "catalog/catalog.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "catalog/table_builder.hpp"
 #include "catalog/tuple.hpp"
 #include "data/data_type.hpp"
-#include "execution/execution_engine.hpp"
 
 #include <SQLParser.h>
 
@@ -16,9 +14,8 @@ using namespace velodb;
 class WhereClauseTest : public test::VelODBTest {
 public:
     WhereClauseTest()
-        : catalog_()
+        : test::VelODBTest()
         , planner_(catalog_)
-        , engine_(catalog_)
     {
     }
 
@@ -89,9 +86,7 @@ protected:
         builder.insertRow(values);
     }
 
-    Catalog catalog_;
     QueryPlanner planner_;
-    ExecutionEngine engine_;
 };
 
 // === NUMERIC RANGE TESTS ===
@@ -323,11 +318,10 @@ TEST_F(WhereClauseTest, ProjectedExpensiveItems)
     ASSERT_TRUE(static_cast<bool>(query_result)) << query_result.error();
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 3); // Laptop, Desk, Monitor
-    // TODO: temporarily include $_rowid and $_mask in count
-    EXPECT_EQ(view.getSchema().getColumnCount(), 5); // name, price, category
+    EXPECT_EQ(view.getSchema().getColumnCount(), 3); // name, price, category
 
     for (const auto& tuple : view) {
-        EXPECT_EQ(tuple.getColumnCount(), 5); // Only projected columns
+        EXPECT_EQ(tuple.getColumnCount(), 3); // Only projected columns
         // Note: In projected results, price is at index 1, not 2
         EXPECT_GT(tuple.getValue(1).getDouble(), 100.0f);
     }
@@ -342,10 +336,10 @@ TEST_F(WhereClauseTest, ProjectedStockStatus)
     ASSERT_TRUE(static_cast<bool>(query_result)) << query_result.error();
     auto& view = query_result.value();
     EXPECT_EQ(view.getRowCount(), 4); // Laptop, Mouse, Keyboard, Monitor
-    EXPECT_EQ(view.getSchema().getColumnCount(), 4); // name, in_stock
+    EXPECT_EQ(view.getSchema().getColumnCount(), 2); // name, in_stock
 
     for (const auto& tuple : view) {
-        EXPECT_EQ(tuple.getColumnCount(), 4); // Only projected columns
+        EXPECT_EQ(tuple.getColumnCount(), 2); // Only projected columns
     }
 }
 

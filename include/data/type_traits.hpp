@@ -3,6 +3,8 @@
 #include "data/data_type.hpp"
 #include "data/ordinal_string.hpp"
 
+#include <stddef.h>
+
 namespace velodb {
 
 #define LIST_TYPES(X)                                                                                                  \
@@ -13,7 +15,8 @@ namespace velodb {
     X(BIGINT, int64_t, int64_t)                                                                                        \
     X(FLOAT, float, float)                                                                                             \
     X(DOUBLE, double, double)                                                                                          \
-    X(VARCHAR, size_t, OrdinalString)
+    X(VARCHAR, size_t, OrdinalString)                                                                                  \
+    X(DATE, uint32_t, uint32_t)
 
 // Trait template for data type id
 

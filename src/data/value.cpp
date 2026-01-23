@@ -254,6 +254,16 @@ OrdinalString Value::get<OrdinalString>() const
     return std::get<OrdinalString>(data_);
 }
 
+template <>
+uint32_t Value::get<uint32_t>() const
+{
+    if (is_null_)
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
+    if (type_id_ != DataTypeId::DATE)
+        VELODB_THROW(TypeError, "Type mismatch");
+    return std::get<uint32_t>(data_);
+}
+
 ValueData& Value::getData()
 {
     if (is_null_)
@@ -299,6 +309,18 @@ Value Value::createDouble(double value)
 Value Value::createString(const std::string& value)
 {
     return { DataTypeId::VARCHAR, OrdinalString(value) };
+}
+
+Value Value::createDate(const std::string& value)
+{
+    // convert value to uint32_t representing the date (YYYYMMDD in decimal)
+    uint32_t date_value = 0;
+    for (auto& ch : value) {
+        if (ch != '-') {
+            date_value = date_value * 10 + (ch - '0');
+        }
+    }
+    return { DataTypeId::DATE, date_value };
 }
 
 Value Value::createNull(DataTypeId type_id)

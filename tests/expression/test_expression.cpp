@@ -101,7 +101,7 @@ TEST_F(ExpressionTest, BinaryLogicalExpression)
     BinaryLogicalExpression and_expr(ConnectiveType::AND, std::move(left_expr), std::move(right_expr));
 
     EXPECT_EQ(and_expr.getReturnType().getTypeId(), DataTypeId::BOOLEAN);
-    EXPECT_EQ(and_expr.getConjunctionType(), ConnectiveType::AND);
+    EXPECT_EQ(and_expr.getConnectiveType(), ConnectiveType::AND);
 
     std::string expr_str = and_expr.toString();
     EXPECT_FALSE(expr_str.empty());

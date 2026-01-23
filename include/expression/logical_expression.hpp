@@ -16,7 +16,7 @@ public:
     const Value evaluate(const Tuple& tuple, const Schema& schema) const override;
     std::string toString() const override;
 
-    ConnectiveType getConjunctionType() const { return connective_type_; }
+    ConnectiveType getConnectiveType() const { return connective_type_; }
 
 protected:
     std::unique_ptr<AbstractExpression> cloneUniqueImpl() const override;

@@ -45,9 +45,6 @@ public:
     // Validate loaded data against expected counts
     Result<bool> validateLoadedData(double scale_factor) const;
 
-    // Generate TPC-H data using dbgen (if available)
-    static Result<void> generateData(double scale_factor, const std::string& output_dir);
-
     // Check if data files exist for given scale factor
     static bool dataFilesExist(const std::string& data_dir, double scale_factor);
 
@@ -58,15 +55,8 @@ private:
     Result<std::vector<Value>> parseCSVLine(const std::string& line, const Schema& schema);
     Result<Value> parseValue(const std::string& str_value, const DataType& type);
 
-    // Specific table loaders
-    Result<size_t> loadCustomerTable(const std::string& file_path);
-    Result<size_t> loadOrdersTable(const std::string& file_path);
-    Result<size_t> loadLineitemTable(const std::string& file_path);
-    Result<size_t> loadPartTable(const std::string& file_path);
-    Result<size_t> loadPartsuppTable(const std::string& file_path);
-    Result<size_t> loadSupplierTable(const std::string& file_path);
-    Result<size_t> loadNationTable(const std::string& file_path);
-    Result<size_t> loadRegionTable(const std::string& file_path);
+    // Generic table loader
+    Result<size_t> loadTableGeneric(const std::string& table_name, const std::string& file_path, const Schema& schema);
 
     // Helper methods
     std::string getTableFileName(const std::string& table_name) const;

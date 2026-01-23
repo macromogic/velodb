@@ -1,6 +1,7 @@
 #include "velodb.hpp"
 
 #include "catalog/mock_catalog_builder.hpp"
+#include "catalog/tpch_catalog_builder.hpp"
 #include "common/exception.hpp"
 #include "planner/plan_visualizer.hpp"
 
@@ -18,6 +19,8 @@ int main(int argc, char* argv[])
     program.add_argument("query").help("SQL query to execute");
 
     program.add_argument("--mock-catalog").help("Use mock catalog with adaptive table creation").flag();
+
+    program.add_argument("--tpch-catalog").help("Use TPC-H catalog").flag();
 
     program.add_argument("--plan-format")
         .help("Format for query plan visualization {text,graphviz,detailed}")
@@ -37,8 +40,8 @@ int main(int argc, char* argv[])
 
     bool verbose = program.get<bool>("--verbose");
     bool use_mock_catalog = program.get<bool>("--mock-catalog");
+    bool use_tpch_catalog = program.get<bool>("--tpch-catalog");
 
-    // Debug: Print what argparse actually parsed
     if (verbose) {
         std::cout << "VelODB v" << VERSION_STRING << std::endl;
         std::cout << "Query Plan Visualization Tool" << std::endl;
@@ -47,20 +50,32 @@ int main(int argc, char* argv[])
 
     std::string query = program.get<std::string>("query");
 
-    if (use_mock_catalog) {
-        // Create adaptive catalog and plan query
-        auto catalog = MockCatalogBuilder::createAdaptiveCatalog();
+    if (use_mock_catalog || use_tpch_catalog) {
+        std::optional<Catalog> catalog_opt;
 
-        // Ensure tables exist for this query
-        bool success = MockCatalogBuilder::ensureTablesForQuery(catalog, query);
-        if (!success) {
-            std::cerr << "Failed to create mock tables for query: " << query << std::endl;
-            return -1;
+        if (use_tpch_catalog) {
+            catalog_opt = TPCHCatalogBuilder::createTPCHCatalog();
+            if (verbose) {
+                std::cout << "Created TPC-H catalog" << std::endl;
+            }
+        } else {
+            // Create adaptive catalog and plan query
+            auto catalog = MockCatalogBuilder::createAdaptiveCatalog();
+
+            // Ensure tables exist for this query
+            bool success = MockCatalogBuilder::ensureTablesForQuery(catalog, query);
+            if (!success) {
+                std::cerr << "Failed to create mock tables for query: " << query << std::endl;
+                return -1;
+            }
+
+            if (verbose) {
+                std::cout << "Created " << catalog.getTableCount() << " mock tables for query" << std::endl;
+            }
+            catalog_opt = std::move(catalog);
         }
 
-        if (verbose) {
-            std::cout << "Created " << catalog.getTableCount() << " mock tables for query" << std::endl;
-        }
+        Catalog& catalog = *catalog_opt;
 
         // Plan and visualize
         hsql::SQLParserResult result;
@@ -105,7 +120,7 @@ int main(int argc, char* argv[])
             return -1;
         }
     } else {
-        std::cerr << "Please use --mock-catalog flag for query planning" << std::endl;
+        std::cerr << "Please use --mock-catalog or --tpch-catalog flag for query planning" << std::endl;
         return -1;
     }
 

@@ -76,7 +76,7 @@ public:
     static std::unique_ptr<DataType> createIntegerType(); // For integers: INTEGER
     static std::unique_ptr<DataType> createDecimalType(); // For prices/amounts: DOUBLE
     static std::unique_ptr<DataType> createStringType(size_t max_len); // For strings: VARCHAR
-    static std::unique_ptr<DataType> createDateType(); // For dates: VARCHAR (YYYY-MM-DD)
+    static std::unique_ptr<DataType> createDateType(); // For dates: DATE
 
     // Common string lengths in TPC-H
     static constexpr size_t NAME_LENGTH = 25;
