@@ -57,7 +57,7 @@ union alignas(16) CommandArgs {
 
     struct SortArgs {
         void* sort_cols[MAX_SORT_COLUMNS];
-        int32_t* indices;
+        int64_t* indices;
         size_t n_sort_columns;
         size_t n_rows;
         size_t n_padded_rows;
@@ -68,7 +68,7 @@ union alignas(16) CommandArgs {
     struct PermuteArgs {
         void* out_data;
         const void* in_data;
-        const int32_t* in_indices;
+        const int64_t* in_indices;
         size_t n;
         DataTypeId type_id;
     } permute;

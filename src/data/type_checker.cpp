@@ -2,7 +2,6 @@
 
 #include "common/fmt.hpp"
 #include "expression/arithmetic_expression.hpp"
-#include "expression/cast_expression.hpp"
 #include "expression/comparison_expression.hpp"
 #include "expression/expression.hpp"
 #include "expression/logical_expression.hpp"
@@ -116,10 +115,6 @@ bool TypeChecker::validateExpression(const AbstractExpression* expr) const
         return validateArithmeticOperands(arith_expr->getLeftExpression().getReturnType(),
                                           arith_expr->getRightExpression().getReturnType(),
                                           arith_expr->getArithmeticType());
-    }
-    case ExpressionType::CAST: {
-        auto* cast_expr = static_cast<const CastExpression*>(expr);
-        return validateCast(cast_expr->getOperandExpression().getReturnType(), expr->getReturnType());
     }
     // Below types are not yet supported
     case ExpressionType::CASE:

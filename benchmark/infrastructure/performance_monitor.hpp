@@ -14,8 +14,8 @@ namespace velodb::benchmark {
 class PerformanceMonitor : public NonCopyable {
 public:
     struct QueryMetrics {
-        std::chrono::duration<double> execution_time { 0 };
-        std::chrono::duration<double> planning_time { 0 };
+        std::chrono::duration<double, std::milli> execution_time { 0 };
+        std::chrono::duration<double, std::milli> planning_time { 0 };
         size_t memory_usage_peak = 0;
         size_t gpu_memory_usage = 0;
         size_t rows_processed = 0;

@@ -105,7 +105,7 @@ public:
 
     static HostMemoryPool& getInstance()
     {
-        constexpr size_t pool_size = 1ul << 32;
+        constexpr size_t pool_size = 1ul << 33;
         static HostMemoryPool instance(pool_size);
         return instance;
     }

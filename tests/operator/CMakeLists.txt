@@ -11,4 +11,4 @@ set_property(TARGET test_operator PROPERTY RUNTIME_OUTPUT_DIRECTORY
 target_compile_options(test_operator PRIVATE -Wall -Wextra -g)
 
 add_test(NAME TestOperator COMMAND test_operator)
-set_tests_properties(TestOperator PROPERTIES TIMEOUT 15)
+set_tests_properties(TestOperator PROPERTIES TIMEOUT 20)

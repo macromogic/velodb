@@ -629,13 +629,13 @@ std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const hsql::Tabl
         auto high_expr = parseExpression(table_ref, (*expr->exprList)[1]);
 
         // Create (expr >= low)
-        auto left_comparison = std::make_unique<ComparisonExpression>(ComparisonType::GREATER_THAN_OR_EQUAL,
-                                                                      operand->cloneUnique(),
-                                                                      std::move(low_expr));
+        auto left_comparison = createComparisonOperator(ComparisonType::GREATER_THAN_OR_EQUAL,
+                                                        operand->cloneUnique(),
+                                                        std::move(low_expr));
         // Create (expr <= high)
-        auto right_comparison = std::make_unique<ComparisonExpression>(ComparisonType::LESS_THAN_OR_EQUAL,
-                                                                       std::move(operand),
-                                                                       std::move(high_expr));
+        auto right_comparison = createComparisonOperator(ComparisonType::LESS_THAN_OR_EQUAL,
+                                                         std::move(operand),
+                                                         std::move(high_expr));
         // Combine with AND
         return std::make_unique<BinaryLogicalExpression>(ConnectiveType::AND,
                                                          std::move(left_comparison),

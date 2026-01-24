@@ -7,12 +7,14 @@ BENCHMARK_DIR="$BASE_DIR/benchmark_tpch"
 ITERATIONS=3
 QUERIES=1,4,6,12,14,15,17,19
 
-if [ -d "$BENCHMARK_DIR" ]; then
-    rm -rf "$BENCHMARK_DIR"
-fi
+# if [ -d "$BENCHMARK_DIR" ]; then
+#     rm -rf "$BENCHMARK_DIR"
+# fi
 mkdir -p "$BENCHMARK_DIR/data"
 echo "*" > "$BENCHMARK_DIR/data/.gitignore"
-for SF in 0.01 0.1 1 2 3 4 5 10; do
+
+function run_bench() {
+    local SF=$1
     DATA_DIR="$BENCHMARK_DIR/data/sf_$SF"
     if [ ! -d "$DATA_DIR" ]; then
         echo "Generating TPC-H data for scale factor $SF..."
@@ -21,5 +23,15 @@ for SF in 0.01 0.1 1 2 3 4 5 10; do
     else
         echo "TPC-H data for scale factor $SF already exists. Skipping generation."
     fi
-    stdbuf -oL -eL $BUILD_DIR/benchmark/tpch_benchmark -v -s "$SF" -d "$DATA_DIR" -i "$ITERATIONS" -q "$QUERIES" --export-format csv --results-dir "$BENCHMARK_DIR/results/sf_$SF"
-done
+    stdbuf -oL -eL $BUILD_DIR/benchmark/tpch_benchmark \
+        -v \
+        --with-profiling \
+        -s "$SF" \
+        -d "$DATA_DIR" \
+        -i "$ITERATIONS" \
+        -q "$QUERIES" \
+        --export-format csv \
+        --results-dir "$BENCHMARK_DIR/results/sf_$SF"
+}
+
+run_bench 0.01

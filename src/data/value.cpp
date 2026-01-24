@@ -130,10 +130,14 @@ bool Value::operator<(const Value& other) const
         return getInteger() < other.getInteger();
     case DataTypeId::BIGINT:
         return getBigInt() < other.getBigInt();
+    case DataTypeId::FLOAT:
+        return getFloat() < other.getFloat();
     case DataTypeId::DOUBLE:
         return getDouble() < other.getDouble();
     case DataTypeId::VARCHAR:
         return getString() < other.getString();
+    case DataTypeId::DATE:
+        return std::get<uint32_t>(data_) < std::get<uint32_t>(other.data_);
     default:
         return false;
     }
@@ -165,15 +169,20 @@ std::string Value::toString() const
     case DataTypeId::INTEGER:
         return fmt::format("{}", getInteger());
     case DataTypeId::BIGINT:
-        return fmt::format("{}", getBigInt());
+        return fmt::format("{}l", getBigInt());
+    case DataTypeId::FLOAT:
+        return fmt::format("{}f", getFloat());
     case DataTypeId::DOUBLE:
         return fmt::format("{}", getDouble());
     case DataTypeId::VARCHAR:
         return fmt::format("'{}'", getString());
-        // {
-        //     auto ordinal_str = std::get<OrdinalString>(data_);
-        //     return ordinal_str.toString();
-        // }
+    case DataTypeId::DATE: {
+        uint32_t date_val = std::get<uint32_t>(data_);
+        uint32_t year = date_val / 10000;
+        uint32_t month = (date_val / 100) % 100;
+        uint32_t day = date_val % 100;
+        return fmt::format("'{:04}-{:02}-{:02}'", year, month, day);
+    }
     default:
         return "UNKNOWN";
     }

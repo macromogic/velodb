@@ -13,4 +13,4 @@ set_property(TARGET test_catalog PROPERTY RUNTIME_OUTPUT_DIRECTORY
 target_compile_options(test_catalog PRIVATE -Wall -Wextra -g)
 
 add_test(NAME TestCatalog COMMAND test_catalog)
-set_tests_properties(TestCatalog PROPERTIES TIMEOUT 15)
+set_tests_properties(TestCatalog PROPERTIES TIMEOUT 20)

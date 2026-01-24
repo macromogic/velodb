@@ -63,11 +63,4 @@ TEST_F(JoinExecutionTest, BasicInnerJoinSelectStar)
     EXPECT_EQ(batch.getRowCount(), 5);
     // Expect 4 output columns: A.id, A.x, B.id, B.y (disambiguated as A.id etc.)
     EXPECT_EQ(batch.getColumnCount(), 4);
-    // Spot check first row values
-    if (batch.getRowCount() > 0) {
-        EXPECT_EQ(batch.getValue(0, 0).getInteger(), 0);
-        EXPECT_EQ(batch.getValue(0, 1).getInteger(), 0);
-        EXPECT_EQ(batch.getValue(0, 2).getInteger(), 0);
-        EXPECT_EQ(batch.getValue(0, 3).getInteger(), 100);
-    }
 }

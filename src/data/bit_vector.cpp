@@ -31,6 +31,25 @@ BitVector::BitVector(size_t num_bits, DataLocation location)
     }
 }
 
+BitVector::BitVector(Element* data, size_t size, size_t capacity, DataLocation location)
+    : size_(size)
+    , element_capacity_(capacity)
+    , location_(location)
+    , data_(data)
+{
+    if (!data_) {
+        // Allocate if not provided
+        if (location_ == DataLocation::HOST) {
+            data_ = static_cast<Element*>(HostMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
+            std::fill_n(data_, element_capacity_, Element(0));
+        } else {
+            auto stream_handle = StreamPool::getInstance().acquire().value();
+            CHECKED_CALL_THROW(cudaMallocAsync(&data_, element_capacity_ * sizeof(Element), stream_handle->get()));
+            CHECKED_CALL_THROW(cudaMemsetAsync(data_, 0, element_capacity_ * sizeof(Element), stream_handle->get()));
+        }
+    }
+}
+
 BitVector::BitVector(BitVector&& other) noexcept
     : size_(other.size_)
     , element_capacity_(other.element_capacity_)

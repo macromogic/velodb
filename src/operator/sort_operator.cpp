@@ -26,6 +26,8 @@ Result<RowBatch> SortOperator::next()
         if (gathered_batch.getRowCount() == 0) {
             return Result<RowBatch>::success(RowBatch()); // End of stream
         }
+        fmt::println("SortOperator gathered {} rows to sort.", gathered_batch.getRowCount());
+        gathered_batch.debug(20);
         gathered_batch.to(DataLocation::CUDA);
         size_t n_rows = gathered_batch.getRowCount();
         size_t n_padded_rows = nextPow2(n_rows);
@@ -35,8 +37,8 @@ Result<RowBatch> SortOperator::next()
 
         // Perform sorting
         size_t n_sort_columns = order_indices_.size();
-        int32_t* d_indices;
-        CHECKED_CALL_THROW(cudaMallocAsync(&d_indices, n_padded_rows * sizeof(int32_t), stream_handle->get()));
+        int64_t* d_indices;
+        CHECKED_CALL_THROW(cudaMallocAsync(&d_indices, n_padded_rows * sizeof(int64_t), stream_handle->get()));
         stream_handle->synchronize();
         std::vector<bool> sorted_cols(n_sort_columns, false);
         uint64_t last_id;
@@ -110,6 +112,8 @@ Result<RowBatch> SortOperator::next()
         }
         CHECKED_CALL_THROW(cudaFreeAsync(d_indices, stream_handle->get()));
         sorted_ = true;
+        fmt::println("SortOperator produced {} sorted rows.", n_rows);
+        gathered_batch.debug(20);
         return Result<RowBatch>::success(std::move(gathered_batch));
     }
     return Result<RowBatch>::success(RowBatch());

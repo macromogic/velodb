@@ -10,13 +10,13 @@ namespace velodb::cuda {
 template <typename T>
 __device__ __forceinline__ void executePermuteImpl(T* __restrict__ output,
                                                    const T* __restrict__ input,
-                                                   const int32_t* __restrict__ scatter_indices,
+                                                   const int64_t* __restrict__ scatter_indices,
                                                    const size_t n)
 {
-    const int tid = threadIdx.x;
+    const size_t tid = threadIdx.x;
     // Grid-Stride Loop
-    for (uint32_t idx = blockIdx.x * blockDim.x + tid; idx < n; idx += gridDim.x * blockDim.x) {
-        int32_t read_pos = scatter_indices[idx];
+    for (size_t idx = blockIdx.x * blockDim.x + tid; idx < n; idx += gridDim.x * blockDim.x) {
+        int64_t read_pos = scatter_indices[idx];
         output[idx] = input[read_pos];
     }
 }

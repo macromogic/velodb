@@ -46,7 +46,7 @@ void TracedException::capture_stack_trace(size_t trace_depth)
 {
     // Capture the stack trace
     stack_trace_obj_.load_here(trace_depth);
-    stack_trace_obj_.skip_n_firsts(5);
+    // stack_trace_obj_.skip_n_firsts(5);
 
     // Format the stack trace
     backward::Printer printer;

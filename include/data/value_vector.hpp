@@ -52,6 +52,16 @@ public:
         }
     }
 
+    // Adoption constructor
+    ValueVectorBase(DType* data, BitVector::Element* mask_data, size_t size, size_t capacity, DataLocation location)
+        : data_(data)
+        , size_(size)
+        , capacity_(capacity)
+        , null_mask_(mask_data, size, capacity, location)
+        , location_(location)
+    {
+    }
+
     // Move constructor
     ValueVectorBase(ValueVectorBase&& other) noexcept
         : data_(other.data_)

@@ -8,4 +8,4 @@ SELECT
 FROM
     lineitem
 WHERE
-    l_shipdate <= '1998-09-02';
+    l_shipdate <= DATE '1998-09-02';

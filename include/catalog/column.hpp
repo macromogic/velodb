@@ -62,6 +62,12 @@ public:
                             std::vector<Value>&& values,
                             DataLocation location = DataLocation::HOST);
 
+    static Column createFromDeviceBuffers(std::unique_ptr<DataType> type,
+                                          void* data,
+                                          BitVector::Element* bitmap_data,
+                                          size_t size,
+                                          size_t capacity);
+
     const DataType& getType() const;
     size_t size() const;
     Value get(size_t index) const;

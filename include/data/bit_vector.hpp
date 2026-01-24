@@ -18,6 +18,7 @@ public:
     using Element = uint8_t;
 
     explicit BitVector(size_t num_bits, DataLocation location = DataLocation::HOST);
+    BitVector(Element* data, size_t size, size_t capacity, DataLocation location);
     // BitVector(const BitVector&);
     BitVector(BitVector&&) noexcept;
     // BitVector& operator=(const BitVector&);

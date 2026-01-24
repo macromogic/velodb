@@ -75,14 +75,15 @@ public:
 
     virtual std::string toString() const = 0;
 
+    void setDebugFlag(bool flag) { debug_flag_ = flag; }
+
 protected:
-    // Implementation required by UniqueCloneable
     virtual std::unique_ptr<AbstractExpression> cloneUniqueImpl() const = 0;
     friend class UniqueCloneable<AbstractExpression>;
 
-protected:
     ExpressionType type_;
     std::unique_ptr<DataType> return_type_;
+    static bool debug_flag_;
 };
 
 class LeafExpression : public AbstractExpression {

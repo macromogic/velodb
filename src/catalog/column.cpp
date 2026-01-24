@@ -86,6 +86,27 @@ Column Column::buildFrom(std::unique_ptr<DataType> type, std::vector<Value>&& va
     }
 }
 
+Column Column::createFromDeviceBuffers(std::unique_ptr<DataType> type,
+                                       void* data,
+                                       BitVector::Element* bitmap_data,
+                                       size_t size,
+                                       size_t capacity)
+{
+    switch (type->getTypeId()) {
+#define X(name, DT, VT)                                                                                                \
+    case DataTypeId::name: {                                                                                           \
+        using VecType = ValueVector<VT>;                                                                               \
+        using DType = typename VecType::DType;                                                                         \
+        return Column(type->cloneUnique(),                                                                             \
+                      VecType(static_cast<DType*>(data), bitmap_data, size, capacity, DataLocation::CUDA));            \
+    }
+        LIST_TYPES(X)
+#undef X
+    default:
+        VELODB_THROW(ExecutionError, "Unsupported data type for device buffer adoption");
+    }
+}
+
 const DataType& Column::getType() const
 {
     return *type_;

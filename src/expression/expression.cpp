@@ -11,6 +11,8 @@ AbstractExpression::AbstractExpression(ExpressionType type, std::unique_ptr<Data
 {
 }
 
+bool AbstractExpression::debug_flag_ = false;
+
 LeafExpression::LeafExpression(ExpressionType type, std::unique_ptr<DataType> return_type)
     : AbstractExpression(type, std::move(return_type))
 {

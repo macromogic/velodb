@@ -118,7 +118,9 @@ __device__ __forceinline__ void sortMergeJoinCountImpl(const JoinColumn& left,
     }
 
     KeyT left_min_key = getKeyAt<KeyT>(left, left_start);
-    KeyT left_max_key = getKeyAt<KeyT>(left, left_end);
+    // Use the last key in the block as the max key to avoid scanning unnecessary range
+    // (especially for the last block where left_end index would return MAX)
+    KeyT left_max_key = getKeyAt<KeyT>(left, left_end - 1);
 
     size_t right_start = lowerBound(right, left_min_key);
     size_t right_end = upperBound(right, left_max_key);

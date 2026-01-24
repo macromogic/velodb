@@ -136,7 +136,7 @@ TPCHBenchmarkRunner::QueryResult TPCHBenchmarkRunner::runSingleQuery(int query_n
             result.error_message = query_result.error();
         }
 
-        fmt::println("  Query finished. Plan time: {:.3f}s, Execution time: {:.3f}s, Rows: {}",
+        fmt::println("  Query finished. Plan time: {:.3f}ms, Execution time: {:.3f}ms, Rows: {}",
                      result.metrics.planning_time.count(),
                      result.metrics.execution_time.count(),
                      result.result_row_count);

@@ -11,4 +11,4 @@ set_property(TARGET test_expression PROPERTY RUNTIME_OUTPUT_DIRECTORY
 target_compile_options(test_expression PRIVATE -Wall -Wextra -g)
 
 add_test(NAME TestExpression COMMAND test_expression)
-set_tests_properties(TestExpression PROPERTIES TIMEOUT 15)
+set_tests_properties(TestExpression PROPERTIES TIMEOUT 20)

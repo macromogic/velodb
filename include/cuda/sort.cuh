@@ -8,10 +8,7 @@
 
 namespace velodb::cuda {
 
-__device__ __forceinline__ int compareSingle(const void* ptr,
-                                             DataTypeId type_id,
-                                             unsigned int row_i,
-                                             unsigned int row_j)
+__device__ __forceinline__ int compareSingle(const void* ptr, DataTypeId type_id, size_t row_i, size_t row_j)
 {
     switch (type_id) {
 #define X(name, DT, VT)                                                                                                \
@@ -31,10 +28,7 @@ __device__ __forceinline__ int compareSingle(const void* ptr,
     }
 }
 
-__device__ __forceinline__ bool needSwap(const CommandArgs::SortArgs& args,
-                                         unsigned int i,
-                                         unsigned int j,
-                                         bool ascending)
+__device__ __forceinline__ bool needSwap(const CommandArgs::SortArgs& args, size_t i, size_t j, bool ascending)
 {
     for (int col_idx = 0; col_idx < args.n_sort_columns; col_idx++) {
         int cmp = compareSingle(args.sort_cols[col_idx], args.col_types[col_idx], i, j);
@@ -53,7 +47,7 @@ __device__ __forceinline__ void swapValues(T& a, T& b)
     b = temp;
 }
 
-__device__ __forceinline__ void swapRows(const CommandArgs::SortArgs& args, unsigned int i, unsigned int j)
+__device__ __forceinline__ void swapRows(const CommandArgs::SortArgs& args, size_t i, size_t j)
 {
     swapValues(args.indices[i], args.indices[j]);
     for (int col_idx = 0; col_idx < args.n_sort_columns; col_idx++) {
@@ -78,11 +72,11 @@ __device__ __forceinline__ void executeBitonicSort(CommandArgs::SortArgs& args, 
     size_t n_rows = args.n_rows;
     size_t n_padded_rows = args.n_padded_rows;
 
-    unsigned int tid = grid.thread_rank();
-    unsigned int n_threads = grid.size();
+    size_t tid = grid.thread_rank();
+    size_t n_threads = grid.size();
 
     // Initialize indices
-    for (unsigned int i = tid; i < n_padded_rows; i += n_threads) {
+    for (size_t i = tid; i < n_padded_rows; i += n_threads) {
         args.indices[i] = i;
         if (i >= n_rows) {
             for (int col_idx = 0; col_idx < args.n_sort_columns; col_idx++) {
@@ -106,10 +100,10 @@ __device__ __forceinline__ void executeBitonicSort(CommandArgs::SortArgs& args, 
     grid.sync();
 
     // Bitonic sort loop
-    for (unsigned int k = 2; k <= n_padded_rows; k <<= 1) {
-        for (unsigned int j = k >> 1; j > 0; j >>= 1) {
-            for (unsigned int i = tid; i < n_padded_rows; i += n_threads) {
-                unsigned int ixj = i ^ j;
+    for (size_t k = 2; k <= n_padded_rows; k <<= 1) {
+        for (size_t j = k >> 1; j > 0; j >>= 1) {
+            for (size_t i = tid; i < n_padded_rows; i += n_threads) {
+                size_t ixj = i ^ j;
                 if (i < ixj) {
                     bool ascending = ((i & k) == 0);
                     if (needSwap(args, i, ixj, ascending)) {

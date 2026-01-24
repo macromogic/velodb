@@ -75,6 +75,15 @@ Value ComparisonExpression::compareValues(const Value& left_val, const Value& ri
         VELODB_THROW(ExecutionError, fmt::format("Comparison operator {} not implemented", comp_type_));
     }
 
+    if (debug_flag_) {
+        fmt::println("Comparing values: {}({}) {} {}({}) => {}",
+                     left_val,
+                     DataType::createType(left_val.getTypeId()),
+                     comp_type_,
+                     right_val,
+                     DataType::createType(right_val.getTypeId()),
+                     result);
+    }
     return Value::createBoolean(result);
 }
 

@@ -27,8 +27,14 @@ const Value BinaryLogicalExpression::evaluate(const Tuple& tuple, const Schema& 
     bool right_bool = right_value.getBoolean();
 
     if (connective_type_ == ConnectiveType::AND) {
+        if (debug_flag_) {
+            fmt::println("Evaluating AND: {} AND {} => {}", left_bool, right_bool, left_bool && right_bool);
+        }
         return Value::createBoolean(left_bool && right_bool);
     } else { // OR
+        if (debug_flag_) {
+            fmt::println("Evaluating OR: {} OR {} => {}", left_bool, right_bool, left_bool || right_bool);
+        }
         return Value::createBoolean(left_bool || right_bool);
     }
 }

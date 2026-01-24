@@ -48,6 +48,14 @@ Result<RowBatch> SortMergeJoinOperator::next()
         joined_ = true;
         return Result<RowBatch>::success(RowBatch());
     }
+    fmt::println("Left table rows: {}, Right table rows: {}",
+                 left_table_.get().getRowCount(),
+                 right_table_.get().getRowCount());
+    fmt::println("Left batch rows: {}, Right batch rows: {}", left_batch.getRowCount(), right_batch.getRowCount());
+    fmt::println("left batch peek:");
+    left_batch.debug(20);
+    fmt::println("right batch peek:");
+    right_batch.debug(20);
 
     // Assumption: both `left_batch` and `right_batch` are sorted ascending by column 0.
     if (left_batch.getColumnCount() < 2 || right_batch.getColumnCount() < 2) {
@@ -64,7 +72,8 @@ Result<RowBatch> SortMergeJoinOperator::next()
 
     // Scan-count phase to determine output size
     auto stream_handle = StreamPool::getInstance().acquire().value();
-    size_t max_join_blocks = left_batch.getRowCount(); // Allocation must cover worst-case fragmentation
+    // Allocate extra space for join blocks to prevent potential overflow if fragmentation is high
+    size_t max_join_blocks = left_batch.getRowCount() * 2;
     MergeJoinBlock* d_join_blocks;
     CHECKED_CALL_THROW(cudaMallocAsync(&d_join_blocks, max_join_blocks * sizeof(MergeJoinBlock), stream_handle->get()));
     size_t* d_join_block_count;
@@ -90,6 +99,7 @@ Result<RowBatch> SortMergeJoinOperator::next()
     size_t h_padded_rows = std::max(MIN_PADDING_SIZE, nextPow2(h_row_count));
 
     // Join-write phase
+    fmt::println("Sort-Merge Join will produce {} output rows (padded to {})", h_row_count, h_padded_rows);
     int64_t* d_out_left;
     CHECKED_CALL_THROW(cudaMallocAsync(&d_out_left, h_padded_rows * sizeof(int64_t), stream_handle->get()));
     int64_t* d_out_right;
@@ -128,10 +138,20 @@ Result<RowBatch> SortMergeJoinOperator::next()
                       } };
     task_manager.waitCommand(task_manager.submitCommand(cmd_join));
 
-    Column left_rowid_col(DataType::createType(DataTypeId::BIGINT), h_padded_rows, DataLocation::CUDA);
-    Column right_rowid_col(DataType::createType(DataTypeId::BIGINT), h_padded_rows, DataLocation::CUDA);
-    left_rowid_col.setFromDeviceBuffers(d_out_left, nullptr);
-    right_rowid_col.setFromDeviceBuffers(d_out_right, nullptr);
+    Column left_rowid_col = Column::createFromDeviceBuffers(DataType::createType(DataTypeId::BIGINT),
+                                                            d_out_left,
+                                                            nullptr,
+                                                            0,
+                                                            h_padded_rows);
+    Column right_rowid_col = Column::createFromDeviceBuffers(DataType::createType(DataTypeId::BIGINT),
+                                                             d_out_right,
+                                                             nullptr,
+                                                             0,
+                                                             h_padded_rows);
+
+    CHECKED_CALL_THROW(cudaFreeAsync(d_join_blocks, stream_handle->get()));
+    CHECKED_CALL_THROW(cudaFreeAsync(d_join_block_count, stream_handle->get()));
+    CHECKED_CALL_THROW(cudaFreeAsync(d_row_count, stream_handle->get()));
     std::vector<Column> result_cols;
     result_cols.reserve(2);
     result_cols.push_back(std::move(left_rowid_col));
