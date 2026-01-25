@@ -26,8 +26,6 @@ Result<RowBatch> SortOperator::next()
         if (gathered_batch.getRowCount() == 0) {
             return Result<RowBatch>::success(RowBatch()); // End of stream
         }
-        fmt::println("SortOperator gathered {} rows to sort.", gathered_batch.getRowCount());
-        gathered_batch.debug(20);
         gathered_batch.to(DataLocation::CUDA);
         size_t n_rows = gathered_batch.getRowCount();
         size_t n_padded_rows = nextPow2(n_rows);
@@ -40,7 +38,7 @@ Result<RowBatch> SortOperator::next()
         int64_t* d_indices;
         CHECKED_CALL_THROW(cudaMallocAsync(&d_indices, n_padded_rows * sizeof(int64_t), stream_handle->get()));
         stream_handle->synchronize();
-        std::vector<bool> sorted_cols(n_sort_columns, false);
+        std::vector<bool> sorted_cols(n_cols, false);
         uint64_t last_id;
         Command sort_cmd;
         sort_cmd.opcode = OpCode::OP_SORT;
@@ -68,28 +66,27 @@ Result<RowBatch> SortOperator::next()
         std::vector<void*> buffers(n_cols, nullptr);
         std::vector<BitVector::Element*> bitmap_buffers(n_cols, nullptr);
         for (size_t i = 0; i < n_cols; ++i) {
-            if (sorted_cols[i]) {
-                continue; // Already sorted
-            }
             auto& col = gathered_batch.getColumn(i);
-            auto* data_ptr = col.rawData();
+            if (!sorted_cols[i]) {
+                auto* data_ptr = col.rawData();
+                auto* temp_buffer = col.getDeviceBuffer();
+                buffers[i] = temp_buffer;
+
+                Command gather_cmd;
+                gather_cmd.opcode = OpCode::OP_PERMUTE;
+                gather_cmd.args = { .permute = {
+                                        .out_data = static_cast<void*>(temp_buffer),
+                                        .in_data = static_cast<void*>(data_ptr),
+                                        .in_indices = d_indices,
+                                        .n = n_rows,
+                                        .type_id = col.getType().getTypeId(),
+                                    } };
+                task_manager.submitCommand(gather_cmd);
+            }
+
             auto* bitmap_ptr = col.rawBitmapData();
-            auto* temp_buffer = col.getDeviceBuffer();
             auto* temp_bitmap_buffer = col.getDeviceBitmapBuffer();
-            buffers[i] = temp_buffer;
             bitmap_buffers[i] = temp_bitmap_buffer;
-
-            Command gather_cmd;
-            gather_cmd.opcode = OpCode::OP_PERMUTE;
-            gather_cmd.args = { .permute = {
-                                    .out_data = static_cast<void*>(temp_buffer),
-                                    .in_data = static_cast<void*>(data_ptr),
-                                    .in_indices = d_indices,
-                                    .n = n_rows,
-                                    .type_id = col.getType().getTypeId(),
-                                } };
-            task_manager.submitCommand(gather_cmd);
-
             Command gather_bits_cmd;
             gather_bits_cmd.opcode = OpCode::OP_PERMUTE;
             gather_bits_cmd.args = { .permute = {
@@ -104,16 +101,11 @@ Result<RowBatch> SortOperator::next()
         task_manager.waitCommand(last_id);
 
         for (size_t i = 0; i < n_cols; ++i) {
-            if (buffers[i] == nullptr) {
-                continue;
-            }
             auto& col = gathered_batch.getColumn(i);
             col.setFromDeviceBuffers(buffers[i], bitmap_buffers[i]);
         }
         CHECKED_CALL_THROW(cudaFreeAsync(d_indices, stream_handle->get()));
         sorted_ = true;
-        fmt::println("SortOperator produced {} sorted rows.", n_rows);
-        gathered_batch.debug(20);
         return Result<RowBatch>::success(std::move(gathered_batch));
     }
     return Result<RowBatch>::success(RowBatch());

@@ -48,14 +48,6 @@ Result<RowBatch> SortMergeJoinOperator::next()
         joined_ = true;
         return Result<RowBatch>::success(RowBatch());
     }
-    fmt::println("Left table rows: {}, Right table rows: {}",
-                 left_table_.get().getRowCount(),
-                 right_table_.get().getRowCount());
-    fmt::println("Left batch rows: {}, Right batch rows: {}", left_batch.getRowCount(), right_batch.getRowCount());
-    fmt::println("left batch peek:");
-    left_batch.debug(20);
-    fmt::println("right batch peek:");
-    right_batch.debug(20);
 
     // Assumption: both `left_batch` and `right_batch` are sorted ascending by column 0.
     if (left_batch.getColumnCount() < 2 || right_batch.getColumnCount() < 2) {
@@ -96,10 +88,9 @@ Result<RowBatch> SortMergeJoinOperator::next()
     CHECKED_CALL_THROW(
         cudaMemcpyAsync(&h_row_count, d_row_count, sizeof(size_t), cudaMemcpyDeviceToHost, stream_handle->get()));
     stream_handle->synchronize();
-    size_t h_padded_rows = std::max(MIN_PADDING_SIZE, nextPow2(h_row_count));
+    size_t h_padded_rows = nextPow2(h_row_count);
 
     // Join-write phase
-    fmt::println("Sort-Merge Join will produce {} output rows (padded to {})", h_row_count, h_padded_rows);
     int64_t* d_out_left;
     CHECKED_CALL_THROW(cudaMallocAsync(&d_out_left, h_padded_rows * sizeof(int64_t), stream_handle->get()));
     int64_t* d_out_right;

@@ -85,8 +85,9 @@ __device__ __forceinline__ void executeBitonicSort(CommandArgs::SortArgs& args, 
 #define X(name, DT, VT)                                                                                                \
     case DataTypeId::name: {                                                                                           \
         DT* col = static_cast<DT*>(ptr);                                                                               \
-        col[i] = args.ascending_flags[col_idx] ? ::cuda::std::numeric_limits<DT>::max()                                \
-                                               : ::cuda::std::numeric_limits<DT>::lowest();                            \
+        DT fill_value = args.ascending_flags[col_idx] ? ::cuda::std::numeric_limits<DT>::max()                         \
+                                                      : ::cuda::std::numeric_limits<DT>::lowest();                     \
+        col[i] = fill_value;                                                                                           \
         break;                                                                                                         \
     }
                     LIST_TYPES(X)

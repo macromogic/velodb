@@ -176,6 +176,7 @@ void* Column::getDeviceBuffer() const
             DType* ptr;
             auto stream_handle = StreamPool::getInstance().acquire().value();
             CHECKED_CALL_THROW(cudaMallocAsync(&ptr, vv.capacity_ * sizeof(DType), stream_handle->get()));
+            stream_handle->synchronize();
             return static_cast<void*>(ptr);
         },
         data_source_);
@@ -196,6 +197,7 @@ BitVector::Element* Column::getDeviceBitmapBuffer() const
                                                0,
                                                vv.null_mask_.element_capacity_ * sizeof(BitVector::Element),
                                                stream_handle->get()));
+            stream_handle->synchronize();
             return ptr;
         },
         data_source_);

@@ -44,13 +44,6 @@ public:
                     free_blocks_[next_ptr] = remaining;
                 }
 
-                // fmt::println("HostMemoryPool: Allocated {} bytes at {}", size, (void*)ptr);
-                // backward::StackTrace st;
-                // st.load_here(8);
-                // backward::Printer printer;
-                // printer.snippet = false;
-                // printer.print(st);
-
                 return ptr;
             }
         }
@@ -63,13 +56,6 @@ public:
             return;
         char* char_ptr = static_cast<char*>(ptr);
         size = alignUp(size, 256);
-
-        // fmt::println("HostMemoryPool: Deallocated {} bytes at {}", size, (void*)char_ptr);
-        // backward::StackTrace st;
-        // st.load_here(8);
-        // backward::Printer printer;
-        // printer.snippet = false;
-        // printer.print(st);
 
         auto [it, success] = free_blocks_.insert({ char_ptr, size });
         assert(success && "Double free detected!");
@@ -105,7 +91,7 @@ public:
 
     static HostMemoryPool& getInstance()
     {
-        constexpr size_t pool_size = 1ul << 33;
+        constexpr size_t pool_size = 1ul << 34;
         static HostMemoryPool instance(pool_size);
         return instance;
     }

@@ -7,11 +7,18 @@ BENCHMARK_DIR="$BASE_DIR/benchmark_tpch"
 ITERATIONS=3
 QUERIES=1,4,6,12,14,15,17,19
 
+BUILD_PRESET=release-no-profiling
+pushd "$BASE_DIR" > /dev/null
+cmake --preset $BUILD_PRESET
+cmake --build --preset $BUILD_PRESET
+popd > /dev/null
+
 # if [ -d "$BENCHMARK_DIR" ]; then
 #     rm -rf "$BENCHMARK_DIR"
 # fi
 mkdir -p "$BENCHMARK_DIR/data"
 echo "*" > "$BENCHMARK_DIR/data/.gitignore"
+
 
 function run_bench() {
     local SF=$1
@@ -35,3 +42,7 @@ function run_bench() {
 }
 
 run_bench 0.01
+run_bench 0.1
+run_bench 1
+run_bench 2
+run_bench 3

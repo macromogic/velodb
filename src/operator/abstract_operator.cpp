@@ -40,11 +40,9 @@ RowBatch AbstractOperator::collectBatches(AbstractOperator& child)
         col.reserve(capacity);
     }
     size_t n_cols = gathered_batch.getColumnCount();
-    // auto& task_manager = context_.getTaskManager();
     if (!buffer.empty()) {
         auto stream_handle = StreamPool::getInstance().acquire().value();
-        // uint64_t last_id;
-        size_t offset = 0;
+        size_t offset = gathered_batch.getRowCount();
         for (const auto& batch : buffer) {
             size_t batch_rows = batch.getRowCount();
             for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
@@ -72,7 +70,6 @@ RowBatch AbstractOperator::collectBatches(AbstractOperator& child)
             offset += batch_rows;
         }
         stream_handle->synchronize();
-        // task_manager.waitCommand(last_id);
     }
 
     setNumRowsForBatch(gathered_batch, n_rows);
