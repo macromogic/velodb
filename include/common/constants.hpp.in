@@ -10,7 +10,7 @@ constexpr int VERSION_MINOR = @PROJECT_VERSION_MINOR@;
 constexpr int VERSION_PATCH = @PROJECT_VERSION_PATCH@;
 constexpr const char* VERSION_STRING = "@PROJECT_VERSION@";
 
-constexpr size_t MAX_BATCH_SIZE = 1ul << 20;
+constexpr size_t MAX_BATCH_SIZE = 1ul << 25;
 constexpr size_t MAX_SORT_COLUMNS = 8;
 
 }

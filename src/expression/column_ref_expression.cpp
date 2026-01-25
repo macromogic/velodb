@@ -1,5 +1,7 @@
 #include "expression/column_ref_expression.hpp"
 
+#include "catalog/column.hpp"
+#include "catalog/row_batch.hpp"
 #include "catalog/tuple.hpp"
 
 #include <fmt/format.h>
@@ -21,6 +23,12 @@ const Value ColumnRefExpression::evaluate(const Tuple& tuple, const Schema& sche
 {
     auto column_index = schema.getColumnIndex(column_name_);
     return tuple.getValue(column_index);
+}
+
+Column ColumnRefExpression::evaluateBatch(const RowBatch& batch, const Schema& schema) const
+{
+    auto column_index = schema.getColumnIndex(column_name_);
+    return batch.getColumn(column_index).slice(0, batch.getRowCount());
 }
 
 std::string ColumnRefExpression::toString() const

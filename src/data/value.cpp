@@ -106,6 +106,12 @@ bool Value::operator==(const Value& other) const
         return false;
     if (type_id_ != other.type_id_)
         return false;
+
+    // TODO: remove this in the future
+    if (type_id_ == DataTypeId::VARCHAR) {
+        return getString() == other.getString();
+    }
+
     return data_ == other.data_;
 }
 

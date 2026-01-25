@@ -12,6 +12,7 @@ public:
     ~ColumnRefExpression() override = default;
 
     const Value evaluate(const Tuple& tuple, const Schema& schema) const override;
+    Column evaluateBatch(const RowBatch& batch, const Schema& schema) const override;
     std::string toString() const override;
 
     const std::string& getTableName() const { return table_name_; }

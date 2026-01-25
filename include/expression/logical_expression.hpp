@@ -14,6 +14,7 @@ public:
     ~BinaryLogicalExpression() override = default;
 
     const Value evaluate(const Tuple& tuple, const Schema& schema) const override;
+    Column evaluateBatch(const RowBatch& batch, const Schema& schema) const override;
     std::string toString() const override;
 
     ConnectiveType getConnectiveType() const { return connective_type_; }
@@ -31,6 +32,7 @@ public:
     ~LogicalNotExpression() override = default;
 
     const Value evaluate(const Tuple& tuple, const Schema& schema) const override;
+    Column evaluateBatch(const RowBatch& batch, const Schema& schema) const override;
     std::string toString() const override;
 
 protected:

@@ -13,6 +13,8 @@ namespace velodb {
 class ExecutionContext;
 class Tuple;
 class Schema;
+class RowBatch;
+class Column;
 
 // Expression types
 enum class ExpressionType {
@@ -72,6 +74,9 @@ public:
 
     // Core evaluation interface
     virtual const Value evaluate(const Tuple& tuple, const Schema& schema) const = 0;
+
+    // Vectorized evaluation interface
+    virtual Column evaluateBatch(const RowBatch& batch, const Schema& schema) const;
 
     virtual std::string toString() const = 0;
 

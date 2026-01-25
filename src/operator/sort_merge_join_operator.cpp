@@ -24,7 +24,6 @@ SortMergeJoinOperator::SortMergeJoinOperator(ExecutionContext& context,
 
 Result<RowBatch> SortMergeJoinOperator::next()
 {
-    PROFILE_SCOPE("SortMergeJoinOperator::next");
     // Simple single-pass INNER merge equi-join on first column (join key) of each side.
     // Assumptions:
     //  Left & Right inputs are individually sorted ascending by key (column 0).
@@ -49,6 +48,7 @@ Result<RowBatch> SortMergeJoinOperator::next()
         return Result<RowBatch>::success(RowBatch());
     }
 
+    PROFILE_SCOPE("SortMergeJoinOperator::next");
     // Assumption: both `left_batch` and `right_batch` are sorted ascending by column 0.
     if (left_batch.getColumnCount() < 2 || right_batch.getColumnCount() < 2) {
         return Result<RowBatch>::failure("Input batches must expose key and $_rowid columns at indices 0 and 1");
@@ -118,7 +118,6 @@ Result<RowBatch> SortMergeJoinOperator::next()
 
     Command cmd_join = {};
     cmd_join.opcode = OpCode::OP_SORT_MERGE_JOIN_WRITE;
-    // TODO: write random indices for padding region
     cmd_join.args = { .sort_merge_join_write = {
                           .left = left_join_col,
                           .right = right_join_col,

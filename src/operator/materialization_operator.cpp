@@ -63,12 +63,11 @@ std::pair<std::string, std::string> MaterializationOperator::splitName(const std
 
 Result<RowBatch> MaterializationOperator::next()
 {
-    PROFILE_SCOPE("MaterializationOperator::next");
-    // Consume child once (single batch join result assumed currently)
     if (produced_) {
         return Result<RowBatch>::success(RowBatch());
     }
     auto join_batch = collectBatches(*child_);
+    PROFILE_SCOPE("MaterializationOperator::next");
     if (join_batch.getRowCount() == 0) {
         produced_ = true;
         return Result<RowBatch>::success(RowBatch());

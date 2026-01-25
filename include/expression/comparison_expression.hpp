@@ -13,6 +13,7 @@ public:
     ~ComparisonExpression() override = default;
 
     const Value evaluate(const Tuple& tuple, const Schema& schema) const override;
+    Column evaluateBatch(const RowBatch& batch, const Schema& schema) const override;
     std::string toString() const override;
 
     ComparisonType getComparisonType() const { return comp_type_; }

@@ -250,7 +250,8 @@ public:
     ConcreteVector slice(size_t start, size_t end) const
     {
         VELODB_ASSERT_MSG(start <= end && end <= size_, "Invalid slice range");
-        VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot slice non-host data");
+        VELODB_ASSERT_MSG(location_ == DataLocation::HOST || location_ == DataLocation::VIEW,
+                          "Cannot slice non-host data");
 
         size_t new_size = end - start;
         return ConcreteVector(data_ + start, new_size, capacity_ - start, null_mask_.slice(start, end));
@@ -477,7 +478,8 @@ public:
     ConcreteVector slice(size_t start, size_t end) const
     {
         VELODB_ASSERT_MSG(start <= end && end <= size_, "Invalid slice range");
-        VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot slice non-host data");
+        VELODB_ASSERT_MSG(location_ == DataLocation::HOST || location_ == DataLocation::VIEW,
+                          "Cannot slice non-host data");
 
         size_t new_size = end - start;
         return ConcreteVector(data_ + start,

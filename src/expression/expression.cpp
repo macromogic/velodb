@@ -1,5 +1,8 @@
 #include "expression/expression.hpp"
 
+#include "catalog/column.hpp"
+#include "catalog/row_batch.hpp"
+
 #include <memory>
 
 namespace velodb {
@@ -12,6 +15,16 @@ AbstractExpression::AbstractExpression(ExpressionType type, std::unique_ptr<Data
 }
 
 bool AbstractExpression::debug_flag_ = false;
+
+Column AbstractExpression::evaluateBatch(const RowBatch& batch, const Schema& schema) const
+{
+    std::vector<Value> values;
+    values.reserve(batch.getRowCount());
+    for (const auto& tuple : batch) {
+        values.push_back(evaluate(tuple, schema));
+    }
+    return Column::buildFrom(getReturnType().cloneUnique(), std::move(values));
+}
 
 LeafExpression::LeafExpression(ExpressionType type, std::unique_ptr<DataType> return_type)
     : AbstractExpression(type, std::move(return_type))

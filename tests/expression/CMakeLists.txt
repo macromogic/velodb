@@ -1,4 +1,5 @@
-add_executable(test_expression test_expression.cpp ../test_main.cpp)
+add_executable(test_expression test_expression.cpp test_expression_batch.cpp
+                               ../test_main.cpp)
 
 target_link_libraries(test_expression ${ALL_OBJS} ${DEPENDENCY_LIBS}
                       GTest::GTest GTest::Main pthread)

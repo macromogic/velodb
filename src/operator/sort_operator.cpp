@@ -20,12 +20,12 @@ SortOperator::SortOperator(ExecutionContext& context,
 
 Result<RowBatch> SortOperator::next()
 {
-    PROFILE_SCOPE("SortOperator::next");
     if (!sorted_) {
         RowBatch gathered_batch = collectBatches(*child_);
         if (gathered_batch.getRowCount() == 0) {
             return Result<RowBatch>::success(RowBatch()); // End of stream
         }
+        PROFILE_SCOPE("SortOperator::next");
         gathered_batch.to(DataLocation::CUDA);
         size_t n_rows = gathered_batch.getRowCount();
         size_t n_padded_rows = nextPow2(n_rows);

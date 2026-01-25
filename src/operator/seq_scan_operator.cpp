@@ -31,12 +31,20 @@ Result<RowBatch> SeqScanOperator::next()
     auto batch = table_.slice(start_row_id, end_row_id);
     Column rowids_(DataType::createType(DataTypeId::BIGINT), batch_size);
     Column masks_(DataType::createType(DataTypeId::BOOLEAN), batch_size);
-    for (const auto& tuple : batch) {
-        Value result = predicate_ ? predicate_->evaluate(tuple, output_schema_) : Value::createBoolean(true);
+
+    if (predicate_) {
+        masks_ = predicate_->evaluateBatch(batch, output_schema_);
+    } else {
+        for (size_t i = 0; i < batch_size; ++i) {
+            masks_.append(Value::createBoolean(true));
+        }
+    }
+
+    for (size_t i = 0; i < batch_size; ++i) {
         rowids_.append(Value::createBigInt(current_row_id_));
-        masks_.append(result);
         ++current_row_id_;
     }
+
     batch.addColumn(std::move(rowids_));
     batch.addColumn(std::move(masks_));
     return Result<RowBatch>::success(std::move(batch));

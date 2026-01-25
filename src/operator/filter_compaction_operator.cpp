@@ -21,12 +21,11 @@ FilterCompactionOperator::FilterCompactionOperator(ExecutionContext& context,
 
 Result<RowBatch> FilterCompactionOperator::next()
 {
-    PROFILE_SCOPE("FilterCompactionOperator::next");
-
     auto child_result = child_->next();
     if (!child_result) {
         return child_result; // Propagate error from child
     }
+    PROFILE_SCOPE("FilterCompactionOperator::next");
     auto& batch = child_result.value();
     batch.to(DataLocation::CUDA);
     size_t n_rows = batch.getRowCount();

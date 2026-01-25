@@ -11,6 +11,7 @@ public:
     ~ConstantExpression() override = default;
 
     const Value evaluate(const Tuple& tuple, const Schema& schema) const override;
+    Column evaluateBatch(const RowBatch& batch, const Schema& schema) const override;
     const Value getValue() const;
     std::string toString() const override;
 

@@ -41,6 +41,7 @@ RowBatch AbstractOperator::collectBatches(AbstractOperator& child)
     }
     size_t n_cols = gathered_batch.getColumnCount();
     if (!buffer.empty()) {
+        PROFILE_SCOPE("Merge collected batches");
         auto stream_handle = StreamPool::getInstance().acquire().value();
         size_t offset = gathered_batch.getRowCount();
         for (const auto& batch : buffer) {
