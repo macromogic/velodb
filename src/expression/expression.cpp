@@ -14,8 +14,16 @@ AbstractExpression::AbstractExpression(ExpressionType type, std::unique_ptr<Data
 {
 }
 
+void AbstractExpression::setSizeForColumn(Column& col, size_t size) const
+{
+    if (col.size() < size) {
+        col.setSize(size);
+    }
+}
+
 bool AbstractExpression::debug_flag_ = false;
 
+// TODO: remove the default implementation in the future
 Column AbstractExpression::evaluateBatch(const RowBatch& batch, const Schema& schema) const
 {
     std::vector<Value> values;

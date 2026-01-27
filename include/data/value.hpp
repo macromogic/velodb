@@ -57,6 +57,7 @@ public:
     float getFloat() const;
     double getDouble() const;
     std::string getString() const;
+    const OrdinalString& getOrdinalString() const;
 
     // Comparison operators
     bool operator==(const Value& other) const;

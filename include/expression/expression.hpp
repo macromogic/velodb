@@ -86,6 +86,8 @@ protected:
     virtual std::unique_ptr<AbstractExpression> cloneUniqueImpl() const = 0;
     friend class UniqueCloneable<AbstractExpression>;
 
+    void setSizeForColumn(Column& col, size_t size) const;
+
     ExpressionType type_;
     std::unique_ptr<DataType> return_type_;
     static bool debug_flag_;

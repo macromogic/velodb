@@ -98,6 +98,15 @@ std::string Value::getString() const
     return std::get<OrdinalString>(data_);
 }
 
+const OrdinalString& Value::getOrdinalString() const
+{
+    if (is_null_)
+        VELODB_THROW(TypeError, "Cannot get value from NULL");
+    if (type_id_ != DataTypeId::VARCHAR)
+        VELODB_THROW(TypeError, "Type mismatch");
+    return std::get<OrdinalString>(data_);
+}
+
 bool Value::operator==(const Value& other) const
 {
     if (is_null_ && other.is_null_)

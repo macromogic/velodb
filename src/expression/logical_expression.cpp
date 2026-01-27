@@ -50,33 +50,28 @@ Column BinaryLogicalExpression::evaluateBatch(const RowBatch& batch, const Schem
     Column result(DataType::createType(DataTypeId::BOOLEAN), count);
 
     // Assume boolean inputs
-    if (left_col.getType().getTypeId() == DataTypeId::BOOLEAN
-        && right_col.getType().getTypeId() == DataTypeId::BOOLEAN) {
+    VELODB_ASSERT_MSG(left_col.getType().isBoolean() && right_col.getType().isBoolean(),
+                      "BinaryLogicalExpression only supports BOOLEAN type");
 
-        const bool* l_data = static_cast<const bool*>(left_col.rawData());
-        const bool* r_data = static_cast<const bool*>(right_col.rawData());
-        const auto* l_nulls = left_col.rawBitmapData();
-        const auto* r_nulls = right_col.rawBitmapData();
+    const uint8_t* l_data = static_cast<const uint8_t*>(left_col.rawData());
+    const uint8_t* r_data = static_cast<const uint8_t*>(right_col.rawData());
+    const auto* l_nulls = left_col.rawBitmapData();
+    const auto* r_nulls = right_col.rawBitmapData();
+    uint8_t* res_data = static_cast<uint8_t*>(result.rawData());
+    BitVector::Element* res_nulls = result.rawBitmapData();
 
-        for (size_t i = 0; i < count; ++i) {
-            if ((l_nulls && l_nulls[i]) || (r_nulls && r_nulls[i])) {
-                result.append(Value::createNull(DataTypeId::BOOLEAN));
-                continue;
-            }
-
-            bool val;
-            if (connective_type_ == ConnectiveType::AND) {
-                val = l_data[i] && r_data[i];
-            } else {
-                val = l_data[i] || r_data[i];
-            }
-            result.append(Value::createBoolean(val));
+    for (size_t i = 0; i < count; ++i) {
+        if ((l_nulls && l_nulls[i]) || (r_nulls && r_nulls[i])) {
+            res_nulls[i] = 1; // Set NULL
+            continue;
         }
-    } else {
-        // Fallback if needed, but for now just return what we have (likely empty or partial) or do row-by-row
-        // To simply standard, we can throw or just use generic loop here if types are off.
-        // For this request, I will assume well-typed.
+        if (connective_type_ == ConnectiveType::AND) {
+            res_data[i] = l_data[i] && r_data[i];
+        } else {
+            res_data[i] = l_data[i] || r_data[i];
+        }
     }
+    setSizeForColumn(result, count);
     return result;
 }
 

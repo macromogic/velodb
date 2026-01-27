@@ -109,6 +109,7 @@ private:
     void setSize(size_t new_size);
 
     friend class RowBatch;
+    friend class AbstractExpression;
 };
 
 } // namespace velodb

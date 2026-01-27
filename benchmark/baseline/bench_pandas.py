@@ -1,3 +1,10 @@
+import os
+
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 from dataclasses import dataclass, field
 import pandas as pd
 import duckdb
@@ -76,7 +83,8 @@ def load_tpch_table(filename: str, columns: list[str], date_column_names: list[s
         names=columns + ['dummy'],
         usecols=columns,
         engine='c',
-        parse_dates=date_column_names
+        parse_dates=date_column_names,
+        index_col=False,
     )
     return df
 
@@ -107,7 +115,8 @@ def main() -> None:
     tables = load_data(args.data_dir)
     with duckdb.connect() as con:
         con.execute("PRAGMA enable_profiling='json'")
-        con.execute("PRAGMA profiling_output='pandas_profile.json'")
+        con.execute("PRAGMA disable_optimizer")
+        con.execute("PRAGMA threads=1")
         for table_name, df in tables.items():
             con.register(table_name, df)
 
@@ -123,14 +132,16 @@ def main() -> None:
             query_path = os.path.join(query_dir, query_file)
             with open(query_path, 'r') as f:
                 query_sql = f.read()
-            print(f"Running Query {query_number}...")
+            # print(f"Running Query {query_number}...")
             for iteration in range(args.iterations):
+                con.execute(f"PRAGMA profiling_output='q{query_number}_{iteration + 1}.json'")
                 start_time = time.perf_counter_ns()
                 con.execute(query_sql)
                 result = con.fetchall()
                 end_time = time.perf_counter_ns()
                 elapsed_ms = (end_time - start_time) / 1_000_000
-                print(f"  Iteration {iteration + 1}: {len(result)} rows returned in {elapsed_ms:.2f} ms.")
+                print(f"Q{query_number},{iteration + 1},Pandas,{elapsed_ms:.2f}")
+                # print(f"  Iteration {iteration + 1}: {len(result)} rows returned in {elapsed_ms:.2f} ms.")
                 gc.collect()
 
 

@@ -2,6 +2,7 @@
 
 #include "catalog/column.hpp"
 #include "catalog/row_batch.hpp"
+#include "data/type_traits.hpp"
 
 namespace velodb {
 
@@ -20,14 +21,24 @@ Column ConstantExpression::evaluateBatch(const RowBatch& batch, const Schema& /*
 {
     size_t rows = batch.getRowCount();
 
-    // Create a vector of values and use buildFrom to ensure proper column construction
-    // (especially important for dictionary-encoded types like VARCHAR)
-    std::vector<Value> values;
-    values.reserve(rows);
-    for (size_t i = 0; i < rows; ++i) {
-        values.push_back(value_);
+    std::vector<Value> value_v { value_ };
+    auto col = Column::buildFrom(getReturnType().cloneUnique(), std::move(value_v));
+    col.reserve(nextPow2(rows));
+    void* data_ptr = col.rawData();
+    switch (value_.getTypeId()) {
+#define X(name, DT, VT)                                                                                                \
+    case DataTypeId::name: {                                                                                           \
+        DT* d = static_cast<DT*>(data_ptr);                                                                            \
+        std::fill_n(d, rows, d[0]);                                                                                    \
+        break;                                                                                                         \
     }
-    return Column::buildFrom(getReturnType().cloneUnique(), std::move(values));
+        LIST_TYPES(X)
+#undef X
+    default:
+        VELODB_THROW(ExecutionError, "Unsupported data type in ConstantExpression::evaluateBatch");
+    }
+    setSizeForColumn(col, rows);
+    return col;
 }
 
 const Value ConstantExpression::getValue() const
