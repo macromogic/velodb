@@ -42,7 +42,11 @@ std::unique_ptr<AbstractOperator> SortMergeJoinPlanNode::createOperator(Executio
 
 std::string SortMergeJoinPlanNode::toString() const
 {
-    return "SortMergeJoin(...)";
+    const auto& left_child = children_[0];
+    const auto& right_child = children_[1];
+    return fmt::format("SortMergeJoin({} = {})",
+                       left_child->getOutputSchema().getColumnInfo(join_key_indices_.first).getName(),
+                       right_child->getOutputSchema().getColumnInfo(join_key_indices_.second).getName());
 }
 
 } // namespace velodb

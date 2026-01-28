@@ -19,6 +19,7 @@
 #include "operator/operator.hpp"
 
 // Query planning
+#include "planner/join_strategy.hpp"
 #include "planner/query_planner.hpp"
 
 // SQL Parser integration
@@ -48,6 +49,10 @@ public:
 
     // Query execution
     Result<QueryResult> executeQuery(const std::string& sql, QueryStatistics* stats = nullptr);
+
+    // Join strategy configuration
+    void setJoinStrategy(JoinStrategy strategy) { execution_engine_.setJoinStrategy(strategy); }
+    JoinStrategy getJoinStrategy() const { return execution_engine_.getJoinStrategy(); }
 
     // Catalog access (temporary for benchmarking)
     Catalog& getCatalog() { return catalog_; }

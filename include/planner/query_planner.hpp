@@ -4,10 +4,15 @@
 #include "common/copy_traits.hpp"
 #include "expression/expression.hpp"
 #include "planner/abstract_plan_node.hpp"
+#include "planner/join_strategy.hpp"
 
 #include <SQLParser.h>
 
 #include <memory>
+
+namespace velodb {
+
+} // namespace velodb
 
 // Forward declarations for SQL parser
 namespace hsql {
@@ -25,11 +30,15 @@ class Schema;
 // Query planner interface
 class QueryPlanner : private NonCopyable {
 public:
-    explicit QueryPlanner(Catalog& catalog);
+    explicit QueryPlanner(Catalog& catalog, JoinStrategy join_strategy = JoinStrategy::HASH_JOIN);
     ~QueryPlanner() = default;
 
     QueryPlanner(QueryPlanner&& other) noexcept = default;
     QueryPlanner& operator=(QueryPlanner&& other) noexcept = default;
+
+    // Join strategy configuration
+    void setJoinStrategy(JoinStrategy strategy) { join_strategy_ = strategy; }
+    JoinStrategy getJoinStrategy() const { return join_strategy_; }
 
     // Main planning interface
     std::unique_ptr<AbstractPlanNode> planSelect(const hsql::SelectStatement* select_stmt);
@@ -90,6 +99,7 @@ private:
     void extractConjuncts(const AbstractExpression* expr, std::vector<const AbstractExpression*>& conjuncts);
 
     std::reference_wrapper<Catalog> catalog_; // Wrap to allow move semantics
+    JoinStrategy join_strategy_;
 };
 
 } // namespace velodb

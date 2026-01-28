@@ -6,6 +6,7 @@
 #include "execution/query_result.hpp"
 #include "expression/expression.hpp"
 #include "planner/abstract_plan_node.hpp"
+#include "planner/join_strategy.hpp"
 #include "planner/query_planner.hpp"
 
 // Forward declarations for SQL parser
@@ -28,6 +29,10 @@ public:
 
     // Main execution interface
     Result<QueryResult> executeQuery(const std::string& sql, QueryStatistics* stats = nullptr);
+
+    // Join strategy configuration
+    void setJoinStrategy(JoinStrategy strategy) { planner_.setJoinStrategy(strategy); }
+    JoinStrategy getJoinStrategy() const { return planner_.getJoinStrategy(); }
 
     size_t getLastExecutionRowCount() const { return last_execution_row_count_; }
     double getLastExecutionTimeMs() const { return last_execution_time_ms_; }

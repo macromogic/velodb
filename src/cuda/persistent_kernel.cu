@@ -2,6 +2,7 @@
 #include "data/type_traits.hpp"
 
 #include "cuda/gather.cuh"
+#include "cuda/hash_join.cuh"
 #include "cuda/permute.cuh"
 #include "cuda/persistent_kernel.cuh"
 #include "cuda/scatter.cuh"
@@ -41,6 +42,18 @@ __device__ __forceinline__ void dispatchCommand(Command& cmd, cg::grid_group& gr
 
     case OpCode::OP_SORT_MERGE_JOIN_WRITE:
         executeSortMergeJoinWrite(cmd.args.sort_merge_join_write, grid);
+        break;
+
+    case OpCode::OP_HASH_JOIN_BUILD:
+        executeHashJoinBuild(cmd.args.hash_join_build, grid);
+        break;
+
+    case OpCode::OP_HASH_JOIN_COUNT:
+        executeHashJoinCount(cmd.args.hash_join_count, grid);
+        break;
+
+    case OpCode::OP_HASH_JOIN_WRITE:
+        executeHashJoinWrite(cmd.args.hash_join_write, grid);
         break;
 
     case OpCode::OP_NOP: // Do nothing

@@ -3,6 +3,7 @@
 #include "catalog/mock_catalog_builder.hpp"
 #include "catalog/tpch_catalog_builder.hpp"
 #include "common/exception.hpp"
+#include "planner/join_strategy.hpp"
 #include "planner/plan_visualizer.hpp"
 
 #include <argparse/argparse.hpp>
@@ -28,6 +29,11 @@ int main(int argc, char* argv[])
         .nargs(1)
         .choices("text", "graphviz", "detailed");
 
+    program.add_argument("--join-strategy", "-j")
+        .help("Join strategy to use {sort_merge, hash}")
+        .default_value(std::string("sort_merge"))
+        .choices("sort_merge", "sort-merge", "smj", "hash", "hj");
+
     program.add_argument("--verbose").help("Enable verbose output").flag();
 
     try {
@@ -41,10 +47,12 @@ int main(int argc, char* argv[])
     bool verbose = program.get<bool>("--verbose");
     bool use_mock_catalog = program.get<bool>("--mock-catalog");
     bool use_tpch_catalog = program.get<bool>("--tpch-catalog");
+    JoinStrategy join_strategy = parseJoinStrategy(program.get<std::string>("--join-strategy"));
 
     if (verbose) {
         std::cout << "VelODB v" << VERSION_STRING << std::endl;
         std::cout << "Query Plan Visualization Tool" << std::endl;
+        std::cout << "Join Strategy: " << joinStrategyToString(join_strategy) << std::endl;
         std::cout << "=============================" << std::endl;
     }
 
@@ -87,7 +95,7 @@ int main(int argc, char* argv[])
         }
 
         if (result.getStatement(0)->type() == hsql::kStmtSelect) {
-            QueryPlanner planner(catalog);
+            QueryPlanner planner(catalog, join_strategy);
             const auto* select_stmt = static_cast<const hsql::SelectStatement*>(result.getStatement(0));
 
             try {

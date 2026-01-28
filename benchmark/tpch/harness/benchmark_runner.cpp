@@ -48,8 +48,12 @@ Result<TPCHBenchmarkRunner::BenchmarkResults> TPCHBenchmarkRunner::runPowerTest(
     results.benchmark_id = generateBenchmarkId();
     results.system_info = performance_monitor_.getSystemInfo();
 
+    // Set join strategy
+    database_.setJoinStrategy(config.join_strategy);
+
     if (config.verbose) {
         fmt::println("Starting TPC-H Power Test ({})", results.benchmark_id);
+        fmt::println("Join Strategy: {}", velodb::joinStrategyToString(config.join_strategy));
         fmt::println("========================================");
     }
 
@@ -232,17 +236,21 @@ Result<void> TPCHBenchmarkRunner::exportResults(const BenchmarkResults& results,
         if (!file.is_open())
             return Result<void>::failure(fmt::format("Cannot create file: {}", std::string(filename)));
 
-        file << "Query,ScaleFactor,Iteration,Time_s,Rows,Status,ErrorMessage\n";
+        file << "Query,ScaleFactor,Iteration,Time_ms,Rows,Status,ErrorMessage\n";
 
         for (const auto& qr : results.query_results) {
-            file << fmt::format("{},{},{},{:.4f},{},{},\"{}\"\n",
+            std::string_view error_msg = qr.error_message;
+            if (auto pos = error_msg.rfind('\n'); pos != std::string_view::npos) {
+                error_msg = error_msg.substr(pos + 1);
+            }
+            file << fmt::format("Q{},{},{},{:.4f},{},{},\"{}\"\n",
                                 qr.query_number,
                                 qr.scale_factor,
                                 qr.iteration,
                                 qr.metrics.execution_time.count(),
                                 qr.result_row_count,
                                 qr.success ? "OK" : "FAIL",
-                                qr.error_message);
+                                error_msg);
         }
         return Result<void>::success();
     } else {

@@ -21,6 +21,9 @@ enum class OpCode : uint32_t {
     OP_SORT_MERGE_JOIN_COUNT,
     OP_SORT_MERGE_JOIN_PREPARE,
     OP_SORT_MERGE_JOIN_WRITE,
+    OP_HASH_JOIN_BUILD,
+    OP_HASH_JOIN_COUNT,
+    OP_HASH_JOIN_WRITE,
     OP_TERMINATE = 0xFFFFFFFF
 };
 
@@ -97,6 +100,43 @@ union alignas(16) CommandArgs {
         int64_t* out_left;
         int64_t* out_right;
     } sort_merge_join_write;
+
+    struct HashJoinBuildArgs {
+        void* keys;
+        int64_t* rowids;
+        size_t n;
+        void* ht_entries; // HashTableEntry<T>*
+        uint32_t* ht_heads;
+        uint32_t* ht_counter;
+        uint32_t ht_capacity;
+        uint32_t ht_num_buckets;
+        DataTypeId type_id;
+    } hash_join_build;
+
+    struct HashJoinCountArgs {
+        void* probe_keys;
+        size_t probe_n;
+        void* ht_entries;
+        uint32_t* ht_heads;
+        uint32_t ht_capacity;
+        uint32_t ht_num_buckets;
+        size_t* out_count;
+        DataTypeId type_id;
+    } hash_join_count;
+
+    struct HashJoinWriteArgs {
+        void* probe_keys;
+        int64_t* probe_rowids;
+        size_t probe_n;
+        void* ht_entries;
+        uint32_t* ht_heads;
+        uint32_t ht_capacity;
+        uint32_t ht_num_buckets;
+        int64_t* out_left;
+        int64_t* out_right;
+        uint32_t* write_offset;
+        DataTypeId type_id;
+    } hash_join_write;
 };
 
 struct alignas(16) Command {

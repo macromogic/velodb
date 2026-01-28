@@ -18,6 +18,7 @@
 #include "expression/logical_expression.hpp"
 #include "planner/abstract_plan_node.hpp"
 #include "planner/filter_compaction_plan_node.hpp"
+#include "planner/hash_join_plan_node.hpp"
 #include "planner/limit_plan_node.hpp"
 #include "planner/materialization_plan_node.hpp"
 #include "planner/projection_plan_node.hpp"
@@ -99,8 +100,9 @@ static auto format_as(OperatorType op_type)
 namespace velodb {
 
 // QueryPlanner implementation
-QueryPlanner::QueryPlanner(Catalog& catalog)
+QueryPlanner::QueryPlanner(Catalog& catalog, JoinStrategy join_strategy)
     : catalog_(catalog)
+    , join_strategy_(join_strategy)
 {
 }
 
@@ -361,36 +363,55 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef*
             size_t left_key_idx = root_node.plan->getOutputSchema().getColumnIndex(root_col->getColumnName());
             size_t right_key_idx = right_node.plan->getOutputSchema().getColumnIndex(next_col->getColumnName());
 
-            // Add sort logic
-            // Left
-            {
-                std::vector<size_t> indices { left_key_idx };
-                std::vector<bool> asc { true };
-                auto sort = std::make_unique<SortPlanNode>(root_node.plan->getOutputSchema().clone(), indices, asc);
-                sort->addChild(std::move(root_node.plan));
-                root_node.plan = std::move(sort);
-            }
-            // Right
-            {
-                std::vector<size_t> indices { right_key_idx };
-                std::vector<bool> asc { true };
-                auto sort = std::make_unique<SortPlanNode>(right_node.plan->getOutputSchema().clone(), indices, asc);
-                sort->addChild(std::move(right_node.plan));
-                right_node.plan = std::move(sort);
-            }
-
-            // Merge Metadata
+            // Merge Metadata for output schema
             auto output_schema = root_node.plan->getOutputSchema().clone();
             for (const auto& col : right_node.plan->getOutputSchema()) {
                 output_schema.addColumnInfo(col.clone());
             }
 
-            auto join_node = std::make_unique<SortMergeJoinPlanNode>(std::move(output_schema),
-                                                                     std::move(root_node.plan),
-                                                                     std::move(right_node.plan),
-                                                                     std::make_pair(left_key_idx, right_key_idx),
-                                                                     root_node.source_tables,
-                                                                     right_node.source_tables);
+            std::unique_ptr<AbstractPlanNode> join_node;
+            if (join_strategy_ == JoinStrategy::HASH_JOIN) {
+                // Hash join: no pre-sorting required
+                join_node = std::make_unique<HashJoinPlanNode>(std::move(output_schema),
+                                                               std::move(root_node.plan),
+                                                               std::move(right_node.plan),
+                                                               std::make_pair(left_key_idx, right_key_idx),
+                                                               root_node.source_tables,
+                                                               right_node.source_tables);
+            } else {
+                // Sort-merge join: sort key columns before join
+                // Left
+                {
+                    std::vector<size_t> indices { left_key_idx };
+                    std::vector<bool> asc { true };
+                    auto sort = std::make_unique<SortPlanNode>(root_node.plan->getOutputSchema().clone(), indices, asc);
+                    sort->addChild(std::move(root_node.plan));
+                    root_node.plan = std::move(sort);
+                }
+                // Right
+                {
+                    std::vector<size_t> indices { right_key_idx };
+                    std::vector<bool> asc { true };
+                    auto sort = std::make_unique<SortPlanNode>(right_node.plan->getOutputSchema().clone(),
+                                                               indices,
+                                                               asc);
+                    sort->addChild(std::move(right_node.plan));
+                    right_node.plan = std::move(sort);
+                }
+
+                // Update output_schema after sorting (schema is the same, but plans changed)
+                output_schema = root_node.plan->getOutputSchema().clone();
+                for (const auto& col : right_node.plan->getOutputSchema()) {
+                    output_schema.addColumnInfo(col.clone());
+                }
+
+                join_node = std::make_unique<SortMergeJoinPlanNode>(std::move(output_schema),
+                                                                    std::move(root_node.plan),
+                                                                    std::move(right_node.plan),
+                                                                    std::make_pair(left_key_idx, right_key_idx),
+                                                                    root_node.source_tables,
+                                                                    right_node.source_tables);
+            }
             root_node.plan = std::move(join_node);
             root_node.table_aliases.insert(root_node.table_aliases.end(),
                                            right_node.table_aliases.begin(),

@@ -7,6 +7,7 @@
 #include "common/copy_traits.hpp"
 #include "common/result.hpp"
 #include "execution/query_result.hpp"
+#include "planner/join_strategy.hpp"
 
 #include <filesystem>
 #include <string>
@@ -24,6 +25,7 @@ public:
         bool validate_results = true;
         bool verbose = true;
         bool with_profiling = false;
+        velodb::JoinStrategy join_strategy = velodb::JoinStrategy::SORT_MERGE_JOIN;
         std::filesystem::path data_directory = "./benchmark/data";
         std::filesystem::path results_directory = "./benchmark/results";
     };

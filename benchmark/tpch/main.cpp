@@ -1,5 +1,6 @@
 #include "common/fmt.hpp"
 #include "harness/benchmark_runner.hpp"
+#include "planner/join_strategy.hpp"
 
 #include <argparse/argparse.hpp>
 #include <fmt/ranges.h>
@@ -100,6 +101,11 @@ int main(int argc, char* argv[])
 
     program.add_argument("--with-profiling").help("Enable profiling during benchmark").flag();
 
+    program.add_argument("--join-strategy", "-j")
+        .help("Join strategy to use {sort_merge, hash}")
+        .default_value(std::string("sort_merge"))
+        .choices("sort_merge", "sort-merge", "smj", "hash", "hj");
+
     // Quick benchmark presets
     program.add_argument("--quick").help("Run quick benchmark (SF=0.01, Q1,Q6, 1 iteration)").flag();
 
@@ -138,12 +144,14 @@ int main(int argc, char* argv[])
         config.validate_results = program.get<bool>("--validate");
         config.verbose = program.get<bool>("--verbose");
         config.with_profiling = program.get<bool>("--with-profiling");
+        config.join_strategy = velodb::parseJoinStrategy(program.get<std::string>("--join-strategy"));
         if (config.verbose) {
             fmt::println("VelODB TPC-H Benchmark");
             fmt::println("======================");
             fmt::println("Scale Factors: {}", fmt::join(config.scale_factors, ", "));
             fmt::println("Queries: {}", fmt::join(config.query_numbers, ", "));
             fmt::println("Iterations: {}", config.iterations);
+            fmt::println("Join Strategy: {}", velodb::joinStrategyToString(config.join_strategy));
             fmt::println("Data Directory: {}", std::string(config.data_directory));
             fmt::println("Results Directory: {}\n", std::string(config.results_directory));
         }
