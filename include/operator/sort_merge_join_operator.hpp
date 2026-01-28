@@ -17,8 +17,9 @@ public:
                           Schema output_schema,
                           std::unique_ptr<AbstractOperator> left_child,
                           std::unique_ptr<AbstractOperator> right_child,
-                          const Table& left_table,
-                          const Table& right_table,
+                          std::pair<size_t, size_t> join_key_indices,
+                          std::vector<const Table*> left_source_tables,
+                          std::vector<const Table*> right_source_tables,
                           JoinType join_type = JoinType::INNER);
     ~SortMergeJoinOperator() override = default;
 
@@ -31,8 +32,9 @@ private:
         return static_cast<int64_t>(seed);
     }
 
-    std::reference_wrapper<const Table> left_table_;
-    std::reference_wrapper<const Table> right_table_;
+    std::pair<size_t, size_t> join_key_indices_;
+    std::vector<const Table*> left_source_tables_;
+    std::vector<const Table*> right_source_tables_;
     JoinType join_type_;
     bool joined_ { false };
     std::random_device rd_ {};

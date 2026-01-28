@@ -34,8 +34,23 @@ Result<RowBatch> FilterCompactionOperator::next()
     }
     auto& task_manager = context_.getTaskManager();
 
-    // We assume $_mask always exists
-    auto mask_index = output_schema_.getColumnIndex("$_mask");
+    // We assume $_mask always exists, possibly with a table prefix
+    size_t mask_index = -1;
+    bool found_mask = false;
+    for (size_t i = 0; i < output_schema_.getColumnCount(); ++i) {
+        auto name = output_schema_.getColumnInfo(i).getName();
+        if (name == "$_mask" || (name.length() > 7 && name.substr(name.length() - 7) == ".$_mask")) {
+            mask_index = i;
+            found_mask = true;
+            break;
+        }
+    }
+
+    if (!found_mask) {
+        // Fallback or explicit check
+        mask_index = output_schema_.getColumnIndex("$_mask");
+    }
+
     auto& mask_column = batch.getColumn(mask_index);
     auto stream_handle = StreamPool::getInstance().acquire().value();
     const uint8_t* mask_data = static_cast<const uint8_t*>(mask_column.rawData());

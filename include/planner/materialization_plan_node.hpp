@@ -8,7 +8,7 @@ namespace velodb {
 class MaterializationPlanNode : public AbstractPlanNode {
 public:
     explicit MaterializationPlanNode(Schema output_schema)
-        : AbstractPlanNode(PlanType::PROJECTION, std::move(output_schema))
+        : AbstractPlanNode(PlanType::MATERIALIZATION, std::move(output_schema))
     {
     }
     ~MaterializationPlanNode() override = default;

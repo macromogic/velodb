@@ -73,18 +73,36 @@ TEST_F(JoinPlannerTest, SelectStarJoinPlanContainsMaterialization)
     };
     auto join_node = find_join(plan.get());
     ASSERT_NE(join_node, nullptr);
+
     // Ensure a materialization node exists above join (its direct parent or ancestor with disambiguated schema)
     bool found_materialization = false;
-    std::function<void(const AbstractPlanNode*, bool)> dfs = [&](const AbstractPlanNode* n, bool seenJoin) {
-        if (!n)
-            return;
-        if (seenJoin && n->getPlanType() == PlanType::PROJECTION && n->getOutputSchema().getColumnCount() > 2) {
-            found_materialization = true;
+    std::function<bool(const AbstractPlanNode*)> contains_join = [&](const AbstractPlanNode* n) {
+        if (!n) {
+            return false;
+        }
+        if (n == join_node) {
+            return true;
         }
         for (auto& c : n->getChildren()) {
-            dfs(c.get(), seenJoin || c.get() == join_node);
+            if (contains_join(c.get())) {
+                return true;
+            }
+        }
+        return false;
+    };
+    std::function<void(const AbstractPlanNode*)> search_mat = [&](const AbstractPlanNode* n) {
+        if (!n) {
+            return;
+        }
+        if (n->getPlanType() == PlanType::MATERIALIZATION) {
+            if (contains_join(n)) {
+                found_materialization = true;
+            }
+        }
+        for (auto& c : n->getChildren()) {
+            search_mat(c.get());
         }
     };
-    dfs(plan.get(), false);
+    search_mat(plan.get());
     EXPECT_TRUE(found_materialization);
 }

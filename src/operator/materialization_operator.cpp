@@ -4,6 +4,7 @@
 #include "catalog/row_batch.hpp"
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
+#include "common/string_utils.hpp"
 
 namespace velodb {
 
@@ -13,52 +14,74 @@ MaterializationOperator::MaterializationOperator(ExecutionContext& context,
     : UnaryOperator(context, std::move(output_schema), std::move(child))
     , produced_(false)
 {
+    // Identify available tables and their RowID column index from the input child operator
+    // The child operator (Projection of RowIDs) must output columns named "TableName.$_rowid"
+    std::unordered_map<std::string, size_t> table_rowid_indices;
+    std::unordered_map<std::string, const Table*> tables;
+
     const auto& in_schema = child_->getOutputSchema();
-    auto [left_table_name, _] = splitName(in_schema.getColumnInfo(0).getName());
-    auto [right_table_name, __] = splitName(in_schema.getColumnInfo(1).getName());
-    left_table_ = &context_.getCatalog().getTable(left_table_name).value().get();
-    right_table_ = &context_.getCatalog().getTable(right_table_name).value().get();
-    VELODB_ASSERT_MSG(left_table_ && right_table_, "Source tables must exist");
+    for (size_t i = 0; i < in_schema.getColumnCount(); ++i) {
+        auto full_name = in_schema.getColumnInfo(i).getName();
+        auto [table_name_view, col_name_view] = splitName(full_name);
+
+        // We expect inputs to be rowids.
+        if (col_name_view == "$_rowid") {
+            std::string table_name(table_name_view);
+            table_rowid_indices[table_name] = i;
+            if (tables.find(table_name) == tables.end()) {
+                auto table_opt = context_.getCatalog().getTable(table_name);
+                VELODB_ASSERT_MSG(table_opt.has_value(), "Source table must exist in catalog");
+                tables[table_name] = &table_opt.value().get();
+            }
+        }
+    }
 
     const auto& out_schema = getOutputSchema();
     // Build column maps
     for (size_t i = 0; i < out_schema.getColumnCount(); ++i) {
         const auto& col_info = out_schema.getColumnInfo(i);
-        auto [table_name, col_name] = splitName(col_info.getName());
-        if (table_name.empty()) {
-            for (size_t j = 0; j < left_table_->getColumnCount(); ++j) {
-                if (left_table_->getColumnName(j) == col_name) {
-                    col_map_.push_back({ true, j });
-                    goto next_column;
-                }
-            }
-            for (size_t j = 0; j < right_table_->getColumnCount(); ++j) {
-                if (right_table_->getColumnName(j) == col_name) {
-                    col_map_.push_back({ false, j });
-                    goto next_column;
-                }
-            }
-            VELODB_THROW(DatabaseError, "Output schema column does not match either source table");
-        next_column:;
-        } else if (table_name == left_table_->getName()) {
-            size_t col_index = left_table_->getColumnIndex(col_name);
-            col_map_.push_back({ true, col_index });
-        } else if (table_name == right_table_->getName()) {
-            size_t col_index = right_table_->getColumnIndex(col_name);
-            col_map_.push_back({ false, col_index });
-        } else {
-            VELODB_THROW(DatabaseError, "Output schema column does not match either source table");
-        }
-    }
-}
+        auto full_name = col_info.getName();
+        auto [table_name_view, col_name_view] = splitName(full_name);
+        std::string table_name(table_name_view);
+        std::string col_name(col_name_view);
 
-std::pair<std::string, std::string> MaterializationOperator::splitName(const std::string& name)
-{
-    auto pos = name.find('.');
-    if (pos == std::string::npos) {
-        return { "", name };
+        const Table* source_table = nullptr;
+        size_t rowid_idx = 0;
+
+        if (table_name.empty()) {
+            for (const auto& [t_name, t_ptr] : tables) {
+                bool found = false;
+                for (size_t j = 0; j < t_ptr->getColumnCount(); ++j) {
+                    if (t_ptr->getColumnName(j) == col_name) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (found) {
+                    if (source_table != nullptr) {
+                        VELODB_THROW(DatabaseError, "Ambiguous column name in materialization: " + col_name);
+                    }
+                    source_table = t_ptr;
+                    rowid_idx = table_rowid_indices[t_name];
+                }
+            }
+            if (source_table == nullptr) {
+                VELODB_THROW(DatabaseError, "Output schema column does not match any source table: " + col_name);
+            }
+        } else {
+            auto it = tables.find(table_name);
+            if (it == tables.end()) {
+                VELODB_THROW(DatabaseError, "Table not available in join results: " + table_name);
+            }
+            source_table = it->second;
+            rowid_idx = table_rowid_indices[table_name];
+        }
+
+        // Find column index in source table
+        size_t source_col_idx = source_table->getColumnIndex(col_name);
+        col_map_.push_back({ rowid_idx, source_table, source_col_idx });
     }
-    return { name.substr(0, pos), name.substr(pos + 1) };
 }
 
 Result<RowBatch> MaterializationOperator::next()
@@ -72,20 +95,20 @@ Result<RowBatch> MaterializationOperator::next()
         produced_ = true;
         return Result<RowBatch>::success(RowBatch());
     }
-    VELODB_ASSERT_MSG(join_batch.getColumnCount() == 2,
-                      "Join batch must have exactly two columns for left and right rowids");
     join_batch.to(DataLocation::HOST);
+
     size_t num_columns = col_map_.size();
     std::vector<Column> output_columns;
     output_columns.reserve(num_columns);
-    for (size_t i = 0; i < num_columns; ++i) {
-        const auto& mapping = col_map_[i];
-        const Table* source_table = mapping.is_left ? left_table_ : right_table_;
-        const Column& source_col = source_table->getColumn(mapping.source_index);
-        const Column& rowid_col = join_batch.getColumn(mapping.is_left ? 0 : 1);
+
+    for (const auto& mapping : col_map_) {
+        const Column& rowid_col = join_batch.getColumn(mapping.rowid_input_index);
+        const Column& source_col = mapping.source_table->getColumn(mapping.source_col_index);
         output_columns.push_back(source_col.gather(rowid_col));
     }
+
     RowBatch materialized_batch = buildBatchFromColumns(std::move(output_columns));
+    setNumRowsForBatch(materialized_batch, join_batch.getRowCount());
     produced_ = true;
     return Result<RowBatch>::success(std::move(materialized_batch));
 }

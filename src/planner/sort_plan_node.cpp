@@ -2,7 +2,7 @@
 
 #include "common/exception.hpp"
 
-#include <stdexcept>
+#include <fmt/ranges.h>
 
 namespace velodb {
 
@@ -28,7 +28,12 @@ std::unique_ptr<AbstractOperator> SortPlanNode::createOperator([[maybe_unused]] 
 
 std::string SortPlanNode::toString() const
 {
-    return "Sort(...)";
+    std::vector<std::string> sort_strs;
+    for (size_t i = 0; i < order_indices_.size(); ++i) {
+        auto& sort_col = output_schema_.getColumnInfo(order_indices_[i]);
+        sort_strs.push_back(fmt::format("{} {}", sort_col.getName(), ascending_flags_[i] ? "ASC" : "DESC"));
+    }
+    return fmt::format("Sort({})", fmt::join(sort_strs, ", "));
 }
 
 } // namespace velodb

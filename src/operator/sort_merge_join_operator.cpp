@@ -12,23 +12,23 @@ SortMergeJoinOperator::SortMergeJoinOperator(ExecutionContext& context,
                                              Schema output_schema,
                                              std::unique_ptr<AbstractOperator> left_child,
                                              std::unique_ptr<AbstractOperator> right_child,
-                                             const Table& left_table,
-                                             const Table& right_table,
+                                             std::pair<size_t, size_t> join_key_indices,
+                                             std::vector<const Table*> left_source_tables,
+                                             std::vector<const Table*> right_source_tables,
                                              JoinType join_type)
     : BinaryOperator(context, std::move(output_schema), std::move(left_child), std::move(right_child))
-    , left_table_(left_table)
-    , right_table_(right_table)
+    , join_key_indices_(join_key_indices)
+    , left_source_tables_(std::move(left_source_tables))
+    , right_source_tables_(std::move(right_source_tables))
     , join_type_(join_type)
 {
 }
 
 Result<RowBatch> SortMergeJoinOperator::next()
 {
-    // Simple single-pass INNER merge equi-join on first column (join key) of each side.
+    // Simple single-pass INNER merge equi-join on generic columns
     // Assumptions:
-    //  Left & Right inputs are individually sorted ascending by key (column 0).
-    //  Column layout per side after projection: [key, $_rowid, $_mask].
-    // Output schema: [left_table_$_rowid, right_table_$_rowid]
+    //  Left & Right inputs are individually sorted ascending by join key
     if (joined_) {
         // Return empty batch to signal completion
         return Result<RowBatch>::success(RowBatch());
@@ -49,21 +49,56 @@ Result<RowBatch> SortMergeJoinOperator::next()
     }
 
     PROFILE_SCOPE("SortMergeJoinOperator::next");
-    // Assumption: both `left_batch` and `right_batch` are sorted ascending by column 0.
-    if (left_batch.getColumnCount() < 2 || right_batch.getColumnCount() < 2) {
-        return Result<RowBatch>::failure("Input batches must expose key and $_rowid columns at indices 0 and 1");
+    // Assumption: both `left_batch` and `right_batch` are sorted ascending by join key.
+
+    // Validate key indices
+    if (join_key_indices_.first >= left_batch.getColumnCount()) {
+        return Result<RowBatch>::failure("Left join key index out of bounds");
+    }
+    if (join_key_indices_.second >= right_batch.getColumnCount()) {
+        return Result<RowBatch>::failure("Right join key index out of bounds");
     }
 
-    JoinColumn left_join_col { .keys = left_batch.getColumn(0).rawData(),
-                               .rowids = static_cast<int64_t*>(left_batch.getColumn(1).rawData()),
-                               .n = left_batch.getRowCount() };
-    JoinColumn right_join_col { .keys = right_batch.getColumn(0).rawData(),
-                                .rowids = static_cast<int64_t*>(right_batch.getColumn(1).rawData()),
-                                .n = right_batch.getRowCount() };
+    // Prepare indices for Join phase (0..N-1)
     auto& task_manager = context_.getTaskManager();
+    auto stream_handle = StreamPool::getInstance().acquire().value();
+
+    // We use a dummy column to hold indices [0, 1, ... N]
+    int64_t* d_left_indices;
+    CHECKED_CALL_THROW(
+        cudaMallocAsync(&d_left_indices, left_batch.getRowCount() * sizeof(int64_t), stream_handle->get()));
+    // We use OP_SORT_MERGE_JOIN_PREPARE to generate sequential indices 0..N ??
+    // Wait, PREPARE generates RANDOM indices 0..n_rows.
+    // If we want SEQUENTIAL indices, we need a sequence generator.
+    // Since we can't change CUDA code, we might need to copy from host or use what we have.
+    // Assuming we can copy from host for now (small overhead vs join logic)
+    std::vector<int64_t> h_left_indices(left_batch.getRowCount());
+    std::iota(h_left_indices.begin(), h_left_indices.end(), 0);
+    CHECKED_CALL_THROW(cudaMemcpyAsync(d_left_indices,
+                                       h_left_indices.data(),
+                                       left_batch.getRowCount() * sizeof(int64_t),
+                                       cudaMemcpyHostToDevice,
+                                       stream_handle->get()));
+
+    int64_t* d_right_indices;
+    CHECKED_CALL_THROW(
+        cudaMallocAsync(&d_right_indices, right_batch.getRowCount() * sizeof(int64_t), stream_handle->get()));
+    std::vector<int64_t> h_right_indices(right_batch.getRowCount());
+    std::iota(h_right_indices.begin(), h_right_indices.end(), 0);
+    CHECKED_CALL_THROW(cudaMemcpyAsync(d_right_indices,
+                                       h_right_indices.data(),
+                                       right_batch.getRowCount() * sizeof(int64_t),
+                                       cudaMemcpyHostToDevice,
+                                       stream_handle->get()));
+
+    JoinColumn left_join_col { .keys = left_batch.getColumn(join_key_indices_.first).rawData(),
+                               .rowids = d_left_indices,
+                               .n = left_batch.getRowCount() };
+    JoinColumn right_join_col { .keys = right_batch.getColumn(join_key_indices_.second).rawData(),
+                                .rowids = d_right_indices,
+                                .n = right_batch.getRowCount() };
 
     // Scan-count phase to determine output size
-    auto stream_handle = StreamPool::getInstance().acquire().value();
     // Allocate extra space for join blocks to prevent potential overflow if fragmentation is high
     size_t max_join_blocks = left_batch.getRowCount() * 2;
     MergeJoinBlock* d_join_blocks;
@@ -75,14 +110,16 @@ Result<RowBatch> SortMergeJoinOperator::next()
     CHECKED_CALL_THROW(cudaMemsetAsync(d_join_block_count, 0, sizeof(size_t), stream_handle->get()));
     CHECKED_CALL_THROW(cudaMemsetAsync(d_row_count, 0, sizeof(size_t), stream_handle->get()));
     stream_handle->synchronize();
+
     Command cmd_count = {};
     cmd_count.opcode = OpCode::OP_SORT_MERGE_JOIN_COUNT;
-    cmd_count.args = { .sort_merge_join_count = { .left = left_join_col,
-                                                  .right = right_join_col,
-                                                  .out_blocks = d_join_blocks,
-                                                  .out_block_count = d_join_block_count,
-                                                  .out_row_count = d_row_count,
-                                                  .type_id = left_batch.getColumn(0).getType().getTypeId() } };
+    cmd_count.args = { .sort_merge_join_count = {
+                           .left = left_join_col,
+                           .right = right_join_col,
+                           .out_blocks = d_join_blocks,
+                           .out_block_count = d_join_block_count,
+                           .out_row_count = d_row_count,
+                           .type_id = left_batch.getColumn(join_key_indices_.first).getType().getTypeId() } };
     task_manager.waitCommand(task_manager.submitCommand(cmd_count));
     size_t h_row_count = 0;
     CHECKED_CALL_THROW(
@@ -91,31 +128,36 @@ Result<RowBatch> SortMergeJoinOperator::next()
     size_t h_padded_rows = nextPow2(h_row_count);
 
     // Join-write phase
-    int64_t* d_out_left;
-    CHECKED_CALL_THROW(cudaMallocAsync(&d_out_left, h_padded_rows * sizeof(int64_t), stream_handle->get()));
-    int64_t* d_out_right;
-    CHECKED_CALL_THROW(cudaMallocAsync(&d_out_right, h_padded_rows * sizeof(int64_t), stream_handle->get()));
-    stream_handle->synchronize();
+    // Allocate output indices buffers
+    int64_t* d_out_left_indices; // Contains indices into Left Batch
+    CHECKED_CALL_THROW(cudaMallocAsync(&d_out_left_indices, h_padded_rows * sizeof(int64_t), stream_handle->get()));
+    int64_t* d_out_right_indices; // Contains indices into Right Batch
+    CHECKED_CALL_THROW(cudaMallocAsync(&d_out_right_indices, h_padded_rows * sizeof(int64_t), stream_handle->get()));
 
-    Command cmd_join_left = {};
-    cmd_join_left.opcode = OpCode::OP_SORT_MERGE_JOIN_PREPARE;
-    cmd_join_left.args = { .sort_merge_join_prepare = {
-                               .rowids = d_out_left,
-                               .n = h_padded_rows,
-                               .n_rows = left_table_.get().getRowCount(),
-                               .seed = getSeed(),
-                           } };
-    task_manager.submitCommand(cmd_join_left);
-    Command cmd_join_right = {};
-    cmd_join_right.opcode = OpCode::OP_SORT_MERGE_JOIN_PREPARE;
-    cmd_join_right.args = { .sort_merge_join_prepare = {
-                                .rowids = d_out_right,
-                                .n = h_padded_rows,
-                                .n_rows = right_table_.get().getRowCount(),
-                                .seed = getSeed(),
-                            } };
-    task_manager.waitCommand(task_manager.submitCommand(cmd_join_right));
+    // Initialize output indices with random VALID indices from batch to satisfy Oblivious RAM access pattern
+    // We use PREPARE to generate random indices in range [0, batch_size)
+    // Note: This fills the 'dummy' slots. Real matches will be overwritten by WRITE.
+    Command cmd_prepare_left = {};
+    cmd_prepare_left.opcode = OpCode::OP_SORT_MERGE_JOIN_PREPARE;
+    cmd_prepare_left.args = { .sort_merge_join_prepare = {
+                                  .rowids = d_out_left_indices,
+                                  .n = h_padded_rows,
+                                  .n_rows = left_batch.getRowCount(), // Random range comes from this
+                                  .seed = getSeed(),
+                              } };
+    task_manager.submitCommand(cmd_prepare_left);
 
+    Command cmd_prepare_right = {};
+    cmd_prepare_right.opcode = OpCode::OP_SORT_MERGE_JOIN_PREPARE;
+    cmd_prepare_right.args = { .sort_merge_join_prepare = {
+                                   .rowids = d_out_right_indices,
+                                   .n = h_padded_rows,
+                                   .n_rows = right_batch.getRowCount(), // Random range comes from this
+                                   .seed = getSeed(),
+                               } };
+    task_manager.waitCommand(task_manager.submitCommand(cmd_prepare_right));
+
+    // Perform Write (Overwrite hits with correct indices)
     Command cmd_join = {};
     cmd_join.opcode = OpCode::OP_SORT_MERGE_JOIN_WRITE;
     cmd_join.args = { .sort_merge_join_write = {
@@ -123,29 +165,114 @@ Result<RowBatch> SortMergeJoinOperator::next()
                           .right = right_join_col,
                           .blocks = d_join_blocks,
                           .n_blocks = d_join_block_count,
-                          .out_left = d_out_left,
-                          .out_right = d_out_right,
+                          .out_left = d_out_left_indices,
+                          .out_right = d_out_right_indices,
                       } };
     task_manager.waitCommand(task_manager.submitCommand(cmd_join));
 
-    Column left_rowid_col = Column::createFromDeviceBuffers(DataType::createType(DataTypeId::BIGINT),
-                                                            d_out_left,
+    // Create Column wrappers for gathering
+    // Note: These columns take ownership of the device pointers, so we DO NOT free d_out_*_indices manually.
+    auto left_indices_col = Column::createFromDeviceBuffers(DataType::createType(DataTypeId::BIGINT),
+                                                            d_out_left_indices,
                                                             nullptr,
-                                                            0,
+                                                            h_padded_rows,
                                                             h_padded_rows);
-    Column right_rowid_col = Column::createFromDeviceBuffers(DataType::createType(DataTypeId::BIGINT),
-                                                             d_out_right,
+
+    auto right_indices_col = Column::createFromDeviceBuffers(DataType::createType(DataTypeId::BIGINT),
+                                                             d_out_right_indices,
                                                              nullptr,
-                                                             0,
+                                                             h_padded_rows,
                                                              h_padded_rows);
+
+    // Gather Logic
+    std::vector<Column> result_cols;
+    result_cols.reserve(left_batch.getColumnCount() + right_batch.getColumnCount());
+
+    size_t last_id = 0;
+    // Gather Left Columns
+    for (size_t i = 0; i < left_batch.getColumnCount(); ++i) {
+        auto& col = left_batch.getColumn(i);
+        DataTypeId type_id = col.getType().getTypeId();
+        size_t type_size = col.getType().size();
+
+        void* d_out_data;
+        CHECKED_CALL_THROW(cudaMallocAsync(&d_out_data, h_padded_rows * type_size, stream_handle->get()));
+
+        Command cmd_permute = {};
+        cmd_permute.opcode = OpCode::OP_PERMUTE;
+        cmd_permute.args.permute = { .out_data = d_out_data,
+                                     .in_data = col.rawData(),
+                                     .in_indices = static_cast<const int64_t*>(left_indices_col.rawData()),
+                                     .n = h_padded_rows,
+                                     .type_id = type_id };
+        last_id = task_manager.submitCommand(cmd_permute);
+
+        // Permute mask (always treated as uint8_t/BOOLEAN)
+        void* d_out_mask;
+        CHECKED_CALL_THROW(cudaMallocAsync(&d_out_mask, h_padded_rows * sizeof(uint8_t), stream_handle->get()));
+
+        Command cmd_mask = {};
+        cmd_mask.opcode = OpCode::OP_PERMUTE;
+        cmd_mask.args.permute = { .out_data = d_out_mask,
+                                  .in_data = col.rawBitmapData(),
+                                  .in_indices = static_cast<const int64_t*>(left_indices_col.rawData()),
+                                  .n = h_padded_rows,
+                                  .type_id = DataTypeId::BOOLEAN };
+        last_id = task_manager.submitCommand(cmd_mask);
+
+        result_cols.push_back(Column::createFromDeviceBuffers(col.getType().cloneUnique(),
+                                                              d_out_data,
+                                                              static_cast<uint8_t*>(d_out_mask),
+                                                              h_padded_rows,
+                                                              h_row_count));
+    }
+
+    // Gather Right Columns
+    for (size_t i = 0; i < right_batch.getColumnCount(); ++i) {
+        auto& col = right_batch.getColumn(i);
+        DataTypeId type_id = col.getType().getTypeId();
+        size_t type_size = col.getType().size();
+
+        void* d_out_data;
+        CHECKED_CALL_THROW(cudaMallocAsync(&d_out_data, h_padded_rows * type_size, stream_handle->get()));
+
+        Command cmd_permute = {};
+        cmd_permute.opcode = OpCode::OP_PERMUTE;
+        cmd_permute.args.permute = { .out_data = d_out_data,
+                                     .in_data = col.rawData(),
+                                     .in_indices = static_cast<const int64_t*>(right_indices_col.rawData()),
+                                     .n = h_padded_rows,
+                                     .type_id = type_id };
+        last_id = task_manager.submitCommand(cmd_permute);
+
+        // Permute mask
+        void* d_out_mask;
+        CHECKED_CALL_THROW(cudaMallocAsync(&d_out_mask, h_padded_rows * sizeof(uint8_t), stream_handle->get()));
+
+        Command cmd_mask = {};
+        cmd_mask.opcode = OpCode::OP_PERMUTE;
+        cmd_mask.args.permute = { .out_data = d_out_mask,
+                                  .in_data = col.rawBitmapData(),
+                                  .in_indices = static_cast<const int64_t*>(right_indices_col.rawData()),
+                                  .n = h_padded_rows,
+                                  .type_id = DataTypeId::BOOLEAN };
+        last_id = task_manager.submitCommand(cmd_mask);
+
+        result_cols.push_back(Column::createFromDeviceBuffers(col.getType().cloneUnique(),
+                                                              d_out_data,
+                                                              static_cast<uint8_t*>(d_out_mask),
+                                                              h_padded_rows,
+                                                              h_row_count));
+    }
+
+    task_manager.waitCommand(last_id);
 
     CHECKED_CALL_THROW(cudaFreeAsync(d_join_blocks, stream_handle->get()));
     CHECKED_CALL_THROW(cudaFreeAsync(d_join_block_count, stream_handle->get()));
     CHECKED_CALL_THROW(cudaFreeAsync(d_row_count, stream_handle->get()));
-    std::vector<Column> result_cols;
-    result_cols.reserve(2);
-    result_cols.push_back(std::move(left_rowid_col));
-    result_cols.push_back(std::move(right_rowid_col));
+    CHECKED_CALL_THROW(cudaFreeAsync(d_left_indices, stream_handle->get()));
+    CHECKED_CALL_THROW(cudaFreeAsync(d_right_indices, stream_handle->get()));
+
     RowBatch joined_batch = buildBatchFromColumns(std::move(result_cols));
     setNumRowsForBatch(joined_batch, h_row_count);
     joined_ = true;

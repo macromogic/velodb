@@ -1,6 +1,12 @@
 add_executable(
-  test_query test_filter_complex.cpp test_filter.cpp test_limit.cpp
-             test_order_by.cpp test_join_execution.cpp ../test_main.cpp)
+  test_query
+  test_filter_complex.cpp
+  test_filter.cpp
+  test_limit.cpp
+  test_order_by.cpp
+  test_join_execution.cpp
+  test_multi_join.cpp
+  ../test_main.cpp)
 
 target_link_libraries(test_query ${ALL_OBJS} ${DEPENDENCY_LIBS} GTest::GTest
                       GTest::Main pthread)
@@ -13,4 +19,4 @@ set_property(TARGET test_query PROPERTY RUNTIME_OUTPUT_DIRECTORY
 target_compile_options(test_query PRIVATE -Wall -Wextra -g)
 
 add_test(NAME TestQuery COMMAND test_query)
-set_tests_properties(TestQuery PROPERTIES TIMEOUT 20)
+set_tests_properties(TestQuery PROPERTIES TIMEOUT 30)

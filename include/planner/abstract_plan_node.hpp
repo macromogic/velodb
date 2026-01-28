@@ -15,18 +15,22 @@ namespace velodb {
 class ExecutionContext;
 
 // Plan node types
-enum class PlanType {
-    INVALID = 0,
-    SEQ_SCAN,
-    COMPACTION,
-    PROJECTION,
-    NESTED_LOOP_JOIN,
-    HASH_JOIN,
-    SORT_MERGE_JOIN,
-    SORT,
-    LIMIT,
-    AGGREGATE
+// clang-format off
+enum class PlanType : uint16_t {
+    INVALID          = 0,
+    SEQ_SCAN         = 0b0000'0001,
+    COMPACTION       = 0b0000'0010,
+    PROJECTION       = 0b0000'0100,
+    JOIN             = 0b0000'1000,
+    NESTED_LOOP_JOIN = 0b0001'1000,
+    HASH_JOIN        = 0b0010'1000,
+    SORT_MERGE_JOIN  = 0b0011'1000,
+    MATERIALIZATION  = 0b0100'0000,
+    SORT             = 0b1000'0000,
+    LIMIT          = 0b1'1000'0000,
+    AGGREGATE     = 0b10'1000'0000
 };
+// clang-format on
 
 // Abstract base class for plan nodes
 class AbstractPlanNode : private NonCopyable {

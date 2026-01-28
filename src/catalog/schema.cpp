@@ -3,6 +3,7 @@
 #include "catalog/column.hpp"
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
+#include "common/string_utils.hpp"
 
 #include <fmt/ranges.h>
 
@@ -15,13 +16,19 @@ Schema::Schema(std::vector<ColumnInfo> columns)
     : columns_(std::move(columns))
 {
     for (size_t i = 0; i < columns_.size(); ++i) {
-        column_name_to_index_[columns_[i].getName()] = i;
+        auto full_name = columns_[i].getName();
+        auto [_, col_name] = splitName(full_name);
+        column_name_to_index_[full_name] = i;
+        column_name_to_index_[col_name] = i;
     }
 }
 
 void Schema::addColumnInfo(ColumnInfo column)
 {
-    column_name_to_index_[column.getName()] = columns_.size();
+    auto full_name = column.getName();
+    auto [_, col_name] = splitName(full_name);
+    column_name_to_index_[full_name] = columns_.size();
+    column_name_to_index_[col_name] = columns_.size();
     columns_.push_back(std::move(column));
 }
 

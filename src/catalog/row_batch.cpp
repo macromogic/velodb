@@ -11,7 +11,12 @@ void RowBatch::addColumn(Column&& column)
     if (columns_.empty()) {
         num_rows_ = column.size();
     } else if (column.size() != num_rows_) {
-        VELODB_THROW(CatalogError, "All columns must have the same number of rows");
+        VELODB_THROW(CatalogError,
+                     fmt::format("All columns must have the same number of rows. Attempting to add column of size {} "
+                                 "to batch with {} rows and {} columns.",
+                                 column.size(),
+                                 num_rows_,
+                                 columns_.size()));
     }
     columns_.push_back(std::move(column));
 }
@@ -19,7 +24,7 @@ void RowBatch::addColumn(Column&& column)
 Column& RowBatch::getColumn(size_t index)
 {
     if (index >= columns_.size()) {
-        VELODB_THROW(CatalogError, "Column index out of range");
+        VELODB_THROW(CatalogError, fmt::format("Column index out of range: {}", index));
     }
     return columns_[index];
 }

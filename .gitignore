@@ -11,3 +11,6 @@ compile_commands.json
 !README.md
 *.dot
 *.log
+*.pdf
+*.png
+*.svg

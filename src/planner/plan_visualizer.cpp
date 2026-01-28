@@ -25,13 +25,15 @@ auto format_as(PlanType type)
     case PlanType::HASH_JOIN:
         return "Hash Join";
     case PlanType::SORT_MERGE_JOIN:
-        return "Merge Sort Join";
+        return "Sort Merge Join";
     case PlanType::SORT:
         return "Sort";
     case PlanType::LIMIT:
         return "Limit";
     case PlanType::AGGREGATE:
         return "Aggregate";
+    case PlanType::MATERIALIZATION:
+        return "Materialization";
     case PlanType::INVALID:
         return "Invalid";
     default:
@@ -184,8 +186,6 @@ void PlanVisualizer::visualizeDetailedRecursive(const std::unique_ptr<AbstractPl
     } else {
         fmt::print(oss, "{}  Children: None (leaf node)\n", prefix);
     }
-
-    oss << "\n";
 }
 
 std::string PlanVisualizer::getNodeShape(PlanType type)

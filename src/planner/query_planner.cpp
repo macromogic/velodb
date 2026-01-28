@@ -7,6 +7,7 @@
 #include "common/constants.hpp"
 #include "common/exception.hpp"
 #include "common/profiler.hpp"
+#include "common/string_utils.hpp"
 #include "data/data_type.hpp"
 #include "data/type_checker.hpp"
 #include "expression/arithmetic_expression.hpp"
@@ -27,6 +28,7 @@
 #include <SQLParser.h>
 #include <fmt/format.h>
 
+#include <list>
 #include <memory>
 
 namespace hsql {
@@ -105,40 +107,62 @@ QueryPlanner::QueryPlanner(Catalog& catalog)
 std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectStatement* select_stmt)
 {
     PROFILE_SCOPE("Query Planning");
-    // Plan the FROM clause
+    // Plan FROM clause
     auto* table_ref = select_stmt->fromTable;
     VELODB_ASSERT_MSG(table_ref != nullptr, "SELECT without FROM not supported");
     VELODB_ASSERT_MSG(select_stmt->selectList != nullptr && !select_stmt->selectList->empty(),
                       "SELECT without select list not supported");
 
-    // Plan WHERE clause and merge with scan
+    // Plan WHERE clause
     std::unique_ptr<AbstractExpression> predicate = nullptr;
     if (select_stmt->whereClause != nullptr) {
         predicate = parseExpression(table_ref, select_stmt->whereClause);
     }
+    auto plan = planTables(table_ref, std::move(predicate));
 
-    auto plan = planTableRef(table_ref, std::move(predicate));
+    // The rest of planSelect (projection, order, limit) remains mostly valid
+    // BUT projection expects specific columns.
+    // The planTables produces a wide table with all columns from all joined tables (plus RowIds).
+    // We need to ensure the columns are named correctly "TableName.ColName".
 
-    auto projection_expressions = parseSelectList(table_ref, select_stmt->selectList);
+    auto output_expressions = parseSelectList(table_ref, select_stmt->selectList);
     auto& input_schema = plan->getOutputSchema();
-    auto select_schema = inferSelectSchema(projection_expressions);
-    switch (table_ref->type) {
-    case hsql::kTableName: {
+    auto select_schema = inferSelectSchema(output_expressions);
+
+    bool is_join = ((static_cast<uint16_t>(plan->getPlanType()) & static_cast<uint16_t>(PlanType::JOIN)) != 0);
+
+    if (is_join) {
+        // Create Projection to keep only RowIDs before Materialization
+        std::vector<std::unique_ptr<AbstractExpression>> rowid_exprs;
+        std::vector<ColumnInfo> rowid_cols;
+
+        const auto& schema = plan->getOutputSchema();
+        for (size_t i = 0; i < schema.getColumnCount(); ++i) {
+            const auto& col = schema.getColumnInfo(i);
+            const auto& name = col.getName();
+            const auto& [_, col_name] = splitName(name);
+            if (col_name == "$_rowid") {
+                rowid_exprs.push_back(std::make_unique<ColumnRefExpression>("", name, col.getType().cloneUnique()));
+                rowid_cols.push_back(col.clone());
+            }
+        }
+
+        // Get rowids, then materialize
+        Schema rowid_schema(std::move(rowid_cols));
+        auto rowid_proj = std::make_unique<ProjectionPlanNode>(input_schema.clone(),
+                                                               rowid_schema.clone(),
+                                                               std::move(rowid_exprs));
+        rowid_proj->addChild(std::move(plan));
+        auto materialization_plan = std::make_unique<MaterializationPlanNode>(std::move(select_schema));
+        materialization_plan->addChild(std::move(rowid_proj));
+        plan = std::move(materialization_plan);
+    } else {
+        // Single table path: Standard Projection
         auto projection_plan = std::make_unique<ProjectionPlanNode>(input_schema.clone(),
                                                                     std::move(select_schema),
-                                                                    std::move(projection_expressions));
+                                                                    std::move(output_expressions));
         projection_plan->addChild(std::move(plan));
         plan = std::move(projection_plan);
-        break;
-    }
-    case hsql::kTableJoin: {
-        auto materialization_plan = std::make_unique<MaterializationPlanNode>(std::move(select_schema));
-        materialization_plan->addChild(std::move(plan));
-        plan = std::move(materialization_plan);
-        break;
-    }
-    default:
-        VELODB_THROW(ExecutionError, "Unsupported table ref type for select list planning");
     }
 
     if (auto* orders = select_stmt->order) {
@@ -152,128 +176,209 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
     return plan;
 }
 
-std::unique_ptr<AbstractPlanNode> QueryPlanner::planTableRef(const hsql::TableRef* table_ref,
-                                                             std::unique_ptr<AbstractExpression> predicate)
+std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef* root_table_ref,
+                                                           std::unique_ptr<AbstractExpression> where_predicate)
 {
-    switch (table_ref->type) {
-    case hsql::kTableName: {
-        const std::string table_name = table_ref->name;
-        auto table = catalog_.get().getTable(table_name);
-        if (!table) {
-            VELODB_THROW(CatalogError, "Table not found: " + table_name);
-        }
-        auto output_schema = inferSeqScanSchema(*table);
-        auto seq_scan_plan = std::make_unique<SeqScanPlanNode>(*table, output_schema.clone(), std::move(predicate));
-        auto filter_compaction_plan = std::make_unique<FilterCompactionPlanNode>(std::move(output_schema));
-        filter_compaction_plan->addChild(std::move(seq_scan_plan));
-        return filter_compaction_plan;
-    }
-    case hsql::kTableJoin: {
-        auto* join = table_ref->join;
-        VELODB_ASSERT_MSG(join != nullptr, "Join table_ref must have join details");
-        VELODB_ASSERT_MSG(join->type == hsql::kJoinInner, "Only inner joins are supported");
-        auto* join_expr = join->condition;
-        // Check if there's a join condition
-        VELODB_ASSERT_MSG(join_expr != nullptr, "Join must have a condition (ON clause)");
-        VELODB_ASSERT_MSG(join_expr->type == hsql::kExprOperator, "Join condition must be an operator expression");
-        VELODB_ASSERT_MSG(join_expr->opType == hsql::kOpEquals, "Only equality joins are supported");
+    // 1. Flatten TableRefs and Collect Join Conditions
+    std::vector<const hsql::TableRef*> leaf_tables;
+    std::vector<std::unique_ptr<AbstractExpression>> join_predicates;
+    collectTableRefs(root_table_ref, leaf_tables, join_predicates);
 
-        // Plan the left and right key expressions for original schemas
-        auto key_expr_1 = parseExpression(table_ref, join_expr->expr);
-        auto key_expr_2 = parseExpression(table_ref, join_expr->expr2);
-        if (expressionReferencesOnlyTable(key_expr_1.get(), join->left->name)) {
-            return planEquiJoin(join->left,
-                                join->right,
-                                std::move(key_expr_1),
-                                std::move(key_expr_2),
-                                std::move(predicate));
-        } else {
-            return planEquiJoin(join->left,
-                                join->right,
-                                std::move(key_expr_2),
-                                std::move(key_expr_1),
-                                std::move(predicate));
-        }
+    // Collect leaf table names (or aliases)
+    std::vector<std::string_view> leaf_names;
+    leaf_names.reserve(leaf_tables.size());
+    for (const auto* ref : leaf_tables) {
+        std::string_view name = ref->alias ? ref->alias->name : ref->name;
+        leaf_names.push_back(name);
     }
-    case hsql::kTableSelect:
-        VELODB_THROW(ExecutionError, "Subqueries not supported");
-    case hsql::kTableCrossProduct:
-        VELODB_THROW(ExecutionError, "Cross products not supported");
-    }
-    __builtin_unreachable();
-}
 
-std::unique_ptr<AbstractPlanNode> QueryPlanner::planEquiJoin(const hsql::TableRef* left_ref,
-                                                             const hsql::TableRef* right_ref,
-                                                             std::unique_ptr<AbstractExpression> left_key_expr,
-                                                             std::unique_ptr<AbstractExpression> right_key_expr,
-                                                             std::unique_ptr<AbstractExpression> predicate)
-{
-    VELODB_ASSERT_MSG(left_ref != nullptr && left_ref->type == hsql::kTableName, "Left table_ref must be a table name");
-    VELODB_ASSERT_MSG(right_ref != nullptr && right_ref->type == hsql::kTableName,
-                      "Right table_ref must be a table name");
-    // Separate predicate into left and right table predicates
-    std::unique_ptr<AbstractExpression> left_predicate = nullptr;
-    std::unique_ptr<AbstractExpression> right_predicate = nullptr;
-
-    if (predicate) {
-        // Extract all conjunctive clauses
+    // Split WHERE clause predicates
+    std::vector<std::unique_ptr<AbstractExpression>> all_predicates;
+    if (where_predicate) {
         std::vector<const AbstractExpression*> conjuncts;
-        extractConjuncts(predicate.get(), conjuncts);
-
-        // Separate conjuncts by table
-        std::vector<std::unique_ptr<AbstractExpression>> left_conjuncts;
-        std::vector<std::unique_ptr<AbstractExpression>> right_conjuncts;
-
-        for (const auto* conjunct : conjuncts) {
-            if (expressionReferencesOnlyTable(conjunct, left_ref->name)) {
-                left_conjuncts.push_back(conjunct->cloneUnique());
-            } else if (expressionReferencesOnlyTable(conjunct, right_ref->name)) {
-                right_conjuncts.push_back(conjunct->cloneUnique());
-            }
-            // Note: cross-table predicates are ignored as per user's assumption
-        }
-
-        // Reconstruct predicates from conjuncts
-        if (!left_conjuncts.empty()) {
-            left_predicate = std::move(left_conjuncts[0]);
-            for (size_t i = 1; i < left_conjuncts.size(); ++i) {
-                left_predicate = std::make_unique<BinaryLogicalExpression>(ConnectiveType::AND,
-                                                                           std::move(left_predicate),
-                                                                           std::move(left_conjuncts[i]));
-            }
-        }
-
-        if (!right_conjuncts.empty()) {
-            right_predicate = std::move(right_conjuncts[0]);
-            for (size_t i = 1; i < right_conjuncts.size(); ++i) {
-                right_predicate = std::make_unique<BinaryLogicalExpression>(ConnectiveType::AND,
-                                                                            std::move(right_predicate),
-                                                                            std::move(right_conjuncts[i]));
-            }
+        extractConjuncts(where_predicate.get(), conjuncts);
+        for (auto* c : conjuncts) {
+            all_predicates.push_back(c->cloneUnique());
         }
     }
 
-    // Plan left and right table references with separated predicates
-    auto left_plan = planJoinSide(left_ref, std::move(left_key_expr), std::move(left_predicate));
-    auto right_plan = planJoinSide(right_ref, std::move(right_key_expr), std::move(right_predicate));
-
-    // Infer the output schema for the join
-    auto left_table = catalog_.get().getTable(left_ref->name);
-    auto right_table = catalog_.get().getTable(right_ref->name);
-    if (!left_table || !right_table) {
-        VELODB_THROW(CatalogError, "Cannot find tables for join");
+    // 2. Classify Predicates (Local Filter vs Join)
+    std::vector<std::vector<std::unique_ptr<AbstractExpression>>> table_filters(leaf_tables.size());
+    for (auto&& pred : all_predicates) {
+        std::unordered_set<std::string_view> referenced_table_names;
+        extractTablesFromExpression(pred.get(), referenced_table_names);
+        VELODB_ASSERT_MSG(referenced_table_names.size() <= 2, "Only supports predicates referencing up to 2 tables");
+        if (referenced_table_names.size() == 1) {
+            // Only one table referenced, push down predicate
+            const auto& table_name = *referenced_table_names.begin();
+            auto it = std::find(leaf_names.begin(), leaf_names.end(), table_name);
+            VELODB_ASSERT_MSG(it != leaf_names.end(), "Referenced table not found in leaf tables");
+            size_t table_idx = std::distance(leaf_names.begin(), it);
+            table_filters[table_idx].push_back(std::move(pred));
+        } else {
+            // Two tables referenced, treat as join predicate
+            join_predicates.push_back(std::move(pred));
+        }
     }
-    auto join_schema = inferJoinSchema(*left_table, *right_table);
 
-    // Create a merge sort join plan node (we can make this configurable later)
-    auto join_plan_node
-        = std::make_unique<SortMergeJoinPlanNode>(std::move(join_schema), *left_table, *right_table, JoinType::INNER);
-    join_plan_node->addChild(std::move(left_plan));
-    join_plan_node->addChild(std::move(right_plan));
+    // 3. Create Leaf Plans
+    std::list<JoinNodeInfo> active_plans;
+    for (size_t i = 0; i < leaf_tables.size(); ++i) {
+        active_plans.push_back(planTableLeaf(leaf_tables[i], table_filters[i]));
+    }
+    VELODB_ASSERT_MSG(!active_plans.empty(), "No tables in query");
 
-    return join_plan_node;
+    // 4. Greedy Join Loop
+    if (active_plans.size() == 1) {
+        // For single table, we skip the join logic
+        return std::move(active_plans.front().plan);
+    } else {
+        JoinNodeInfo root_node = std::move(active_plans.front());
+        active_plans.pop_front();
+        while (!active_plans.empty()) {
+            std::unique_ptr<AbstractExpression> best_pred = nullptr;
+            bool left_is_left_operand = true; // Does Predicate Left Operand match Current Node?
+
+            // Find a candidate table to join
+            auto it = active_plans.begin();
+            for (; it != active_plans.end(); ++it) {
+                for (auto& pred : join_predicates) {
+                    if (!pred) {
+                        continue;
+                    }
+                    VELODB_ASSERT_MSG(pred->getExpressionType() == ExpressionType::COMPARISON,
+                                      "Join predicate must be a comparison expression");
+                    auto* compare = static_cast<const ComparisonExpression*>(pred.get());
+                    VELODB_ASSERT_MSG(compare->getComparisonType() == ComparisonType::EQUAL,
+                                      "Only Equi-Join supported in this planner");
+
+                    bool left_in_root = expressionReferencesTables(&compare->getLeftExpression(),
+                                                                   root_node.table_aliases);
+                    bool right_in_next = expressionReferencesTables(&compare->getRightExpression(), it->table_aliases);
+                    if (left_in_root && right_in_next) {
+                        best_pred = std::move(pred);
+                        left_is_left_operand = true;
+                        goto found_match;
+                    }
+
+                    // Try swapped
+                    bool right_in_root = expressionReferencesTables(&compare->getRightExpression(),
+                                                                    root_node.table_aliases);
+                    bool left_in_next = expressionReferencesTables(&compare->getLeftExpression(), it->table_aliases);
+                    if (right_in_root && left_in_next) {
+                        best_pred = std::move(pred);
+                        left_is_left_operand = false;
+                        goto found_match;
+                    }
+                }
+            }
+
+        found_match:
+            VELODB_ASSERT_MSG(it != active_plans.end(), "Cartesian product detected (no join condition found)");
+
+            // Construct Join
+            auto& right_node = *it;
+            auto* compare = static_cast<ComparisonExpression*>(best_pred.get());
+
+            // Resolve Columns
+            auto* root_expr = left_is_left_operand ? &compare->getLeftExpression() : &compare->getRightExpression();
+            auto* next_expr = left_is_left_operand ? &compare->getRightExpression() : &compare->getLeftExpression();
+
+            VELODB_ASSERT_MSG(root_expr->getExpressionType() == ExpressionType::COLUMN_REF, "Join key must be column");
+            VELODB_ASSERT_MSG(next_expr->getExpressionType() == ExpressionType::COLUMN_REF, "Join key must be column");
+
+            auto* root_col = static_cast<const ColumnRefExpression*>(root_expr);
+            auto* next_col = static_cast<const ColumnRefExpression*>(next_expr);
+
+            // Add projection to fetch join key and $_rowid for leaf (i.e., non-join) nodes
+            if ((static_cast<uint16_t>(root_node.plan->getPlanType()) & static_cast<uint16_t>(PlanType::JOIN)) == 0) {
+                auto rowid_col_name = fmt::format("{}.$_rowid", root_node.table_aliases.front());
+                std::vector<std::unique_ptr<AbstractExpression>> proj_exprs;
+                proj_exprs.reserve(2);
+                proj_exprs.push_back(root_expr->cloneUnique());
+                proj_exprs.push_back(std::make_unique<ColumnRefExpression>("",
+                                                                           rowid_col_name,
+                                                                           DataType::createType(DataTypeId::BIGINT)));
+                auto& in_schema = root_node.plan->getOutputSchema();
+                std::vector<ColumnInfo> proj_cols;
+                proj_cols.reserve(2);
+                proj_cols.push_back(in_schema.getColumnInfo(root_col->getColumnName()).clone());
+                proj_cols.push_back(in_schema.getColumnInfo(rowid_col_name).clone());
+                auto proj_plan = std::make_unique<ProjectionPlanNode>(in_schema.clone(),
+                                                                      Schema(std::move(proj_cols)),
+                                                                      std::move(proj_exprs));
+                proj_plan->addChild(std::move(root_node.plan));
+                root_node.plan = std::move(proj_plan);
+            }
+            if ((static_cast<uint16_t>(right_node.plan->getPlanType()) & static_cast<uint16_t>(PlanType::JOIN)) == 0) {
+                auto rowid_col_name = fmt::format("{}.$_rowid", right_node.table_aliases.front());
+                std::vector<std::unique_ptr<AbstractExpression>> proj_exprs;
+                proj_exprs.reserve(2);
+                proj_exprs.push_back(next_expr->cloneUnique());
+                proj_exprs.push_back(std::make_unique<ColumnRefExpression>("",
+                                                                           rowid_col_name,
+                                                                           DataType::createType(DataTypeId::BIGINT)));
+                auto& in_schema = right_node.plan->getOutputSchema();
+                std::vector<ColumnInfo> proj_cols;
+                proj_cols.reserve(2);
+                proj_cols.push_back(in_schema.getColumnInfo(next_col->getColumnName()).clone());
+                proj_cols.push_back(in_schema.getColumnInfo(rowid_col_name).clone());
+                auto proj_plan = std::make_unique<ProjectionPlanNode>(in_schema.clone(),
+                                                                      Schema(std::move(proj_cols)),
+                                                                      std::move(proj_exprs));
+                proj_plan->addChild(std::move(right_node.plan));
+                right_node.plan = std::move(proj_plan);
+            }
+
+            size_t left_key_idx = root_node.plan->getOutputSchema().getColumnIndex(root_col->getColumnName());
+            size_t right_key_idx = right_node.plan->getOutputSchema().getColumnIndex(next_col->getColumnName());
+
+            // Add sort logic
+            // Left
+            {
+                std::vector<size_t> indices { left_key_idx };
+                std::vector<bool> asc { true };
+                auto sort = std::make_unique<SortPlanNode>(root_node.plan->getOutputSchema().clone(), indices, asc);
+                sort->addChild(std::move(root_node.plan));
+                root_node.plan = std::move(sort);
+            }
+            // Right
+            {
+                std::vector<size_t> indices { right_key_idx };
+                std::vector<bool> asc { true };
+                auto sort = std::make_unique<SortPlanNode>(right_node.plan->getOutputSchema().clone(), indices, asc);
+                sort->addChild(std::move(right_node.plan));
+                right_node.plan = std::move(sort);
+            }
+
+            // Merge Metadata
+            auto output_schema = root_node.plan->getOutputSchema().clone();
+            for (const auto& col : right_node.plan->getOutputSchema()) {
+                output_schema.addColumnInfo(col.clone());
+            }
+
+            auto join_node = std::make_unique<SortMergeJoinPlanNode>(std::move(output_schema),
+                                                                     std::move(root_node.plan),
+                                                                     std::move(right_node.plan),
+                                                                     std::make_pair(left_key_idx, right_key_idx),
+                                                                     root_node.source_tables,
+                                                                     right_node.source_tables);
+            root_node.plan = std::move(join_node);
+            root_node.table_aliases.insert(root_node.table_aliases.end(),
+                                           right_node.table_aliases.begin(),
+                                           right_node.table_aliases.end());
+            root_node.source_tables.insert(root_node.source_tables.end(),
+                                           right_node.source_tables.begin(),
+                                           right_node.source_tables.end());
+
+            active_plans.erase(it);
+        }
+
+        return std::move(root_node.plan);
+    }
 }
+
+// ... Implement helpers ...
 
 std::unique_ptr<AbstractPlanNode> QueryPlanner::planOrderBy(std::unique_ptr<AbstractPlanNode>&& plan,
                                                             const std::vector<hsql::OrderDescription*>* orders)
@@ -284,7 +389,13 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planOrderBy(std::unique_ptr<Abst
     for (auto* order_desc : *orders) {
         VELODB_ASSERT_MSG(order_desc->expr->type == hsql::kExprColumnRef, "ORDER BY must be column references");
         auto* col_ref = order_desc->expr;
-        auto col_index = schema.getColumnIndex(col_ref->name);
+        std::string col_name = col_ref->name;
+        if (col_ref->alias != nullptr) {
+            col_name = fmt::format("{}.{}", col_ref->alias, col_ref->name);
+        } else if (col_ref->table != nullptr) {
+            col_name = fmt::format("{}.{}", col_ref->table, col_ref->name);
+        }
+        auto col_index = schema.getColumnIndex(col_name);
         order_indices.push_back(col_index);
         ascending_flags.push_back(order_desc->type == hsql::kOrderAsc);
     }
@@ -317,44 +428,103 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planLimitOffset(std::unique_ptr<
     return limit_plan;
 }
 
-std::unique_ptr<AbstractPlanNode> QueryPlanner::planJoinSide(const hsql::TableRef* table_ref,
-                                                             std::unique_ptr<AbstractExpression> join_key_expr,
-                                                             std::unique_ptr<AbstractExpression> predicate)
+void QueryPlanner::collectTableRefs(const hsql::TableRef* table_ref,
+                                    std::vector<const hsql::TableRef*>& leaf_tables,
+                                    std::vector<std::unique_ptr<AbstractExpression>>& join_conditions)
 {
-    auto plan = planTableRef(table_ref, std::move(predicate));
-    // Input schema after seq scan + compaction
-    const auto& input_schema = plan->getOutputSchema();
-
-    // Plan key expression again for projection context (clone)
-    std::vector<std::unique_ptr<AbstractExpression>> proj_exprs;
-    proj_exprs.push_back(std::move(join_key_expr));
-    // Add $_rowid and $_mask columns
-    proj_exprs.push_back(
-        std::make_unique<ColumnRefExpression>(table_ref->name, "$_rowid", std::make_unique<BigIntType>()));
-    proj_exprs.push_back(
-        std::make_unique<ColumnRefExpression>(table_ref->name, "$_mask", std::make_unique<BooleanType>()));
-    auto proj_schema = inferSelectSchema(proj_exprs);
-    auto projection_plan = std::make_unique<ProjectionPlanNode>(input_schema.clone(),
-                                                                proj_schema.clone(),
-                                                                std::move(proj_exprs));
-    projection_plan->addChild(std::move(plan));
-
-    // Sort by first column (join key) ascending for merge sort join
-    std::vector<size_t> order_indices { 0 };
-    std::vector<bool> ascending { true };
-    auto sort_plan = std::make_unique<SortPlanNode>(proj_schema.clone(),
-                                                    std::move(order_indices),
-                                                    std::move(ascending));
-    sort_plan->addChild(std::move(projection_plan));
-    return sort_plan;
+    switch (table_ref->type) {
+    case hsql::kTableName: {
+        leaf_tables.push_back(table_ref);
+        break;
+    }
+    case hsql::kTableJoin: {
+        collectTableRefs(table_ref->join->left, leaf_tables, join_conditions);
+        collectTableRefs(table_ref->join->right, leaf_tables, join_conditions);
+        if (table_ref->join->condition) {
+            // Pass the currently accumulated leaves to parseExpression to avoid recursion
+            join_conditions.push_back(parseExpression(leaf_tables, table_ref->join->condition));
+        }
+        break;
+    }
+    case hsql::kTableCrossProduct: {
+        for (auto* ref : *table_ref->list) {
+            collectTableRefs(ref, leaf_tables, join_conditions);
+        }
+        break;
+    }
+    default: {
+        VELODB_THROW(ExecutionError, "Unsupported table reference type");
+    }
+    }
 }
 
-Schema QueryPlanner::inferSeqScanSchema(const Table& table)
+QueryPlanner::JoinNodeInfo QueryPlanner::planTableLeaf(const hsql::TableRef* table_ref,
+                                                       std::vector<std::unique_ptr<AbstractExpression>>& filters)
 {
-    auto schema = table.getSchema().clone();
-    schema.addColumnInfo({ "$_rowid", std::make_unique<BigIntType>(), false });
-    schema.addColumnInfo({ "$_mask", std::make_unique<BooleanType>(), false });
-    return schema;
+    VELODB_ASSERT_MSG(table_ref->type == hsql::kTableName, "Leaf must be table name");
+    std::string table_name = table_ref->name;
+    std::string alias = table_ref->alias ? table_ref->alias->name : table_name;
+
+    auto table = catalog_.get().getTable(table_name);
+    if (!table) {
+        VELODB_THROW(CatalogError, "Table not found: " + table_name);
+    }
+
+    // 1. Seq Scan
+    auto seq_scan_schema = inferSeqScanSchema(*table, alias);
+    // Combine filters
+    std::unique_ptr<AbstractExpression> predicate = nullptr;
+    if (!filters.empty()) {
+        predicate = std::move(filters[0]);
+        for (size_t i = 1; i < filters.size(); ++i) {
+            predicate = std::make_unique<BinaryLogicalExpression>(ConnectiveType::AND,
+                                                                  std::move(predicate),
+                                                                  std::move(filters[i]));
+        }
+    }
+    filters.clear();
+    auto seq_scan = std::make_unique<SeqScanPlanNode>(*table, seq_scan_schema.clone(), std::move(predicate));
+
+    // 2. Filter Compaction
+    auto filter = std::make_unique<FilterCompactionPlanNode>(std::move(seq_scan_schema));
+    filter->addChild(std::move(seq_scan));
+
+    return { std::move(filter), { alias }, { &table->get() } };
+}
+
+bool QueryPlanner::expressionReferencesTables(const AbstractExpression* expr, const std::vector<std::string>& tables)
+{
+    if (expr->getExpressionType() == ExpressionType::COLUMN_REF) {
+        const auto* col_ref = static_cast<const ColumnRefExpression*>(expr);
+        const std::string& ref_table = col_ref->getTableName();
+        for (const auto& t : tables) {
+            if (t == ref_table)
+                return true;
+        }
+        return false;
+    }
+    if (expr->isUnary()) {
+        const auto* un = static_cast<const UnaryExpression*>(expr);
+        return expressionReferencesTables(&un->getOperandExpression(), tables);
+    } else if (!expr->isLeaf()) {
+        const auto* bin = static_cast<const BinaryExpression*>(expr);
+        return expressionReferencesTables(&bin->getLeftExpression(), tables)
+            && // AND: sub-expression must also be valid in context (usually)
+            expressionReferencesTables(&bin->getRightExpression(), tables);
+    }
+    return true; // Constant
+}
+
+Schema QueryPlanner::inferSeqScanSchema(const Table& table, std::string_view table_alias)
+{
+    VELODB_ASSERT_MSG(!table_alias.empty(), "Table alias cannot be empty for SeqScan schema inference");
+    std::vector<ColumnInfo> columns;
+    for (const auto& col_info : table.getSchema()) {
+        columns.emplace_back(fmt::format("{}.{}", table_alias, col_info.getName()), col_info.getType().cloneUnique());
+    }
+    columns.emplace_back(fmt::format("{}.$_rowid", table_alias), std::make_unique<BigIntType>());
+    columns.emplace_back(fmt::format("{}.$_mask", table_alias), std::make_unique<BooleanType>());
+    return Schema(std::move(columns));
 }
 
 Schema QueryPlanner::inferSelectSchema(const std::vector<std::unique_ptr<AbstractExpression>>& expressions)
@@ -369,21 +539,12 @@ Schema QueryPlanner::inferSelectSchema(const std::vector<std::unique_ptr<Abstrac
                                  std::move(return_type));
             break;
         case ExpressionType::CONSTANT:
-        default:
             columns.emplace_back(fmt::format("col_{}", i), std::move(return_type));
             break;
+        default:
+            VELODB_THROW(ExecutionError, "Unsupported expression type in SELECT list for schema inference");
         }
     }
-    return Schema(std::move(columns));
-}
-
-Schema QueryPlanner::inferJoinSchema(const Table& left_table, const Table& right_table)
-{
-    // Join output schema (phase 1): only expose the rowid pairs from original tables.
-    // Downstream materialization operator will use these rowids to fetch required columns.
-    std::vector<ColumnInfo> columns;
-    columns.emplace_back(fmt::format("{}.$_rowid", left_table.getName()), std::make_unique<BigIntType>());
-    columns.emplace_back(fmt::format("{}.$_rowid", right_table.getName()), std::make_unique<BigIntType>());
     return Schema(std::move(columns));
 }
 
@@ -392,41 +553,27 @@ std::vector<std::unique_ptr<AbstractExpression>> QueryPlanner::parseSelectList(
     const std::vector<hsql::Expr*>* select_list)
 {
     std::vector<std::unique_ptr<AbstractExpression>> expressions;
-
     VELODB_ASSERT_MSG(select_list != nullptr && !select_list->empty(), "SELECT list cannot be empty");
 
-    // Check if this is SELECT * (single kExprStar expression)
     if (select_list->size() == 1 && (*select_list)[0]->type == hsql::kExprStar) {
-        switch (table_ref->type) {
-        case hsql::kTableName: {
-            const std::string table_name = table_ref->name;
-            auto& schema = catalog_.get().getTable(table_name)->get().getSchema();
-            for (const auto& col_info : schema) {
-                expressions.push_back(std::make_unique<ColumnRefExpression>(table_name,
-                                                                            col_info.getName(),
-                                                                            col_info.getType().cloneUnique()));
+        std::vector<const hsql::TableRef*> leaves;
+        std::vector<std::unique_ptr<AbstractExpression>> dummy_conds;
+        collectTableRefs(table_ref, leaves, dummy_conds);
+
+        for (const auto* leaf : leaves) {
+            const std::string table_name = leaf->name;
+            const std::string alias = leaf->alias ? leaf->alias->name : table_name;
+            auto table = catalog_.get().getTable(table_name);
+            if (!table)
+                VELODB_THROW(CatalogError, "Table not found: " + table_name);
+
+            for (const auto& col_info : table->get().getSchema()) {
+                // Project as Alias.Col
+                expressions.push_back(std::make_unique<ColumnRefExpression>(
+                    table_name, // table name (metadata)
+                    alias + "." + col_info.getName(), // Column Name in Schema (Qualified)
+                    col_info.getType().cloneUnique()));
             }
-            break;
-        }
-        case hsql::kTableJoin: {
-            const std::string left_name = table_ref->join->left->name;
-            const std::string right_name = table_ref->join->right->name;
-            auto& left_schema = catalog_.get().getTable(left_name)->get().getSchema();
-            for (const auto& col_info : left_schema) {
-                expressions.push_back(std::make_unique<ColumnRefExpression>(left_name,
-                                                                            col_info.getName(),
-                                                                            col_info.getType().cloneUnique()));
-            }
-            auto& right_schema = catalog_.get().getTable(right_name)->get().getSchema();
-            for (const auto& col_info : right_schema) {
-                expressions.push_back(std::make_unique<ColumnRefExpression>(right_name,
-                                                                            col_info.getName(),
-                                                                            col_info.getType().cloneUnique()));
-            }
-            break;
-        }
-        default:
-            VELODB_THROW(ExecutionError, "Unsupported table reference type for SELECT *");
         }
     } else {
         for (const auto* expr : *select_list) {
@@ -434,12 +581,12 @@ std::vector<std::unique_ptr<AbstractExpression>> QueryPlanner::parseSelectList(
             expressions.push_back(parseExpression(table_ref, expr));
         }
     }
-
     return expressions;
 }
 
-std::unique_ptr<AbstractExpression> QueryPlanner::parseExpression(const hsql::TableRef* table_ref,
-                                                                  const hsql::Expr* expr)
+std::unique_ptr<AbstractExpression> QueryPlanner::parseExpression(
+    const std::vector<const hsql::TableRef*>& scope_tables,
+    const hsql::Expr* expr)
 {
     std::unique_ptr<AbstractExpression> result;
     switch (expr->type) {
@@ -463,13 +610,13 @@ std::unique_ptr<AbstractExpression> QueryPlanner::parseExpression(const hsql::Ta
         result = std::make_unique<ConstantExpression>(Value::createNull(DataTypeId::ANY));
         break;
     case hsql::kExprColumnRef:
-        result = parseColumnRef(table_ref, expr);
+        result = parseColumnRef(scope_tables, expr);
         if (!result) {
             VELODB_THROW(ExecutionError, fmt::format("Column reference not found: {}", expr->name));
         }
         break;
     case hsql::kExprOperator:
-        result = parseOperator(table_ref, expr);
+        result = parseOperator(scope_tables, expr);
         break;
     case hsql::kExprStar:
         VELODB_THROW(ExecutionError, "* expression should be handled in parseSelectList, not parseExpression");
@@ -480,48 +627,60 @@ std::unique_ptr<AbstractExpression> QueryPlanner::parseExpression(const hsql::Ta
     return result;
 }
 
-std::unique_ptr<AbstractExpression> QueryPlanner::parseColumnRef(const hsql::TableRef* table_ref,
+std::unique_ptr<AbstractExpression> QueryPlanner::parseColumnRef(const std::vector<const hsql::TableRef*>& scope_tables,
                                                                  const hsql::Expr* expr)
 {
-    switch (table_ref->type) {
-    case hsql::kTableName: {
-        const std::string table_name = table_ref->name;
-        if (expr->table != nullptr && table_name != expr->table) {
-            return nullptr;
+    std::string col_name = expr->name;
+    std::string tbl_name = expr->table ? expr->table : "";
+
+    const hsql::TableRef* match = nullptr;
+
+    if (!tbl_name.empty()) {
+        for (const auto* leaf : scope_tables) {
+            std::string alias = leaf->alias ? leaf->alias->name : leaf->name;
+            if (alias == tbl_name) {
+                match = leaf;
+                break;
+            }
         }
-        auto table_opt = catalog_.get().getTable(table_name);
-        VELODB_ASSERT_MSG(table_opt, "Table not found in catalog: " + table_name);
-        auto& table = table_opt->get();
-        const std::string column_name = expr->name;
-        if (!table.hasColumn(column_name)) {
-            return nullptr;
+    } else {
+        // Implicit
+        for (const auto* leaf : scope_tables) {
+            // Need to check schema
+            std::string alias = leaf->alias ? leaf->alias->name : leaf->name;
+            auto table = catalog_.get().getTable(leaf->name);
+            if (table && table->get().hasColumn(col_name)) {
+                if (match) {
+                    VELODB_THROW(ExecutionError, "Ambiguous column reference: " + col_name);
+                }
+                match = leaf;
+            }
         }
-        auto type = table.getColumnType(column_name).cloneUnique();
-        // TODO: alias?
-        return std::make_unique<ColumnRefExpression>(table.getName(), column_name, std::move(type));
     }
-    case hsql::kTableJoin: {
-        auto left_expr = parseColumnRef(table_ref->join->left, expr);
-        if (left_expr) {
-            return left_expr;
-        }
-        auto right_expr = parseColumnRef(table_ref->join->right, expr);
-        return right_expr;
-    }
-    case hsql::kTableSelect:
-    case hsql::kTableCrossProduct:
-        VELODB_THROW(ExecutionError, "Unsupported table reference type for column reference");
-    }
-    __builtin_unreachable();
+
+    if (!match)
+        return nullptr;
+
+    auto table = catalog_.get().getTable(match->name);
+    if (!table || !table->get().hasColumn(col_name))
+        return nullptr;
+
+    std::string alias = match->alias ? match->alias->name : match->name;
+    std::string qualified_name = alias + "." + col_name;
+
+    return std::make_unique<ColumnRefExpression>(match->name,
+                                                 qualified_name,
+                                                 table->get().getColumnType(col_name).cloneUnique());
 }
 
-std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const hsql::TableRef* table_ref, const hsql::Expr* expr)
+std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const std::vector<const hsql::TableRef*>& scope_tables,
+                                                                const hsql::Expr* expr)
 {
     // Implement operator planning for all comparison operators
     switch (expr->opType) {
     case hsql::kOpPlus: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         auto return_type = g_type_checker.deduceArithmeticType(left->getReturnType(),
                                                                right->getReturnType(),
                                                                ArithmeticType::PLUS);
@@ -531,8 +690,8 @@ std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const hsql::Tabl
                                                       std::move(right));
     }
     case hsql::kOpMinus: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         auto return_type = g_type_checker.deduceArithmeticType(left->getReturnType(),
                                                                right->getReturnType(),
                                                                ArithmeticType::MINUS);
@@ -542,8 +701,8 @@ std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const hsql::Tabl
                                                       std::move(right));
     }
     case hsql::kOpAsterisk: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         auto return_type = g_type_checker.deduceArithmeticType(left->getReturnType(),
                                                                right->getReturnType(),
                                                                ArithmeticType::MULTIPLY);
@@ -553,8 +712,8 @@ std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const hsql::Tabl
                                                       std::move(right));
     }
     case hsql::kOpSlash: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         auto return_type = g_type_checker.deduceArithmeticType(left->getReturnType(),
                                                                right->getReturnType(),
                                                                ArithmeticType::DIVIDE);
@@ -564,8 +723,8 @@ std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const hsql::Tabl
                                                       std::move(right));
     }
     case hsql::kOpPercentage: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         auto return_type = g_type_checker.deduceArithmeticType(left->getReturnType(),
                                                                right->getReturnType(),
                                                                ArithmeticType::MODULO);
@@ -575,47 +734,47 @@ std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const hsql::Tabl
                                                       std::move(right));
     }
     case hsql::kOpEquals: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         return createComparisonOperator(ComparisonType::EQUAL, std::move(left), std::move(right));
     }
     case hsql::kOpNotEquals: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         return createComparisonOperator(ComparisonType::NOT_EQUAL, std::move(left), std::move(right));
     }
     case hsql::kOpLess: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         return createComparisonOperator(ComparisonType::LESS_THAN, std::move(left), std::move(right));
     }
     case hsql::kOpLessEq: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         return createComparisonOperator(ComparisonType::LESS_THAN_OR_EQUAL, std::move(left), std::move(right));
     }
     case hsql::kOpGreater: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         return createComparisonOperator(ComparisonType::GREATER_THAN, std::move(left), std::move(right));
     }
     case hsql::kOpGreaterEq: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         return createComparisonOperator(ComparisonType::GREATER_THAN_OR_EQUAL, std::move(left), std::move(right));
     }
     case hsql::kOpAnd: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         return std::make_unique<BinaryLogicalExpression>(ConnectiveType::AND, std::move(left), std::move(right));
     }
     case hsql::kOpOr: {
-        auto left = parseExpression(table_ref, expr->expr);
-        auto right = parseExpression(table_ref, expr->expr2);
+        auto left = parseExpression(scope_tables, expr->expr);
+        auto right = parseExpression(scope_tables, expr->expr2);
         return std::make_unique<BinaryLogicalExpression>(ConnectiveType::OR, std::move(left), std::move(right));
     }
     case hsql::kOpNot: {
-        auto operand = parseExpression(table_ref, expr->expr);
+        auto operand = parseExpression(scope_tables, expr->expr);
         return std::make_unique<LogicalNotExpression>(std::move(operand));
     }
     case hsql::kOpBetween: {
@@ -624,9 +783,9 @@ std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const hsql::Tabl
         VELODB_ASSERT_MSG(expr->exprList != nullptr && expr->exprList->size() == 2,
                           "BETWEEN requires exactly 2 operands");
 
-        auto operand = parseExpression(table_ref, expr->expr);
-        auto low_expr = parseExpression(table_ref, (*expr->exprList)[0]);
-        auto high_expr = parseExpression(table_ref, (*expr->exprList)[1]);
+        auto operand = parseExpression(scope_tables, expr->expr);
+        auto low_expr = parseExpression(scope_tables, (*expr->exprList)[0]);
+        auto high_expr = parseExpression(scope_tables, (*expr->exprList)[1]);
 
         // Create (expr >= low)
         auto left_comparison = createComparisonOperator(ComparisonType::GREATER_THAN_OR_EQUAL,
@@ -645,10 +804,10 @@ std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const hsql::Tabl
         // IN is: (expr = val1) OR (expr = val2) OR ...
         VELODB_ASSERT_MSG(expr->exprList != nullptr && !expr->exprList->empty(),
                           "IN requires a non-empty list of operands");
-        auto operand = parseExpression(table_ref, expr->expr);
+        auto operand = parseExpression(scope_tables, expr->expr);
         std::unique_ptr<AbstractExpression> in_expression = nullptr;
         for (const auto* list_expr : *expr->exprList) {
-            auto value_expr = parseExpression(table_ref, list_expr);
+            auto value_expr = parseExpression(scope_tables, list_expr);
             auto equality_expr = createComparisonOperator(ComparisonType::EQUAL,
                                                           operand->cloneUnique(),
                                                           std::move(value_expr));
@@ -670,6 +829,32 @@ std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const hsql::Tabl
     }
 }
 
+std::unique_ptr<AbstractExpression> QueryPlanner::parseExpression(const hsql::TableRef* table_ref,
+                                                                  const hsql::Expr* expr)
+{
+    std::vector<const hsql::TableRef*> leaves;
+    std::vector<std::unique_ptr<AbstractExpression>> dummy_conds;
+    collectTableRefs(table_ref, leaves, dummy_conds);
+    return parseExpression(leaves, expr);
+}
+
+std::unique_ptr<AbstractExpression> QueryPlanner::parseColumnRef(const hsql::TableRef* table_ref,
+                                                                 const hsql::Expr* expr)
+{
+    std::vector<const hsql::TableRef*> leaves;
+    std::vector<std::unique_ptr<AbstractExpression>> dummy_conds;
+    collectTableRefs(table_ref, leaves, dummy_conds);
+    return parseColumnRef(leaves, expr);
+}
+
+std::unique_ptr<AbstractExpression> QueryPlanner::parseOperator(const hsql::TableRef* table_ref, const hsql::Expr* expr)
+{
+    std::vector<const hsql::TableRef*> leaves;
+    std::vector<std::unique_ptr<AbstractExpression>> dummy_conds;
+    collectTableRefs(table_ref, leaves, dummy_conds);
+    return parseOperator(leaves, expr);
+}
+
 std::unique_ptr<AbstractExpression> QueryPlanner::createComparisonOperator(ComparisonType type,
                                                                            std::unique_ptr<AbstractExpression> left,
                                                                            std::unique_ptr<AbstractExpression> right)
@@ -679,16 +864,36 @@ std::unique_ptr<AbstractExpression> QueryPlanner::createComparisonOperator(Compa
     if (left_expression_type == ExpressionType::COLUMN_REF && right_expression_type == ExpressionType::CONSTANT) {
         auto* left_expr = static_cast<ColumnRefExpression*>(left.get());
         auto value = static_cast<ConstantExpression*>(right.release())->getValue();
-        auto& table = catalog_.get().getTable(left_expr->getTableName())->get();
-        auto& column = table.getColumn(left_expr->getColumnName());
+
+        // Debugging SegFault
+        // std::cerr << "Debug: Handling " << left_expr->getTableName() << "." << left_expr->getColumnName() <<
+        // std::endl;
+
+        auto table_opt = catalog_.get().getTable(left_expr->getTableName());
+        if (!table_opt) {
+            VELODB_THROW(ExecutionError, "Table not found: " + left_expr->getTableName());
+        }
+        auto& table = table_opt->get();
+
+        auto [_, col_name] = splitName(left_expr->getColumnName());
+
+        auto& column = table.getColumn(col_name);
         column.ensureOrdinal(value, type);
         right = std::make_unique<ConstantExpression>(value);
     } else if (left_expression_type == ExpressionType::CONSTANT
                && right_expression_type == ExpressionType::COLUMN_REF) {
         auto* right_expr = static_cast<ColumnRefExpression*>(right.get());
         auto value = static_cast<ConstantExpression*>(left.release())->getValue();
-        auto& table = catalog_.get().getTable(right_expr->getTableName())->get();
-        auto& column = table.getColumn(right_expr->getColumnName());
+
+        auto table_opt = catalog_.get().getTable(right_expr->getTableName());
+        if (!table_opt) {
+            VELODB_THROW(ExecutionError, "Table not found: " + right_expr->getTableName());
+        }
+        auto& table = table_opt->get();
+
+        auto [_, col_name] = splitName(right_expr->getColumnName());
+
+        auto& column = table.getColumn(col_name);
         column.ensureOrdinal(value, type);
         left = std::make_unique<ConstantExpression>(value);
     }
@@ -712,25 +917,24 @@ void QueryPlanner::extractConjuncts(const AbstractExpression* expr, std::vector<
     }
 }
 
-bool QueryPlanner::expressionReferencesOnlyTable(const AbstractExpression* expr, const std::string_view table_name)
+void QueryPlanner::extractTablesFromExpression(const AbstractExpression* expr,
+                                               std::unordered_set<std::string_view>& tables)
 {
     if (expr->isLeaf()) {
         if (expr->getExpressionType() == ExpressionType::COLUMN_REF) {
             const auto* col_ref = static_cast<const ColumnRefExpression*>(expr);
             const auto& ref_table_name = col_ref->getTableName();
-            return table_name == ref_table_name;
-        } else {
-            // Non-column leaf nodes do not reference any table
-            return true;
+            tables.insert(ref_table_name);
         }
     } else if (expr->isUnary()) {
         const auto& child = static_cast<const UnaryExpression*>(expr)->getOperandExpression();
-        return expressionReferencesOnlyTable(&child, table_name);
+        extractTablesFromExpression(&child, tables);
     } else {
         // expr must be binary
         const auto& left = static_cast<const BinaryExpression*>(expr)->getLeftExpression();
         const auto& right = static_cast<const BinaryExpression*>(expr)->getRightExpression();
-        return expressionReferencesOnlyTable(&left, table_name) && expressionReferencesOnlyTable(&right, table_name);
+        extractTablesFromExpression(&left, tables);
+        extractTablesFromExpression(&right, tables);
     }
 }
 
