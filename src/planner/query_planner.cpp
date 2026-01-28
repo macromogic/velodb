@@ -233,6 +233,74 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef*
         // For single table, we skip the join logic
         return std::move(active_plans.front().plan);
     } else {
+        // 4a. Pre-process: Collect all join keys for each table (deduplicated)
+        std::unordered_map<std::string, std::unordered_set<std::string>> table_join_key_set;
+        for (const auto& pred : join_predicates) {
+            if (!pred) {
+                continue;
+            }
+            VELODB_ASSERT_MSG(pred->getExpressionType() == ExpressionType::COMPARISON,
+                              "Join predicate must be a comparison expression");
+            auto* compare = static_cast<const ComparisonExpression*>(pred.get());
+            VELODB_ASSERT_MSG(compare->getComparisonType() == ComparisonType::EQUAL,
+                              "Only Equi-Join supported in this planner");
+
+            auto* left_expr = &compare->getLeftExpression();
+            auto* right_expr = &compare->getRightExpression();
+            VELODB_ASSERT_MSG(left_expr->getExpressionType() == ExpressionType::COLUMN_REF,
+                              "Join key must be column reference");
+            VELODB_ASSERT_MSG(right_expr->getExpressionType() == ExpressionType::COLUMN_REF,
+                              "Join key must be column reference");
+
+            auto* left_col = static_cast<const ColumnRefExpression*>(left_expr);
+            auto* right_col = static_cast<const ColumnRefExpression*>(right_expr);
+
+            // Extract alias and column name from qualified name "alias.column"
+            auto [left_alias, left_name] = splitName(left_col->getColumnName());
+            auto [right_alias, right_name] = splitName(right_col->getColumnName());
+
+            table_join_key_set[std::string(left_alias)].insert(std::string(left_name));
+            table_join_key_set[std::string(right_alias)].insert(std::string(right_name));
+        }
+
+        // 4b. Add projection to each leaf node: join keys + $_rowid
+        for (auto& node_info : active_plans) {
+            const auto& alias = node_info.table_aliases.front();
+            auto it = table_join_key_set.find(alias);
+            VELODB_ASSERT_MSG(it != table_join_key_set.end(), fmt::format("Join keys not found for table {}", alias));
+            const auto& keys = it->second;
+
+            auto rowid_col_name = fmt::format("{}.$_rowid", alias);
+            auto& in_schema = node_info.plan->getOutputSchema();
+
+            std::vector<std::unique_ptr<AbstractExpression>> proj_exprs;
+            std::vector<ColumnInfo> proj_cols;
+            proj_exprs.reserve(keys.size() + 1);
+            proj_cols.reserve(keys.size() + 1);
+
+            // Add all join key columns
+            for (const auto& key : keys) {
+                auto qualified_name = fmt::format("{}.{}", alias, key);
+                const auto& col_info = in_schema.getColumnInfo(qualified_name);
+                proj_exprs.push_back(
+                    std::make_unique<ColumnRefExpression>("", qualified_name, col_info.getType().cloneUnique()));
+                proj_cols.push_back(col_info.clone());
+            }
+
+            // Add $_rowid column
+            const auto& rowid_col_info = in_schema.getColumnInfo(rowid_col_name);
+            proj_exprs.push_back(
+                std::make_unique<ColumnRefExpression>("", rowid_col_name, DataType::createType(DataTypeId::BIGINT)));
+            proj_cols.push_back(rowid_col_info.clone());
+
+            auto proj_plan = std::make_unique<ProjectionPlanNode>(in_schema.clone(),
+                                                                  Schema(std::move(proj_cols)),
+                                                                  std::move(proj_exprs));
+            proj_plan->addChild(std::move(node_info.plan));
+            node_info.plan = std::move(proj_plan);
+        }
+
+        // 4c. Greedy join loop
         JoinNodeInfo root_node = std::move(active_plans.front());
         active_plans.pop_front();
         while (!active_plans.empty()) {
@@ -289,46 +357,6 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef*
 
             auto* root_col = static_cast<const ColumnRefExpression*>(root_expr);
             auto* next_col = static_cast<const ColumnRefExpression*>(next_expr);
-
-            // Add projection to fetch join key and $_rowid for leaf (i.e., non-join) nodes
-            if ((static_cast<uint16_t>(root_node.plan->getPlanType()) & static_cast<uint16_t>(PlanType::JOIN)) == 0) {
-                auto rowid_col_name = fmt::format("{}.$_rowid", root_node.table_aliases.front());
-                std::vector<std::unique_ptr<AbstractExpression>> proj_exprs;
-                proj_exprs.reserve(2);
-                proj_exprs.push_back(root_expr->cloneUnique());
-                proj_exprs.push_back(std::make_unique<ColumnRefExpression>("",
-                                                                           rowid_col_name,
-                                                                           DataType::createType(DataTypeId::BIGINT)));
-                auto& in_schema = root_node.plan->getOutputSchema();
-                std::vector<ColumnInfo> proj_cols;
-                proj_cols.reserve(2);
-                proj_cols.push_back(in_schema.getColumnInfo(root_col->getColumnName()).clone());
-                proj_cols.push_back(in_schema.getColumnInfo(rowid_col_name).clone());
-                auto proj_plan = std::make_unique<ProjectionPlanNode>(in_schema.clone(),
-                                                                      Schema(std::move(proj_cols)),
-                                                                      std::move(proj_exprs));
-                proj_plan->addChild(std::move(root_node.plan));
-                root_node.plan = std::move(proj_plan);
-            }
-            if ((static_cast<uint16_t>(right_node.plan->getPlanType()) & static_cast<uint16_t>(PlanType::JOIN)) == 0) {
-                auto rowid_col_name = fmt::format("{}.$_rowid", right_node.table_aliases.front());
-                std::vector<std::unique_ptr<AbstractExpression>> proj_exprs;
-                proj_exprs.reserve(2);
-                proj_exprs.push_back(next_expr->cloneUnique());
-                proj_exprs.push_back(std::make_unique<ColumnRefExpression>("",
-                                                                           rowid_col_name,
-                                                                           DataType::createType(DataTypeId::BIGINT)));
-                auto& in_schema = right_node.plan->getOutputSchema();
-                std::vector<ColumnInfo> proj_cols;
-                proj_cols.reserve(2);
-                proj_cols.push_back(in_schema.getColumnInfo(next_col->getColumnName()).clone());
-                proj_cols.push_back(in_schema.getColumnInfo(rowid_col_name).clone());
-                auto proj_plan = std::make_unique<ProjectionPlanNode>(in_schema.clone(),
-                                                                      Schema(std::move(proj_cols)),
-                                                                      std::move(proj_exprs));
-                proj_plan->addChild(std::move(right_node.plan));
-                right_node.plan = std::move(proj_plan);
-            }
 
             size_t left_key_idx = root_node.plan->getOutputSchema().getColumnIndex(root_col->getColumnName());
             size_t right_key_idx = right_node.plan->getOutputSchema().getColumnIndex(next_col->getColumnName());

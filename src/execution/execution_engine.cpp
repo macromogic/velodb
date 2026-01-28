@@ -7,8 +7,6 @@
 #include <SQLParser.h>
 #include <fmt/core.h>
 
-#include <stdexcept>
-
 namespace velodb {
 
 // ExecutionEngine implementation

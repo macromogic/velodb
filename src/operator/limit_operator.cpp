@@ -26,6 +26,7 @@ Result<RowBatch> LimitOperator::next()
     }
     PROFILE_SCOPE("LimitOperator::next");
     auto input_batch = std::move(child_result).value();
+    input_batch.to(DataLocation::CUDA);
     auto input_row_count = input_batch.getRowCount();
     auto n_cols = input_batch.getColumnCount();
     if (input_row_count == 0) {
