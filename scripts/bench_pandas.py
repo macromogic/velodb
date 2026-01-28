@@ -12,6 +12,7 @@ import time
 import gc
 import argparse
 import os
+import threading
 
 
 @dataclass
@@ -104,17 +105,62 @@ def load_data(data_dir: str) -> dict[str, pd.DataFrame]:
     return tables
 
 
+def run_query_with_timeout(con: duckdb.DuckDBPyConnection, query_sql: str, timeout: int):
+    """Run a query with timeout using threading and interrupt()."""
+    result = [None]  # Use list to store result from thread
+    error = [None]
+    interrupted = [False]
+
+    def execute_query():
+        try:
+            start_time = time.perf_counter_ns()
+            con.execute(query_sql)
+            rows = con.fetchall()
+            end_time = time.perf_counter_ns()
+            elapsed_ms = (end_time - start_time) / 1_000_000
+            result[0] = ('success', len(rows), elapsed_ms)
+        except duckdb.InterruptException:
+            interrupted[0] = True
+            result[0] = ('timeout', 0, 0)
+        except Exception as e:
+            error[0] = str(e)
+            result[0] = ('error', str(e), 0)
+
+    thread = threading.Thread(target=execute_query)
+    thread.start()
+    thread.join(timeout=timeout if timeout > 0 else None)
+
+    if thread.is_alive():
+        # Query still running, interrupt it
+        con.interrupt()
+        thread.join(timeout=5)  # Wait a bit for cleanup
+        if thread.is_alive():
+            # If still alive after interrupt, we have a problem
+            return ('timeout', 0, 0)
+        if interrupted[0]:
+            return ('timeout', 0, 0)
+
+    return result[0] if result[0] else ('error', 'Unknown error', 0)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Load TPC-H tables into Pandas DataFrames.")
     parser.add_argument('--data-dir', type=str, required=True, help='Directory containing TPC-H .tbl files')
     parser.add_argument('--query-dir', type=str, required=False, help='Directory containing TPC-H query files')
     parser.add_argument('--iterations', '-i', type=int, default=1, help='Number of iterations to run each query')
-    parser.add_argument('--queries', '-q', type=int, nargs='+', required=False, help='List of query numbers to run')
+    parser.add_argument('--queries', '-q', type=lambda s: [int(x) for x in s.split(',')], required=False, help='List of query numbers to run (comma-separated)')
+    parser.add_argument('--output', '-o', type=str, required=False, help='CSV output file path for benchmark results')
+    parser.add_argument('--timeout', '-t', type=int, default=0, help='Timeout in seconds for each query (0 = no timeout)')
     args = parser.parse_args()
 
+    csv_file = None
+    if args.output:
+        csv_file = open(args.output, 'w')
+        csv_file.write("query,iteration,time_ms\n")
+
     tables = load_data(args.data_dir)
+
     with duckdb.connect() as con:
-        con.execute("PRAGMA enable_profiling='json'")
         con.execute("PRAGMA disable_optimizer")
         con.execute("PRAGMA threads=1")
         for table_name, df in tables.items():
@@ -123,7 +169,7 @@ def main() -> None:
         if args.query_dir:
             query_dir = args.query_dir
         else:
-            query_dir = os.path.join(os.path.dirname(__file__), '../tpch/queries/templates')
+            query_dir = os.path.join(os.path.dirname(__file__), '../benchmark/tpch/queries/templates')
         query_files = sorted([f for f in os.listdir(query_dir) if f.startswith('q') and f.endswith('.sql')])
         for query_file in query_files:
             query_number = int(query_file[1:query_file.index('.')])
@@ -132,17 +178,26 @@ def main() -> None:
             query_path = os.path.join(query_dir, query_file)
             with open(query_path, 'r') as f:
                 query_sql = f.read()
-            # print(f"Running Query {query_number}...")
+            print(f"Running Query {query_number}...")
             for iteration in range(args.iterations):
-                con.execute(f"PRAGMA profiling_output='q{query_number}_{iteration + 1}.json'")
-                start_time = time.perf_counter_ns()
-                con.execute(query_sql)
-                result = con.fetchall()
-                end_time = time.perf_counter_ns()
-                elapsed_ms = (end_time - start_time) / 1_000_000
-                print(f"Q{query_number},{iteration + 1},Pandas,{elapsed_ms:.2f}")
-                # print(f"  Iteration {iteration + 1}: {len(result)} rows returned in {elapsed_ms:.2f} ms.")
+                status, row_count, elapsed_ms = run_query_with_timeout(con, query_sql, args.timeout)
+
+                if status == 'success':
+                    if csv_file:
+                        csv_file.write(f"Q{query_number},{iteration + 1},{elapsed_ms:.2f}\n")
+                    print(f"  Iteration {iteration + 1}: {row_count} rows returned in {elapsed_ms:.2f} ms.")
+                elif status == 'timeout':
+                    print(f"  Iteration {iteration + 1}: TIMEOUT (>{args.timeout}s)")
+                    if csv_file:
+                        csv_file.write(f"Q{query_number},{iteration + 1},TIMEOUT\n")
+                else:  # error
+                    print(f"  Iteration {iteration + 1}: ERROR - {row_count}")
+                    if csv_file:
+                        csv_file.write(f"Q{query_number},{iteration + 1},ERROR\n")
                 gc.collect()
+
+    if csv_file:
+        csv_file.close()
 
 
 if __name__ == "__main__":
