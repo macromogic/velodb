@@ -2,6 +2,7 @@
 
 #include "common/fmt.hpp"
 #include "common/profiler.hpp"
+#include "cuda/host_memory_pool.hpp"
 #include "execution/query_result.hpp"
 
 #include <fmt/chrono.h>
@@ -89,6 +90,9 @@ Result<TPCHBenchmarkRunner::BenchmarkResults> TPCHBenchmarkRunner::runPowerTest(
                 if (config.verbose && !query_result.success) {
                     fmt::println("  FAILED: {}", query_result.error_message);
                 }
+
+                // Reset pinned memory pool between queries to prevent fragmentation
+                HostMemoryPool::getInstance().reset();
             }
         }
     }

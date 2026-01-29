@@ -4,10 +4,11 @@
 #include "cuda/helper.hpp"
 
 #include <backward.hpp>
+#include <fmt/ranges.h>
 
 #include <cassert>
-#include <iostream>
 #include <map>
+#include <mutex>
 #include <vector>
 
 namespace velodb {
@@ -32,14 +33,15 @@ public:
     void* allocate(size_t size)
     {
         size = alignUp(size, 256);
+        std::lock_guard<std::mutex> lock(mutex_);
         for (auto it = free_blocks_.begin(); it != free_blocks_.end(); ++it) {
             if (it->second >= size) {
-                char* ptr = it->first;
+                void* ptr = it->first;
                 size_t block_size = it->second;
                 free_blocks_.erase(it);
 
                 if (block_size > size) {
-                    char* next_ptr = ptr + size;
+                    void* next_ptr = static_cast<char*>(ptr) + size;
                     size_t remaining = block_size - size;
                     free_blocks_[next_ptr] = remaining;
                 }
@@ -47,22 +49,25 @@ public:
                 return ptr;
             }
         }
-        VELODB_THROW(ExecutionError, "HostMemoryPool: Out of memory");
+        VELODB_THROW(ExecutionError,
+                     fmt::format("HostMemoryPool: Out of memory. Trying to allocate {} bytes from free blocks {}",
+                                 size,
+                                 free_blocks_));
     }
 
     void deallocate(void* ptr, size_t size)
     {
         if (!ptr)
             return;
-        char* char_ptr = static_cast<char*>(ptr);
         size = alignUp(size, 256);
 
-        auto [it, success] = free_blocks_.insert({ char_ptr, size });
+        std::lock_guard<std::mutex> lock(mutex_);
+        auto [it, success] = free_blocks_.insert({ ptr, size });
         assert(success && "Double free detected!");
 
         auto next_it = std::next(it);
         if (next_it != free_blocks_.end()) {
-            if (char_ptr + size == next_it->first) {
+            if (static_cast<char*>(ptr) + size == next_it->first) {
                 it->second += next_it->second;
                 free_blocks_.erase(next_it);
             }
@@ -70,23 +75,52 @@ public:
 
         if (it != free_blocks_.begin()) {
             auto prev_it = std::prev(it);
-            if (prev_it->first + prev_it->second == char_ptr) {
+            if (static_cast<char*>(prev_it->first) + prev_it->second == ptr) {
                 prev_it->second += it->second;
                 free_blocks_.erase(it);
             }
         }
     }
 
-    void debug() const
+    /**
+     * @brief Reset the memory pool to its initial state.
+     *
+     * This should only be called when no allocations are active.
+     * Used to defragment the pool between benchmark runs.
+     */
+    void reset()
     {
-        std::cout << "--- Pool Status ---\n";
-        size_t free_total = 0;
-        for (auto const& [ptr, size] : free_blocks_) {
-            std::cout << "Free Block: " << (void*)ptr << " | Size: " << size << "\n";
-            free_total += size;
+        std::lock_guard<std::mutex> lock(mutex_);
+        free_blocks_.clear();
+        free_blocks_[base_ptr_] = total_size_;
+    }
+
+    /**
+     * @brief Get the total free memory available in the pool.
+     */
+    size_t totalFreeMemory() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        size_t total = 0;
+        for (const auto& [ptr, size] : free_blocks_) {
+            total += size;
         }
-        std::cout << "Total Free: " << free_total << " / " << total_size_ << "\n";
-        std::cout << "-------------------\n";
+        return total;
+    }
+
+    /**
+     * @brief Get the largest contiguous free block available.
+     */
+    size_t largestFreeBlock() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        size_t largest = 0;
+        for (const auto& [ptr, size] : free_blocks_) {
+            if (size > largest) {
+                largest = size;
+            }
+        }
+        return largest;
     }
 
     static HostMemoryPool& getInstance()
@@ -108,9 +142,10 @@ private:
         return (x + align - 1) & ~(align - 1);
     }
 
+    mutable std::mutex mutex_;
     char* base_ptr_;
     size_t total_size_;
-    std::map<char*, size_t> free_blocks_;
+    std::map<void*, size_t> free_blocks_;
 };
 
 }

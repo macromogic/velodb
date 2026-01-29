@@ -66,13 +66,26 @@ Result<RowBatch> HashJoinOperator::next()
     uint32_t ht_num_buckets = static_cast<uint32_t>(nextPow2(build_size * 2));
 
     DataTypeId key_type_id = build_batch.getColumn(join_key_indices_.first).getType().getTypeId();
-    size_t key_type_size = build_batch.getColumn(join_key_indices_.first).getType().size();
 
     // Calculate entry size based on key type
     // HashTableEntry<T> = { T key; int64_t rowid; uint32_t next; }
-    size_t entry_size = key_type_size + sizeof(int64_t) + sizeof(uint32_t);
-    // Align to 8 bytes for better memory access
-    entry_size = ((entry_size + 7) / 8) * 8;
+    // IMPORTANT: Must match actual struct sizeof with alignment padding!
+    // Struct layout for int32_t key: key(4) + padding(4) + rowid(8) + next(4) + padding(4) = 24
+    // Struct layout for int64_t key: key(8) + rowid(8) + next(4) + padding(4) = 24
+    size_t entry_size;
+    switch (key_type_id) {
+    case DataTypeId::INTEGER:
+        entry_size = sizeof(HashTableEntry<int32_t>);
+        break;
+    case DataTypeId::BIGINT:
+        entry_size = sizeof(HashTableEntry<int64_t>);
+        break;
+    case DataTypeId::DOUBLE:
+        entry_size = sizeof(HashTableEntry<double>);
+        break;
+    default:
+        VELODB_THROW(ExecutionError, "Unsupported key type for Hash Join");
+    }
 
     void* d_ht_entries;
     uint32_t* d_ht_heads;
@@ -82,7 +95,8 @@ Result<RowBatch> HashJoinOperator::next()
     CHECKED_CALL_THROW(cudaMallocAsync(&d_ht_heads, ht_num_buckets * sizeof(uint32_t), stream_handle->get()));
     CHECKED_CALL_THROW(cudaMallocAsync(&d_ht_counter, sizeof(uint32_t), stream_handle->get()));
 
-    // Initialize hash table: heads = 0xFF (HASH_TABLE_EMPTY), counter = 0
+    // Initialize hash table: entries set to EMPTY pattern, heads = 0xFF (HASH_TABLE_EMPTY), counter = 0
+    CHECKED_CALL_THROW(cudaMemsetAsync(d_ht_entries, 0xFF, ht_capacity * entry_size, stream_handle->get()));
     CHECKED_CALL_THROW(cudaMemsetAsync(d_ht_heads, 0xFF, ht_num_buckets * sizeof(uint32_t), stream_handle->get()));
     CHECKED_CALL_THROW(cudaMemsetAsync(d_ht_counter, 0, sizeof(uint32_t), stream_handle->get()));
 
@@ -96,6 +110,7 @@ Result<RowBatch> HashJoinOperator::next()
                                        build_size * sizeof(int64_t),
                                        cudaMemcpyHostToDevice,
                                        stream_handle->get()));
+    stream_handle->synchronize();
 
     // ========================================================================
     // Step 2: Build Hash Table
@@ -119,6 +134,7 @@ Result<RowBatch> HashJoinOperator::next()
     size_t* d_match_count;
     CHECKED_CALL_THROW(cudaMallocAsync(&d_match_count, sizeof(size_t), stream_handle->get()));
     CHECKED_CALL_THROW(cudaMemsetAsync(d_match_count, 0, sizeof(size_t), stream_handle->get()));
+    stream_handle->synchronize();
 
     Command cmd_count = {};
     cmd_count.opcode = OpCode::OP_HASH_JOIN_COUNT;
@@ -148,11 +164,10 @@ Result<RowBatch> HashJoinOperator::next()
         return Result<RowBatch>::success(RowBatch());
     }
 
-    size_t h_padded_rows = nextPow2(h_match_count);
-
     // ========================================================================
     // Step 4: Allocate Output Buffers and Prepare Random Indices (ORAM)
     // ========================================================================
+    size_t h_padded_rows = nextPow2(h_match_count);
     int64_t* d_out_left_indices;
     int64_t* d_out_right_indices;
     CHECKED_CALL_THROW(cudaMallocAsync(&d_out_left_indices, h_padded_rows * sizeof(int64_t), stream_handle->get()));
@@ -169,6 +184,7 @@ Result<RowBatch> HashJoinOperator::next()
                                        probe_batch.getRowCount() * sizeof(int64_t),
                                        cudaMemcpyHostToDevice,
                                        stream_handle->get()));
+    stream_handle->synchronize();
 
     // Fill output with random valid indices for ORAM padding
     Command cmd_prepare_left = {};
@@ -189,6 +205,7 @@ Result<RowBatch> HashJoinOperator::next()
     uint32_t* d_write_offset;
     CHECKED_CALL_THROW(cudaMallocAsync(&d_write_offset, sizeof(uint32_t), stream_handle->get()));
     CHECKED_CALL_THROW(cudaMemsetAsync(d_write_offset, 0, sizeof(uint32_t), stream_handle->get()));
+    stream_handle->synchronize();
 
     Command cmd_write = {};
     cmd_write.opcode = OpCode::OP_HASH_JOIN_WRITE;
