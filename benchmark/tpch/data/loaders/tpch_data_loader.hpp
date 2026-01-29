@@ -7,6 +7,7 @@
 #include "catalog/table_builder.hpp"
 #include "common/copy_traits.hpp"
 #include "common/result.hpp"
+#include "data/data_location.hpp"
 #include "data/value.hpp"
 
 #include <memory>
@@ -24,6 +25,8 @@ public:
         bool validate_data = true;
         size_t batch_size = 10000;
         bool verbose = false;
+        // Use pageable memory for large tables to reduce pinned memory pressure
+        DataLocation data_location = DataLocation::HOST_PAGEABLE;
     };
 
     struct LoadStatistics {
@@ -51,6 +54,7 @@ public:
 
 private:
     Catalog& catalog_;
+    DataLocation current_location_ = DataLocation::HOST_PAGEABLE;
 
     // File parsing methods
     Result<std::vector<Value>> parseCSVLine(std::string_view line, const Schema& schema);

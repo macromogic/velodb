@@ -4,6 +4,8 @@
 #include "common/profiler.hpp"
 #include "cuda/helper.hpp"
 #include "cuda/host_memory_pool.hpp"
+#include "cuda/pageable_memory_pool.hpp"
+#include "cuda/staged_transfer.hpp"
 #include "cuda/stream.hpp"
 #include "cuda/stream_pool.hpp"
 #include "data/data_location.hpp"
@@ -21,8 +23,12 @@ BitVector::BitVector(size_t num_bits, DataLocation location)
     , location_(location)
     , data_(nullptr)
 {
-    if (location_ == DataLocation::HOST) {
+    if (location_ == DataLocation::HOST || location_ == DataLocation::HOST_PINNED) {
         data_ = static_cast<Element*>(HostMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
+        std::fill_n(data_, element_capacity_, Element(0));
+        location_ = DataLocation::HOST_PINNED; // Normalize HOST to HOST_PINNED
+    } else if (location_ == DataLocation::HOST_PAGEABLE) {
+        data_ = static_cast<Element*>(PageableMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
         std::fill_n(data_, element_capacity_, Element(0));
     } else {
         auto stream_handle = StreamPool::getInstance().acquire().value();
@@ -39,8 +45,13 @@ BitVector::BitVector(Element* data, size_t size, size_t capacity, DataLocation l
 {
     if (!data_) {
         // Allocate if not provided
-        if (location_ == DataLocation::HOST) {
+        if (location_ == DataLocation::HOST || location_ == DataLocation::HOST_PINNED) {
             data_ = static_cast<Element*>(HostMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
+            std::fill_n(data_, element_capacity_, Element(0));
+            location_ = DataLocation::HOST_PINNED;
+        } else if (location_ == DataLocation::HOST_PAGEABLE) {
+            data_ = static_cast<Element*>(
+                PageableMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
             std::fill_n(data_, element_capacity_, Element(0));
         } else {
             auto stream_handle = StreamPool::getInstance().acquire().value();
@@ -63,7 +74,8 @@ BitVector BitVector::cloneImpl() const
 {
     BitVector copy(size_, location_);
     switch (location_) {
-    case DataLocation::HOST:
+    case DataLocation::HOST_PINNED: // HOST is an alias for HOST_PINNED
+    case DataLocation::HOST_PAGEABLE:
         std::copy(data_, data_ + element_capacity_, copy.data_);
         break;
     case DataLocation::CUDA: {
@@ -98,8 +110,11 @@ BitVector& BitVector::operator=(BitVector&& other) noexcept
 BitVector::~BitVector()
 {
     switch (location_) {
-    case DataLocation::HOST:
+    case DataLocation::HOST_PINNED: // HOST is an alias for HOST_PINNED
         HostMemoryPool::getInstance().deallocate(data_, element_capacity_ * sizeof(Element));
+        break;
+    case DataLocation::HOST_PAGEABLE:
+        PageableMemoryPool::getInstance().deallocate(data_, element_capacity_ * sizeof(Element));
         break;
     case DataLocation::CUDA: {
         auto stream_handle = StreamPool::getInstance().acquire().value();
@@ -155,7 +170,7 @@ bool BitVector::get(size_t index) const
 
 void BitVector::resize(size_t new_size)
 {
-    VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot resize non-host BitVector");
+    VELODB_ASSERT_MSG(isHostLocation(location_), "Cannot resize non-host BitVector");
     reserve(new_size); // Ensure capacity
     if (new_size > size_) {
         // Initialize new elements to 0
@@ -186,6 +201,14 @@ void BitVector::reserve(size_t new_capacity)
                                                stream_handle->get()));
             CHECKED_CALL_THROW(cudaFreeAsync(data_, stream_handle->get()));
             stream_handle->synchronize();
+        } else if (location_ == DataLocation::HOST_PAGEABLE) {
+            auto& pageable_pool = PageableMemoryPool::getInstance();
+            new_data = static_cast<Element*>(pageable_pool.allocate(new_element_capacity * sizeof(Element)));
+            if (data_) {
+                std::copy(data_, data_ + size_, new_data);
+            }
+            std::fill_n(new_data + size_, new_element_capacity - size_, Element(0));
+            pageable_pool.deallocate(data_, element_capacity_ * sizeof(Element));
         } else {
             auto& host_memory_pool = HostMemoryPool::getInstance();
             new_data = static_cast<Element*>(host_memory_pool.allocate(new_element_capacity * sizeof(Element)));
@@ -204,7 +227,7 @@ void BitVector::reserve(size_t new_capacity)
 BitVector BitVector::slice(size_t start, size_t end) const
 {
     VELODB_ASSERT_MSG(start <= end && end <= size_, "Invalid slice range");
-    VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot slice non-host data");
+    VELODB_ASSERT_MSG(isHostLocation(location_), "Cannot slice non-host data");
 
     size_t slice_bits = end - start;
     BitVector result(slice_bits);
@@ -236,11 +259,33 @@ void BitVector::copyBits(Element* dest, size_t dest_offset, const Element* src, 
 void BitVector::to(DataLocation location)
 {
     VELODB_ASSERT_MSG(location != DataLocation::VIEW, "Cannot move data to VIEW");
-    if (location_ != location) {
-        auto stream_handle = StreamPool::getInstance().acquire().value();
-        if (location_ == DataLocation::CUDA) {
-            PROFILE_SCOPE("BitVector D2H Transfer");
-            // For Byte Vector, capacity is bytes
+
+    // Handle VIEW: need to copy data first to take ownership
+    if (location_ == DataLocation::VIEW) {
+        // Copy data to owned memory
+        Element* new_data = static_cast<Element*>(
+            HostMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
+        std::copy(data_, data_ + element_capacity_, new_data);
+        data_ = new_data;
+        location_ = DataLocation::HOST_PINNED;
+    }
+
+    // Normalize HOST to HOST_PINNED for comparison
+    DataLocation target = (location == DataLocation::HOST) ? DataLocation::HOST_PINNED : location;
+    DataLocation current = (location_ == DataLocation::HOST) ? DataLocation::HOST_PINNED : location_;
+
+    if (current == target) {
+        return;
+    }
+
+    auto stream_handle = StreamPool::getInstance().acquire().value();
+
+    if (current == DataLocation::CUDA) {
+        // CUDA -> HOST_PINNED or CUDA -> HOST_PAGEABLE
+        PROFILE_SCOPE("BitVector D2H Transfer");
+
+        if (target == DataLocation::HOST_PINNED) {
+            // CUDA -> HOST_PINNED: direct DMA
             Element* host_data = static_cast<Element*>(
                 HostMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
             CHECKED_CALL_THROW(cudaMemcpyAsync(host_data,
@@ -252,22 +297,56 @@ void BitVector::to(DataLocation location)
             stream_handle->synchronize();
             data_ = host_data;
         } else {
-            PROFILE_SCOPE("BitVector H2D Transfer");
-            Element* device_data;
-            CHECKED_CALL_THROW(
-                cudaMallocAsync(&device_data, element_capacity_ * sizeof(Element), stream_handle->get()));
+            // CUDA -> HOST_PAGEABLE: staged transfer
+            Element* pageable_data = static_cast<Element*>(
+                PageableMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
+            StagedTransfer::toHost(pageable_data, data_, element_capacity_ * sizeof(Element));
+            CHECKED_CALL_THROW(cudaFreeAsync(data_, stream_handle->get()));
+            stream_handle->synchronize();
+            data_ = pageable_data;
+        }
+        location_ = target;
+    } else if (target == DataLocation::CUDA) {
+        // HOST_PINNED -> CUDA or HOST_PAGEABLE -> CUDA
+        PROFILE_SCOPE("BitVector H2D Transfer");
+        Element* device_data;
+        CHECKED_CALL_THROW(cudaMallocAsync(&device_data, element_capacity_ * sizeof(Element), stream_handle->get()));
+
+        if (current == DataLocation::HOST_PINNED) {
+            // HOST_PINNED -> CUDA: direct DMA
             CHECKED_CALL_THROW(cudaMemcpyAsync(device_data,
                                                data_,
                                                element_capacity_ * sizeof(Element),
                                                cudaMemcpyHostToDevice,
                                                stream_handle->get()));
-            if (location_ == DataLocation::HOST) {
-                HostMemoryPool::getInstance().deallocate(data_, element_capacity_ * sizeof(Element));
-            }
-            stream_handle->synchronize();
-            data_ = device_data;
+            HostMemoryPool::getInstance().deallocate(data_, element_capacity_ * sizeof(Element));
+        } else {
+            // HOST_PAGEABLE -> CUDA: staged transfer
+            stream_handle->synchronize(); // Ensure device_data is allocated
+            StagedTransfer::toDevice(device_data, data_, element_capacity_ * sizeof(Element));
+            PageableMemoryPool::getInstance().deallocate(data_, element_capacity_ * sizeof(Element));
         }
-        location_ = location;
+        stream_handle->synchronize();
+        data_ = device_data;
+        location_ = DataLocation::CUDA;
+    } else {
+        // HOST_PINNED <-> HOST_PAGEABLE
+        PROFILE_SCOPE("BitVector Host Memory Transfer");
+        if (current == DataLocation::HOST_PINNED && target == DataLocation::HOST_PAGEABLE) {
+            Element* pageable_data = static_cast<Element*>(
+                PageableMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
+            std::copy(data_, data_ + element_capacity_, pageable_data);
+            HostMemoryPool::getInstance().deallocate(data_, element_capacity_ * sizeof(Element));
+            data_ = pageable_data;
+            location_ = DataLocation::HOST_PAGEABLE;
+        } else {
+            Element* pinned_data = static_cast<Element*>(
+                HostMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
+            std::copy(data_, data_ + element_capacity_, pinned_data);
+            PageableMemoryPool::getInstance().deallocate(data_, element_capacity_ * sizeof(Element));
+            data_ = pinned_data;
+            location_ = DataLocation::HOST_PINNED;
+        }
     }
 }
 

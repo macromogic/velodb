@@ -100,6 +100,7 @@ function run_bench() {
         -d "$DATA_DIR" \
         -i "$ITERATIONS" \
         -q "$QUERIES" \
+        -j hash \
         --export-format csv \
         --results-dir "$BENCHMARK_DIR/results/sf_$SF" \
         $ADDITIONAL_ARGS

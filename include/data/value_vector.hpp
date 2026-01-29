@@ -5,6 +5,8 @@
 #include "common/profiler.hpp"
 #include "cuda/helper.hpp"
 #include "cuda/host_memory_pool.hpp"
+#include "cuda/pageable_memory_pool.hpp"
+#include "cuda/staged_transfer.hpp"
 #include "cuda/stream.hpp"
 #include "cuda/stream_pool.hpp"
 #include "data/bit_vector.hpp"
@@ -40,8 +42,12 @@ public:
         , null_mask_(capacity_, location)
         , location_(location)
     {
-        if (location == DataLocation::HOST) {
+        if (location == DataLocation::HOST || location == DataLocation::HOST_PINNED) {
             data_ = static_cast<DType*>(HostMemoryPool::getInstance().allocate(capacity_ * sizeof(DType)));
+            std::fill_n(data_, capacity_, DType());
+            location_ = DataLocation::HOST_PINNED; // Normalize HOST to HOST_PINNED
+        } else if (location == DataLocation::HOST_PAGEABLE) {
+            data_ = static_cast<DType*>(PageableMemoryPool::getInstance().allocate(capacity_ * sizeof(DType)));
             std::fill_n(data_, capacity_, DType());
         } else if (location == DataLocation::CUDA) {
             auto stream_handle = StreamPool::getInstance().acquire().value();
@@ -86,7 +92,9 @@ public:
                 if (location_ == DataLocation::CUDA) {
                     auto stream_handle = StreamPool::getInstance().acquire().value();
                     cudaFreeAsync(data_, stream_handle->get());
-                } else {
+                } else if (location_ == DataLocation::HOST_PAGEABLE) {
+                    PageableMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
+                } else if (location_ == DataLocation::HOST_PINNED || location_ == DataLocation::HOST) {
                     HostMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
                 }
             }
@@ -102,7 +110,7 @@ public:
             other.data_ = nullptr;
             other.size_ = 0;
             other.capacity_ = 0;
-            other.location_ = DataLocation::HOST;
+            other.location_ = DataLocation::HOST_PINNED;
         }
         return *this;
     }
@@ -116,7 +124,9 @@ public:
             auto stream_handle = StreamPool::getInstance().acquire().value();
             cudaFreeAsync(data_, stream_handle->get());
             stream_handle->synchronize();
-        } else if (location_ == DataLocation::HOST) {
+        } else if (location_ == DataLocation::HOST_PAGEABLE) {
+            PageableMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
+        } else if (location_ == DataLocation::HOST || location_ == DataLocation::HOST_PINNED) {
             HostMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
         }
     }
@@ -127,13 +137,36 @@ public:
     void to(DataLocation location)
     {
         VELODB_ASSERT_MSG(location != DataLocation::VIEW, "Cannot move data to VIEW");
-        if (location_ != location) {
-            auto stream_handle = StreamPool::getInstance().acquire().value();
-            if (location_ == DataLocation::CUDA) {
-                PROFILE_SCOPE("ValueVector D2H Transfer");
-                // Oblivious transfer: round up to next power of 2 to hide selectivity
-                size_t padded_capacity = nextPow2(capacity_);
-                VELODB_ASSERT_MSG(capacity_ >= padded_capacity, "Insufficient capacity for oblivious transfer");
+
+        // Handle VIEW: need to copy data first to take ownership
+        if (location_ == DataLocation::VIEW) {
+            // Copy data to owned memory
+            DType* new_data = static_cast<DType*>(HostMemoryPool::getInstance().allocate(capacity_ * sizeof(DType)));
+            std::copy(data_, data_ + capacity_, new_data);
+            data_ = new_data;
+            location_ = DataLocation::HOST_PINNED;
+            // null_mask_ VIEW will be handled by its own to() call
+        }
+
+        // Normalize HOST to HOST_PINNED for comparison
+        DataLocation target = (location == DataLocation::HOST) ? DataLocation::HOST_PINNED : location;
+        DataLocation current = (location_ == DataLocation::HOST) ? DataLocation::HOST_PINNED : location_;
+
+        if (current == target) {
+            null_mask_.to(location);
+            return;
+        }
+
+        auto stream_handle = StreamPool::getInstance().acquire().value();
+
+        if (current == DataLocation::CUDA) {
+            // CUDA -> HOST_PINNED or CUDA -> HOST_PAGEABLE
+            PROFILE_SCOPE("ValueVector D2H Transfer");
+            size_t padded_capacity = nextPow2(capacity_);
+            VELODB_ASSERT_MSG(capacity_ >= padded_capacity, "Insufficient capacity for oblivious transfer");
+
+            if (target == DataLocation::HOST_PINNED) {
+                // CUDA -> HOST_PINNED: direct DMA
                 DType* host_data = static_cast<DType*>(
                     HostMemoryPool::getInstance().allocate(padded_capacity * sizeof(DType)));
                 CHECKED_CALL_THROW(cudaMemcpyAsync(host_data,
@@ -144,27 +177,62 @@ public:
                 CHECKED_CALL_THROW(cudaFreeAsync(data_, stream_handle->get()));
                 stream_handle->synchronize();
                 data_ = host_data;
-                capacity_ = padded_capacity;
             } else {
-                PROFILE_SCOPE("ValueVector H2D Transfer");
-                size_t padded_capacity = nextPow2(capacity_);
-                DType* device_data;
-                CHECKED_CALL_THROW(
-                    cudaMallocAsync(&device_data, padded_capacity * sizeof(DType), stream_handle->get()));
+                // CUDA -> HOST_PAGEABLE: staged transfer
+                DType* pageable_data = static_cast<DType*>(
+                    PageableMemoryPool::getInstance().allocate(padded_capacity * sizeof(DType)));
+                StagedTransfer::toHost(pageable_data, data_, padded_capacity * sizeof(DType));
+                CHECKED_CALL_THROW(cudaFreeAsync(data_, stream_handle->get()));
+                stream_handle->synchronize();
+                data_ = pageable_data;
+            }
+            capacity_ = padded_capacity;
+            location_ = target;
+        } else if (target == DataLocation::CUDA) {
+            // HOST_PINNED -> CUDA or HOST_PAGEABLE -> CUDA
+            PROFILE_SCOPE("ValueVector H2D Transfer");
+            size_t padded_capacity = nextPow2(capacity_);
+            DType* device_data;
+            CHECKED_CALL_THROW(cudaMallocAsync(&device_data, padded_capacity * sizeof(DType), stream_handle->get()));
+
+            if (current == DataLocation::HOST_PINNED) {
+                // HOST_PINNED -> CUDA: direct DMA
                 CHECKED_CALL_THROW(cudaMemcpyAsync(device_data,
                                                    data_,
                                                    capacity_ * sizeof(DType),
                                                    cudaMemcpyHostToDevice,
                                                    stream_handle->get()));
-                if (location_ == DataLocation::HOST) {
-                    HostMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
-                }
-                stream_handle->synchronize();
-                data_ = device_data;
-                capacity_ = padded_capacity;
+                HostMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
+            } else {
+                // HOST_PAGEABLE -> CUDA: staged transfer
+                stream_handle->synchronize(); // Ensure device_data is allocated
+                StagedTransfer::toDevice(device_data, data_, capacity_ * sizeof(DType));
+                PageableMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
             }
-            location_ = location;
+            stream_handle->synchronize();
+            data_ = device_data;
+            capacity_ = padded_capacity;
+            location_ = DataLocation::CUDA;
+        } else {
+            // HOST_PINNED <-> HOST_PAGEABLE
+            PROFILE_SCOPE("ValueVector Host Memory Transfer");
+            if (current == DataLocation::HOST_PINNED && target == DataLocation::HOST_PAGEABLE) {
+                DType* pageable_data = static_cast<DType*>(
+                    PageableMemoryPool::getInstance().allocate(capacity_ * sizeof(DType)));
+                std::copy(data_, data_ + capacity_, pageable_data);
+                HostMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
+                data_ = pageable_data;
+                location_ = DataLocation::HOST_PAGEABLE;
+            } else {
+                DType* pinned_data = static_cast<DType*>(
+                    HostMemoryPool::getInstance().allocate(capacity_ * sizeof(DType)));
+                std::copy(data_, data_ + capacity_, pinned_data);
+                PageableMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
+                data_ = pinned_data;
+                location_ = DataLocation::HOST_PINNED;
+            }
         }
+
         null_mask_.to(location);
     }
 
@@ -175,7 +243,7 @@ public:
 
     void resize(size_t new_size, DType value = DType())
     {
-        VELODB_ASSERT_MSG(location_ == DataLocation::HOST, "Cannot resize non-host data");
+        VELODB_ASSERT_MSG(isHostLocation(location_), "Cannot resize non-host data");
         if (new_size > capacity_) {
             size_t new_capacity = (new_size - capacity_ + 15) / 16 * 16 + capacity_;
             reserve(new_capacity);
@@ -197,12 +265,19 @@ public:
         }
         if (new_capacity > capacity_) {
             auto stream_handle = StreamPool::getInstance().acquire().value();
-            if (location_ == DataLocation::HOST) {
+            if (location_ == DataLocation::HOST || location_ == DataLocation::HOST_PINNED) {
                 auto& host_memory_pool = HostMemoryPool::getInstance();
                 DType* new_data = static_cast<DType*>(host_memory_pool.allocate(new_capacity * sizeof(DType)));
                 stream_handle->synchronize();
                 std::copy(data_, data_ + size_, new_data);
                 host_memory_pool.deallocate(data_, capacity_ * sizeof(DType));
+                data_ = new_data;
+                capacity_ = new_capacity;
+            } else if (location_ == DataLocation::HOST_PAGEABLE) {
+                auto& pageable_memory_pool = PageableMemoryPool::getInstance();
+                DType* new_data = static_cast<DType*>(pageable_memory_pool.allocate(new_capacity * sizeof(DType)));
+                std::copy(data_, data_ + size_, new_data);
+                pageable_memory_pool.deallocate(data_, capacity_ * sizeof(DType));
                 data_ = new_data;
                 capacity_ = new_capacity;
             } else if (location_ == DataLocation::CUDA) {
@@ -250,8 +325,7 @@ public:
     ConcreteVector slice(size_t start, size_t end) const
     {
         VELODB_ASSERT_MSG(start <= end && end <= size_, "Invalid slice range");
-        VELODB_ASSERT_MSG(location_ == DataLocation::HOST || location_ == DataLocation::VIEW,
-                          "Cannot slice non-host data");
+        VELODB_ASSERT_MSG(isHostLocation(location_) || location_ == DataLocation::VIEW, "Cannot slice non-host data");
 
         size_t new_size = end - start;
         return ConcreteVector(data_ + start, new_size, capacity_ - start, null_mask_.slice(start, end));
@@ -270,7 +344,7 @@ public:
 
     ConcreteVector gather(const IntVector& rowids) const
     {
-        VELODB_ASSERT_MSG(location_ == DataLocation::HOST && rowids.location() == DataLocation::HOST,
+        VELODB_ASSERT_MSG(isHostLocation(location_) && isHostLocation(rowids.location()),
                           "Materialization gather must happen on HOST");
         ConcreteVector vec(nextPow2(rowids.capacity()), DataLocation::HOST);
         const auto* rowid_data = rowids.data();
@@ -367,7 +441,7 @@ public:
     static ValueVector buildFrom(const DType* data, size_t n, DataLocation location = DataLocation::HOST)
     {
         ValueVector vec(n, location);
-        if (location == DataLocation::HOST) {
+        if (isHostLocation(location)) {
             std::copy(data, data + n, vec.data_);
         } else if (location == DataLocation::CUDA) {
             CHECKED_CALL_THROW(cudaMemcpy(vec.data_, data, n * sizeof(DType), cudaMemcpyDeviceToDevice));
@@ -478,8 +552,7 @@ public:
     ConcreteVector slice(size_t start, size_t end) const
     {
         VELODB_ASSERT_MSG(start <= end && end <= size_, "Invalid slice range");
-        VELODB_ASSERT_MSG(location_ == DataLocation::HOST || location_ == DataLocation::VIEW,
-                          "Cannot slice non-host data");
+        VELODB_ASSERT_MSG(isHostLocation(location_) || location_ == DataLocation::VIEW, "Cannot slice non-host data");
 
         size_t new_size = end - start;
         return ConcreteVector(data_ + start,

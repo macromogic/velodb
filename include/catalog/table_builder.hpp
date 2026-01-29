@@ -3,6 +3,7 @@
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "common/copy_traits.hpp"
+#include "data/data_location.hpp"
 #include "data/value.hpp"
 
 #include <functional>
@@ -14,7 +15,7 @@ namespace velodb {
 
 class TableBuilder : private NonCopyable {
 public:
-    TableBuilder(std::string name, Schema schema);
+    TableBuilder(std::string name, Schema schema, DataLocation location = DataLocation::HOST);
     TableBuilder(TableBuilder&& other) noexcept = default;
     TableBuilder& operator=(TableBuilder&& other) noexcept = default;
 
@@ -36,6 +37,7 @@ private:
     Schema schema_;
     size_t num_columns_;
     size_t num_rows_ = 0;
+    DataLocation location_;
     std::vector<std::vector<Value>> pending_columns_;
 
     void validateRowSize(const std::vector<Value>& row) const;

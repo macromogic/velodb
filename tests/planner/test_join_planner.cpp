@@ -56,13 +56,31 @@ TEST_F(JoinPlannerTest, SelectStarJoinPlanContainsMaterialization)
     ASSERT_EQ(stmt->type(), hsql::kStmtSelect);
     auto* select = static_cast<const hsql::SelectStatement*>(stmt);
     auto plan = planner_->planSelect(select);
+
+    // Debug: print plan tree
+    std::function<void(const AbstractPlanNode*, int)> print_plan = [&](const AbstractPlanNode* n, int depth) {
+        if (!n)
+            return;
+        for (int i = 0; i < depth; ++i)
+            std::cout << "  ";
+        std::cout << "PlanType: " << static_cast<uint16_t>(n->getPlanType()) << " (" << n->toString() << ")"
+                  << std::endl;
+        for (auto& c : n->getChildren()) {
+            print_plan(c.get(), depth + 1);
+        }
+    };
+    std::cout << "\n=== Plan Tree ===" << std::endl;
+    print_plan(plan.get(), 0);
+    std::cout << "==================\n" << std::endl;
+
     // Top should be Materialization (PlanType::PROJECTION reused) or Limit/Order wrapping it
-    // Traverse until reach merge join
+    // Traverse until reach any join node (HASH_JOIN or SORT_MERGE_JOIN)
     std::function<const AbstractPlanNode*(const AbstractPlanNode*)> find_join =
         [&](const AbstractPlanNode* n) -> const AbstractPlanNode* {
         if (!n)
             return nullptr;
-        if (n->getPlanType() == PlanType::SORT_MERGE_JOIN)
+        // Check for any JOIN type using bitmask
+        if (static_cast<int>(n->getPlanType()) & static_cast<int>(PlanType::JOIN))
             return n;
         for (auto& c : n->getChildren()) {
             auto r = find_join(c.get());

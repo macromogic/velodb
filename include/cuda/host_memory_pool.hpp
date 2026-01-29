@@ -91,7 +91,12 @@ public:
 
     static HostMemoryPool& getInstance()
     {
-        constexpr size_t pool_size = 1ul << 34;
+        // Reduced from 16GB to 512MB since main data now uses pageable memory
+        // This pinned pool is mainly used for:
+        // - Intermediate results during query execution
+        // - Small tables that benefit from fast DMA
+        // - Device->Host transfers that need pinned memory
+        constexpr size_t pool_size = 512ul << 20; // 512MB
         static HostMemoryPool instance(pool_size);
         return instance;
     }

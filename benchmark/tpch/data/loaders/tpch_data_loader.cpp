@@ -26,12 +26,16 @@ Result<TPCHDataLoader::LoadStatistics> TPCHDataLoader::loadAllTables(const LoadC
     LoadStatistics stats;
     auto start_time = std::chrono::steady_clock::now();
 
+    // Store the data location for use in loadTableGeneric
+    current_location_ = config.data_location;
+
     // Get all table names in dependency order (no foreign key constraints for now)
     std::vector<std::string> table_names = { "region", "nation",   "customer", "supplier",
                                              "part",   "partsupp", "orders",   "lineitem" };
 
     if (config.verbose) {
         fmt::println("Loading TPC-H data (SF={}) from: {}", config.scale_factor, config.data_directory);
+        fmt::println("  Data location: {}", format_as(config.data_location));
     }
 
     for (const auto& table_name : table_names) {
@@ -241,7 +245,7 @@ Result<size_t> TPCHDataLoader::loadTableGeneric(const std::string& table_name,
         return Result<size_t>::failure(fmt::format("Cannot open file: {}", file_path));
     }
 
-    TableBuilder builder(table_name, schema.clone());
+    TableBuilder builder(table_name, schema.clone(), current_location_);
 
     std::string line;
     size_t rows_loaded = 0;

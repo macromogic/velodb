@@ -8,10 +8,11 @@
 
 namespace velodb {
 
-TableBuilder::TableBuilder(std::string name, Schema schema)
+TableBuilder::TableBuilder(std::string name, Schema schema, DataLocation location)
     : name_(std::move(name))
     , schema_(std::move(schema))
     , num_columns_(schema_.getColumnCount())
+    , location_(location)
 {
     pending_columns_.resize(num_columns_);
 }
@@ -75,7 +76,9 @@ Table TableBuilder::build() &&
     std::vector<Column> columns;
     columns.reserve(num_columns_);
     for (size_t i = 0; i < num_columns_; ++i) {
-        auto column = Column::buildFrom(table.getColumnType(i).cloneUnique(), std::move(pending_columns_[i]));
+        auto column = Column::buildFrom(table.getColumnType(i).cloneUnique(),
+                                        std::move(pending_columns_[i]),
+                                        location_);
         columns.push_back(std::move(column));
     }
     table.columns_ = std::move(columns);
