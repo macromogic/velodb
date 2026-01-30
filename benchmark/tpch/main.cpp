@@ -101,6 +101,8 @@ int main(int argc, char* argv[])
 
     program.add_argument("--with-profiling").help("Enable profiling during benchmark").flag();
 
+    program.add_argument("--profile-per-query").help("Print and reset profiler after each query execution").flag();
+
     program.add_argument("--join-strategy", "-j")
         .help("Join strategy to use {sort_merge, hash}")
         .default_value(std::string("sort_merge"))
@@ -144,6 +146,7 @@ int main(int argc, char* argv[])
         config.validate_results = program.get<bool>("--validate");
         config.verbose = program.get<bool>("--verbose");
         config.with_profiling = program.get<bool>("--with-profiling");
+        config.profile_per_query = program.get<bool>("--profile-per-query");
         config.join_strategy = velodb::parseJoinStrategy(program.get<std::string>("--join-strategy"));
         if (config.verbose) {
             fmt::println("VelODB TPC-H Benchmark");

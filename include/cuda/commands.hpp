@@ -24,6 +24,7 @@ enum class OpCode : uint32_t {
     OP_HASH_JOIN_BUILD,
     OP_HASH_JOIN_COUNT,
     OP_HASH_JOIN_WRITE,
+    OP_COMPARE_EQ,
     OP_TERMINATE = 0xFFFFFFFF
 };
 
@@ -137,6 +138,14 @@ union alignas(16) CommandArgs {
         uint32_t* write_offset;
         DataTypeId type_id;
     } hash_join_write;
+
+    struct CompareEqArgs {
+        const void* left_data;
+        const void* right_data;
+        uint8_t* out_mask;
+        size_t n;
+        DataTypeId type_id;
+    } compare_eq;
 };
 
 struct alignas(16) Command {

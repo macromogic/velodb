@@ -17,6 +17,8 @@
 
 #include <fmt/ranges.h>
 
+#include <set>
+#include <unordered_map>
 #include <utility>
 
 #include <cuda_runtime.h>
@@ -88,7 +90,7 @@ public:
     {
         if (this != &other) {
             // Clean up current resources
-            if (location_ != DataLocation::VIEW && data_ != nullptr) {
+            if (!isViewLocation(location_) && data_ != nullptr) {
                 if (location_ == DataLocation::CUDA) {
                     auto stream_handle = StreamPool::getInstance().acquire().value();
                     cudaFreeAsync(data_, stream_handle->get());
@@ -129,6 +131,7 @@ public:
         } else if (location_ == DataLocation::HOST || location_ == DataLocation::HOST_PINNED) {
             HostMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
         }
+        // VIEW and CUDA_VIEW don't own memory, nothing to free
     }
 
     size_t size() const { return size_; }
@@ -136,20 +139,73 @@ public:
 
     void to(DataLocation location)
     {
-        VELODB_ASSERT_MSG(location != DataLocation::VIEW, "Cannot move data to VIEW");
+        VELODB_ASSERT_MSG(location != DataLocation::VIEW && location != DataLocation::CUDA_VIEW,
+                          "Cannot move data to VIEW or CUDA_VIEW");
+
+        // Normalize target location
+        DataLocation target = (location == DataLocation::HOST) ? DataLocation::HOST_PINNED : location;
 
         // Handle VIEW: need to copy data first to take ownership
+        // Optimize: copy directly to target location instead of always going through HOST_PINNED
         if (location_ == DataLocation::VIEW) {
-            // Copy data to owned memory
-            DType* new_data = static_cast<DType*>(HostMemoryPool::getInstance().allocate(capacity_ * sizeof(DType)));
-            std::copy(data_, data_ + capacity_, new_data);
+            // For VIEW, only transfer size_ elements (not capacity_)
+            // capacity_ for VIEW represents max accessible range, not actual data size
+            size_t transfer_size = size_;
+            if (target == DataLocation::CUDA) {
+                // VIEW -> CUDA: use staged transfer (VIEW data is in pageable memory)
+                auto stream_handle = StreamPool::getInstance().acquire().value();
+                size_t new_capacity = nextPow2(transfer_size);
+                DType* device_data;
+                CHECKED_CALL_THROW(cudaMallocAsync(&device_data, new_capacity * sizeof(DType), stream_handle->get()));
+                stream_handle->synchronize();
+                StagedTransfer::toDevice(device_data, data_, transfer_size * sizeof(DType));
+                data_ = device_data;
+                capacity_ = new_capacity;
+                location_ = DataLocation::CUDA;
+            } else if (target == DataLocation::HOST_PAGEABLE) {
+                // VIEW -> HOST_PAGEABLE: copy to pageable memory
+                DType* new_data = static_cast<DType*>(
+                    PageableMemoryPool::getInstance().allocate(transfer_size * sizeof(DType)));
+                std::copy(data_, data_ + transfer_size, new_data);
+                data_ = new_data;
+                capacity_ = transfer_size;
+                location_ = DataLocation::HOST_PAGEABLE;
+            } else {
+                // VIEW -> HOST_PINNED: copy to pinned memory
+                DType* new_data = static_cast<DType*>(
+                    HostMemoryPool::getInstance().allocate(transfer_size * sizeof(DType)));
+                std::copy(data_, data_ + transfer_size, new_data);
+                data_ = new_data;
+                capacity_ = transfer_size;
+                location_ = DataLocation::HOST_PINNED;
+            }
+            // null_mask_ VIEW will be handled by its own to() call below
+        } else if (location_ == DataLocation::CUDA_VIEW) {
+            // Copy data to owned CUDA memory with proper padding for oblivious transfer
+            // For VIEW, only transfer size_ elements
+            auto stream_handle = StreamPool::getInstance().acquire().value();
+            size_t padded_capacity = nextPow2(size_);
+            DType* new_data;
+            CHECKED_CALL_THROW(cudaMallocAsync(&new_data, padded_capacity * sizeof(DType), stream_handle->get()));
+            CHECKED_CALL_THROW(cudaMemcpyAsync(new_data,
+                                               data_,
+                                               size_ * sizeof(DType),
+                                               cudaMemcpyDeviceToDevice,
+                                               stream_handle->get()));
+            // Zero out padding region to prevent data leaks
+            if (padded_capacity > size_) {
+                CHECKED_CALL_THROW(cudaMemsetAsync(new_data + size_,
+                                                   0,
+                                                   (padded_capacity - size_) * sizeof(DType),
+                                                   stream_handle->get()));
+            }
+            stream_handle->synchronize();
             data_ = new_data;
-            location_ = DataLocation::HOST_PINNED;
-            // null_mask_ VIEW will be handled by its own to() call
+            capacity_ = padded_capacity;
+            location_ = DataLocation::CUDA;
         }
 
-        // Normalize HOST to HOST_PINNED for comparison
-        DataLocation target = (location == DataLocation::HOST) ? DataLocation::HOST_PINNED : location;
+        // Check if we've already reached target
         DataLocation current = (location_ == DataLocation::HOST) ? DataLocation::HOST_PINNED : location_;
 
         if (current == target) {
@@ -162,31 +218,32 @@ public:
         if (current == DataLocation::CUDA) {
             // CUDA -> HOST_PINNED or CUDA -> HOST_PAGEABLE
             PROFILE_SCOPE("ValueVector D2H Transfer");
-            size_t padded_capacity = nextPow2(capacity_);
-            VELODB_ASSERT_MSG(capacity_ >= padded_capacity, "Insufficient capacity for oblivious transfer");
 
             if (target == DataLocation::HOST_PINNED) {
-                // CUDA -> HOST_PINNED: direct DMA
+                // CUDA -> HOST_PINNED: direct DMA with oblivious transfer (padded)
+                size_t padded_capacity = nextPow2(capacity_);
+                // Only use padded transfer if CUDA memory was allocated with padding
+                size_t transfer_capacity = (capacity_ == padded_capacity) ? padded_capacity : capacity_;
                 DType* host_data = static_cast<DType*>(
-                    HostMemoryPool::getInstance().allocate(padded_capacity * sizeof(DType)));
+                    HostMemoryPool::getInstance().allocate(transfer_capacity * sizeof(DType)));
                 CHECKED_CALL_THROW(cudaMemcpyAsync(host_data,
                                                    data_,
-                                                   padded_capacity * sizeof(DType),
+                                                   transfer_capacity * sizeof(DType),
                                                    cudaMemcpyDeviceToHost,
                                                    stream_handle->get()));
                 CHECKED_CALL_THROW(cudaFreeAsync(data_, stream_handle->get()));
                 stream_handle->synchronize();
                 data_ = host_data;
+                capacity_ = transfer_capacity;
             } else {
-                // CUDA -> HOST_PAGEABLE: staged transfer
+                // CUDA -> HOST_PAGEABLE: staged transfer (no padding needed for pageable)
                 DType* pageable_data = static_cast<DType*>(
-                    PageableMemoryPool::getInstance().allocate(padded_capacity * sizeof(DType)));
-                StagedTransfer::toHost(pageable_data, data_, padded_capacity * sizeof(DType));
+                    PageableMemoryPool::getInstance().allocate(capacity_ * sizeof(DType)));
+                StagedTransfer::toHost(pageable_data, data_, capacity_ * sizeof(DType));
                 CHECKED_CALL_THROW(cudaFreeAsync(data_, stream_handle->get()));
                 stream_handle->synchronize();
                 data_ = pageable_data;
             }
-            capacity_ = padded_capacity;
             location_ = target;
         } else if (target == DataLocation::CUDA) {
             // HOST_PINNED -> CUDA or HOST_PAGEABLE -> CUDA
@@ -325,10 +382,19 @@ public:
     ConcreteVector slice(size_t start, size_t end) const
     {
         VELODB_ASSERT_MSG(start <= end && end <= size_, "Invalid slice range");
-        VELODB_ASSERT_MSG(isHostLocation(location_) || location_ == DataLocation::VIEW, "Cannot slice non-host data");
 
         size_t new_size = end - start;
-        return ConcreteVector(data_ + start, new_size, capacity_ - start, null_mask_.slice(start, end));
+        if (isCudaLocation(location_)) {
+            // CUDA data: return a CUDA_VIEW
+            return ConcreteVector(data_ + start,
+                                  new_size,
+                                  capacity_ - start,
+                                  null_mask_.slice(start, end),
+                                  DataLocation::CUDA_VIEW);
+        } else {
+            // HOST data: return a VIEW
+            return ConcreteVector(data_ + start, new_size, capacity_ - start, null_mask_.slice(start, end));
+        }
     }
 
     ConcreteVector tryOwn()
@@ -346,11 +412,12 @@ public:
     {
         VELODB_ASSERT_MSG(isHostLocation(location_) && isHostLocation(rowids.location()),
                           "Materialization gather must happen on HOST");
-        ConcreteVector vec(nextPow2(rowids.capacity()), DataLocation::HOST);
+        // Use pageable memory for gather results to avoid exhausting the limited pinned memory pool.
+        // Materialized results typically don't need DMA transfers.
+        ConcreteVector vec(nextPow2(rowids.capacity()), DataLocation::HOST_PAGEABLE);
         const auto* rowid_data = rowids.data();
         for (size_t i = 0; i < rowids.capacity(); ++i) {
-            auto rowid = static_cast<size_t>(rowid_data[i]);
-            VELODB_ASSERT_MSG(rowid < size_, "Rowid out of range");
+            auto rowid = static_cast<size_t>(rowid_data[i]) % size_;
             if (null_mask_.get(rowid)) {
                 vec.null_mask_.set(i);
             } else {
@@ -552,14 +619,24 @@ public:
     ConcreteVector slice(size_t start, size_t end) const
     {
         VELODB_ASSERT_MSG(start <= end && end <= size_, "Invalid slice range");
-        VELODB_ASSERT_MSG(isHostLocation(location_) || location_ == DataLocation::VIEW, "Cannot slice non-host data");
 
         size_t new_size = end - start;
-        return ConcreteVector(data_ + start,
-                              new_size,
-                              capacity_ - start,
-                              null_mask_.slice(start, end),
-                              ordered_strings_);
+        if (isCudaLocation(location_)) {
+            // CUDA data: return a CUDA_VIEW
+            return ConcreteVector(data_ + start,
+                                  new_size,
+                                  capacity_ - start,
+                                  null_mask_.slice(start, end),
+                                  ordered_strings_,
+                                  DataLocation::CUDA_VIEW);
+        } else {
+            // HOST data: return a VIEW
+            return ConcreteVector(data_ + start,
+                                  new_size,
+                                  capacity_ - start,
+                                  null_mask_.slice(start, end),
+                                  ordered_strings_);
+        }
     }
 
     ConcreteVector tryOwn()
@@ -584,24 +661,33 @@ public:
         size_t n = data.size();
         ValueVector vec(n, location);
 
-        // Build ordered string list
+        // Use std::set for automatic deduplication and sorting
+        std::set<std::string> unique_strings;
         for (const auto& value : data) {
             if (!value.isNull()) {
-                vec.ordered_strings_->push_back(value.getString());
+                unique_strings.insert(value.getString());
             }
         }
-        std::sort(vec.ordered_strings_->begin(), vec.ordered_strings_->end());
 
+        // Initialize ordered_strings_ from sorted set and build ordinal map
+        vec.ordered_strings_->reserve(unique_strings.size());
+        std::unordered_map<std::string_view, size_t> string_to_ordinal;
+        string_to_ordinal.reserve(unique_strings.size());
+
+        size_t ord = 0;
+        for (auto& str : unique_strings) {
+            vec.ordered_strings_->push_back(std::move(str));
+            string_to_ordinal[(*vec.ordered_strings_)[ord]] = ord;
+            ord++;
+        }
+
+        // Assign ordinals using O(1) hash lookup
         size_t i = 0;
         for (auto&& value : data) {
             if (value.isNull()) {
                 vec.null_mask_.set(i);
             } else {
-                // TODO: Make it oblivious?
-                auto ordinal = std::distance(
-                    vec.ordered_strings_->begin(),
-                    std::lower_bound(vec.ordered_strings_->begin(), vec.ordered_strings_->end(), value.getString()));
-                vec.data_[i] = static_cast<DType>(ordinal);
+                vec.data_[i] = static_cast<DType>(string_to_ordinal[value.getString()]);
             }
             i++;
         }
@@ -610,16 +696,45 @@ public:
         return vec;
     }
 
+    // Helper methods for StringColumnBuilder
+    void setNull(size_t index) { null_mask_.set(index); }
+    void setOrdinal(size_t index, size_t ordinal) { data_[index] = ordinal; }
+    void setSize(size_t new_size)
+    {
+        size_ = new_size;
+        null_mask_.size_ = new_size;
+    }
+    void setDictionary(size_t capacity) { ordered_strings_->reserve(capacity); }
+    void setDictionaryEntry(size_t index, std::string&& str)
+    {
+        if (index >= ordered_strings_->size()) {
+            ordered_strings_->resize(index + 1);
+        }
+        (*ordered_strings_)[index] = std::move(str);
+    }
+
 private:
     std::shared_ptr<std::vector<std::string>> ordered_strings_;
 
-    // Internal constructor
+    // Internal constructor for slice (HOST VIEW)
     ValueVector(DType* data,
                 size_t size,
                 size_t capacity,
                 BitVector null_mask,
                 const std::shared_ptr<std::vector<std::string>>& ordered_strings)
         : Base(data, size, capacity, std::move(null_mask))
+        , ordered_strings_(ordered_strings)
+    {
+    }
+
+    // Internal constructor for sliceDevice (CUDA_VIEW)
+    ValueVector(DType* data,
+                size_t size,
+                size_t capacity,
+                BitVector null_mask,
+                const std::shared_ptr<std::vector<std::string>>& ordered_strings,
+                DataLocation location)
+        : Base(data, size, capacity, std::move(null_mask), location)
         , ordered_strings_(ordered_strings)
     {
     }

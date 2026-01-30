@@ -77,18 +77,20 @@ Result<RowBatch> FilterCompactionOperator::next()
     last_id = task_manager.submitCommand(scatter_cmd);
 
     // Gather command to collect the valid rows
+    // Process columns one at a time to reduce peak GPU memory usage
+    // This trades off some parallelism for memory efficiency
     size_t n_cols = batch.getColumnCount();
-    std::vector<void*> buffers;
-    std::vector<BitVector::Element*> bitmap_buffers;
-    buffers.reserve(n_cols);
-    bitmap_buffers.reserve(n_cols);
-    for (auto& input_col : batch.getColumns()) {
+    std::vector<void*> buffers(n_cols, nullptr);
+    std::vector<BitVector::Element*> bitmap_buffers(n_cols, nullptr);
+
+    for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
+        auto& input_col = batch.getColumn(col_idx);
         auto* data_ptr = input_col.rawData();
         auto* bitmap_ptr = input_col.rawBitmapData();
         auto* temp_buffer = input_col.getDeviceBuffer();
         auto* temp_bitmap_buffer = input_col.getDeviceBitmapBuffer();
-        buffers.push_back(temp_buffer);
-        bitmap_buffers.push_back(temp_bitmap_buffer);
+        buffers[col_idx] = temp_buffer;
+        bitmap_buffers[col_idx] = temp_bitmap_buffer;
 
         Command gather_cmd = {};
         gather_cmd.opcode = OpCode::OP_GATHER;
@@ -115,8 +117,11 @@ Result<RowBatch> FilterCompactionOperator::next()
                                      .type_id = DataTypeId::BOOLEAN,
                                  } };
         last_id = task_manager.submitCommand(gather_bits_cmd);
+
+        // Wait and swap buffers immediately to free old GPU memory
+        task_manager.waitCommand(last_id);
+        input_col.setFromDeviceBuffers(temp_buffer, temp_bitmap_buffer);
     }
-    task_manager.waitCommand(last_id);
 
     size_t h_scatter_count = 0;
     CHECKED_CALL_THROW(cudaMemcpyAsync(&h_scatter_count,
@@ -125,10 +130,7 @@ Result<RowBatch> FilterCompactionOperator::next()
                                        cudaMemcpyDeviceToHost,
                                        stream_handle->get()));
     stream_handle->synchronize();
-    for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
-        auto& input_col = batch.getColumn(col_idx);
-        input_col.setFromDeviceBuffers(buffers[col_idx], bitmap_buffers[col_idx]);
-    }
+    // Buffers already swapped in the loop above
     setNumRowsForBatch(batch, h_scatter_count);
 
     CHECKED_CALL_THROW(cudaFreeAsync(d_scatter_indices, stream_handle->get()));

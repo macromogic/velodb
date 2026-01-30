@@ -68,7 +68,7 @@ Column::Column(std::unique_ptr<DataType> type, size_t initial_capacity, DataLoca
 
 Column Column::buildFrom(std::unique_ptr<DataType> type, std::vector<Value>&& values, DataLocation location)
 {
-    PROFILE_SCOPE("Column::buildFrom");
+    PROFILE_SCOPE(fmt::format("Column::buildFrom({}, n={})", type->toString(), values.size()).c_str());
     switch (type->getTypeId()) {
 #define X(name, DT, VT)                                                                                                \
     case DataTypeId::name: {                                                                                           \
@@ -84,6 +84,11 @@ Column Column::buildFrom(std::unique_ptr<DataType> type, std::vector<Value>&& va
     default:
         VELODB_THROW(ExecutionError, "Unsupported data type");
     }
+}
+
+Column Column::adopt(std::unique_ptr<DataType> type, ValueVector<OrdinalString>&& vec)
+{
+    return Column(std::move(type), std::move(vec));
 }
 
 Column Column::createFromDeviceBuffers(std::unique_ptr<DataType> type,

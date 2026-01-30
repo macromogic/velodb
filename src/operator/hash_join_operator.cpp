@@ -29,23 +29,30 @@ HashJoinOperator::HashJoinOperator(ExecutionContext& context,
 
 Result<RowBatch> HashJoinOperator::next()
 {
+    PROFILE_SCOPE("HashJoinOperator::next");
+
+    // Already completed - return empty to signal end of stream
     if (joined_) {
         return Result<RowBatch>::success(RowBatch());
     }
 
-    // Collect all left (build) & right (probe) batches
-    auto build_batch = collectBatches(*left_child_);
+    RowBatch build_batch, probe_batch;
+    {
+        PROFILE_SCOPE("HashJoin: collect build side");
+        build_batch = collectBatches(*left_child_);
+    }
     if (build_batch.getRowCount() == 0) {
         joined_ = true;
         return Result<RowBatch>::success(RowBatch());
     }
-    auto probe_batch = collectBatches(*right_child_);
+    {
+        PROFILE_SCOPE("HashJoin: collect probe side");
+        probe_batch = collectBatches(*right_child_);
+    }
     if (probe_batch.getRowCount() == 0) {
         joined_ = true;
         return Result<RowBatch>::success(RowBatch());
     }
-
-    PROFILE_SCOPE("HashJoinOperator::next");
 
     // Validate key indices
     if (join_key_indices_.first >= build_batch.getColumnCount()) {
@@ -275,8 +282,8 @@ Result<RowBatch> HashJoinOperator::next()
         result_cols.push_back(Column::createFromDeviceBuffers(col.getType().cloneUnique(),
                                                               d_out_data,
                                                               static_cast<uint8_t*>(d_out_mask),
-                                                              h_padded_rows,
-                                                              h_match_count));
+                                                              h_match_count,
+                                                              h_padded_rows));
     }
 
     // Gather Right (Probe) Columns
@@ -312,8 +319,8 @@ Result<RowBatch> HashJoinOperator::next()
         result_cols.push_back(Column::createFromDeviceBuffers(col.getType().cloneUnique(),
                                                               d_out_data,
                                                               static_cast<uint8_t*>(d_out_mask),
-                                                              h_padded_rows,
-                                                              h_match_count));
+                                                              h_match_count,
+                                                              h_padded_rows));
     }
 
     task_manager.waitCommand(last_id);
@@ -329,6 +336,7 @@ Result<RowBatch> HashJoinOperator::next()
     CHECKED_CALL_THROW(cudaFreeAsync(d_match_count, stream_handle->get()));
     CHECKED_CALL_THROW(cudaFreeAsync(d_write_offset, stream_handle->get()));
 
+    // Build result batch (kept on CUDA) and return directly
     RowBatch joined_batch = buildBatchFromColumns(std::move(result_cols));
     setNumRowsForBatch(joined_batch, h_match_count);
     joined_ = true;

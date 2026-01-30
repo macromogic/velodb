@@ -25,6 +25,7 @@ public:
         bool validate_results = true;
         bool verbose = true;
         bool with_profiling = false;
+        bool profile_per_query = false; // Print and reset profiler after each query
         velodb::JoinStrategy join_strategy = velodb::JoinStrategy::SORT_MERGE_JOIN;
         std::filesystem::path data_directory = "./benchmark/data";
         std::filesystem::path results_directory = "./benchmark/results";

@@ -64,6 +64,20 @@ void RowBatch::to(DataLocation location)
     }
 }
 
+RowBatch RowBatch::slice(size_t start, size_t end) const
+{
+    VELODB_ASSERT_MSG(start <= end && end <= num_rows_, "Invalid slice range");
+
+    std::vector<Column> sliced_columns;
+    sliced_columns.reserve(columns_.size());
+
+    for (const auto& col : columns_) {
+        sliced_columns.push_back(col.slice(start, end));
+    }
+
+    return RowBatch(std::move(sliced_columns));
+}
+
 BatchIterator RowBatch::begin() const
 {
     return BatchIterator(*this);

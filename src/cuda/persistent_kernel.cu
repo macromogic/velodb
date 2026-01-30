@@ -1,6 +1,7 @@
 #include "data/data_type.hpp"
 #include "data/type_traits.hpp"
 
+#include "cuda/compare.cuh"
 #include "cuda/gather.cuh"
 #include "cuda/hash_join.cuh"
 #include "cuda/permute.cuh"
@@ -54,6 +55,10 @@ __device__ __forceinline__ void dispatchCommand(Command& cmd, cg::grid_group& gr
 
     case OpCode::OP_HASH_JOIN_WRITE:
         executeHashJoinWrite(cmd.args.hash_join_write, grid);
+        break;
+
+    case OpCode::OP_COMPARE_EQ:
+        executeCompareEq(cmd.args.compare_eq, grid);
         break;
 
     case OpCode::OP_NOP: // Do nothing

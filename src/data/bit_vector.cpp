@@ -72,13 +72,23 @@ BitVector::BitVector(BitVector&& other) noexcept
 
 BitVector BitVector::cloneImpl() const
 {
-    BitVector copy(size_, location_);
+    // For views, clone to owned memory
+    DataLocation clone_location = location_;
+    if (location_ == DataLocation::VIEW) {
+        clone_location = DataLocation::HOST_PINNED;
+    } else if (location_ == DataLocation::CUDA_VIEW) {
+        clone_location = DataLocation::CUDA;
+    }
+
+    BitVector copy(size_, clone_location);
     switch (location_) {
     case DataLocation::HOST_PINNED: // HOST is an alias for HOST_PINNED
     case DataLocation::HOST_PAGEABLE:
+    case DataLocation::VIEW:
         std::copy(data_, data_ + element_capacity_, copy.data_);
         break;
-    case DataLocation::CUDA: {
+    case DataLocation::CUDA:
+    case DataLocation::CUDA_VIEW: {
         auto stream_handle = StreamPool::getInstance().acquire().value();
         CHECKED_CALL_THROW(cudaMemcpyAsync(copy.data_,
                                            data_,
@@ -88,9 +98,6 @@ BitVector BitVector::cloneImpl() const
         stream_handle->synchronize();
         break;
     }
-    case DataLocation::VIEW:
-        copy.data_ = data_;
-        break;
     default:
         __builtin_unreachable();
     }
@@ -122,6 +129,10 @@ BitVector::~BitVector()
         stream_handle->synchronize();
         break;
     }
+    case DataLocation::VIEW:
+    case DataLocation::CUDA_VIEW:
+        // Non-owning views don't free memory
+        break;
     default:
         break;
     }
@@ -227,16 +238,20 @@ void BitVector::reserve(size_t new_capacity)
 BitVector BitVector::slice(size_t start, size_t end) const
 {
     VELODB_ASSERT_MSG(start <= end && end <= size_, "Invalid slice range");
-    VELODB_ASSERT_MSG(isHostLocation(location_), "Cannot slice non-host data");
 
     size_t slice_bits = end - start;
-    BitVector result(slice_bits);
 
-    if (slice_bits > 0) {
-        copyBits(result.data_, 0, data_, start, slice_bits);
+    if (isCudaLocation(location_)) {
+        // CUDA data: return a CUDA_VIEW
+        return BitVector(data_ + start, slice_bits, element_capacity_ - start, DataLocation::CUDA_VIEW);
+    } else {
+        // HOST data: return a VIEW (copy bits for now, could optimize to VIEW later)
+        BitVector result(slice_bits);
+        if (slice_bits > 0) {
+            copyBits(result.data_, 0, data_, start, slice_bits);
+        }
+        return result;
     }
-
-    return result;
 }
 
 void BitVector::append(const BitVector& other)
@@ -258,20 +273,63 @@ void BitVector::copyBits(Element* dest, size_t dest_offset, const Element* src, 
 
 void BitVector::to(DataLocation location)
 {
-    VELODB_ASSERT_MSG(location != DataLocation::VIEW, "Cannot move data to VIEW");
+    VELODB_ASSERT_MSG(location != DataLocation::VIEW && location != DataLocation::CUDA_VIEW,
+                      "Cannot move data to VIEW or CUDA_VIEW");
+
+    // Normalize target location
+    DataLocation target = (location == DataLocation::HOST) ? DataLocation::HOST_PINNED : location;
 
     // Handle VIEW: need to copy data first to take ownership
+    // Optimize: copy directly to target location instead of always going through HOST_PINNED
     if (location_ == DataLocation::VIEW) {
-        // Copy data to owned memory
-        Element* new_data = static_cast<Element*>(
-            HostMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
-        std::copy(data_, data_ + element_capacity_, new_data);
+        if (target == DataLocation::CUDA) {
+            // VIEW -> CUDA: use staged transfer (VIEW data is in pageable memory)
+            auto stream_handle = StreamPool::getInstance().acquire().value();
+            Element* device_data;
+            CHECKED_CALL_THROW(
+                cudaMallocAsync(&device_data, element_capacity_ * sizeof(Element), stream_handle->get()));
+            stream_handle->synchronize();
+            StagedTransfer::toDevice(device_data, data_, element_capacity_ * sizeof(Element));
+            data_ = device_data;
+            location_ = DataLocation::CUDA;
+        } else if (target == DataLocation::HOST_PAGEABLE) {
+            // VIEW -> HOST_PAGEABLE: copy to pageable memory
+            Element* new_data = static_cast<Element*>(
+                PageableMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
+            std::copy(data_, data_ + element_capacity_, new_data);
+            data_ = new_data;
+            location_ = DataLocation::HOST_PAGEABLE;
+        } else {
+            // VIEW -> HOST_PINNED: copy to pinned memory
+            Element* new_data = static_cast<Element*>(
+                HostMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));
+            std::copy(data_, data_ + element_capacity_, new_data);
+            data_ = new_data;
+            location_ = DataLocation::HOST_PINNED;
+        }
+    } else if (location_ == DataLocation::CUDA_VIEW) {
+        // Copy data to owned CUDA memory with proper padding for oblivious transfer
+        // For VIEW, only transfer size_ elements
+        auto stream_handle = StreamPool::getInstance().acquire().value();
+        size_t padded_capacity = nextPow2(size_);
+        Element* new_data;
+        CHECKED_CALL_THROW(cudaMallocAsync(&new_data, padded_capacity * sizeof(Element), stream_handle->get()));
+        CHECKED_CALL_THROW(
+            cudaMemcpyAsync(new_data, data_, size_ * sizeof(Element), cudaMemcpyDeviceToDevice, stream_handle->get()));
+        // Zero out padding region
+        if (padded_capacity > size_) {
+            CHECKED_CALL_THROW(cudaMemsetAsync(new_data + size_,
+                                               0,
+                                               (padded_capacity - size_) * sizeof(Element),
+                                               stream_handle->get()));
+        }
+        stream_handle->synchronize();
         data_ = new_data;
-        location_ = DataLocation::HOST_PINNED;
+        element_capacity_ = padded_capacity;
+        location_ = DataLocation::CUDA;
     }
 
-    // Normalize HOST to HOST_PINNED for comparison
-    DataLocation target = (location == DataLocation::HOST) ? DataLocation::HOST_PINNED : location;
+    // Check if we've already reached target
     DataLocation current = (location_ == DataLocation::HOST) ? DataLocation::HOST_PINNED : location_;
 
     if (current == target) {

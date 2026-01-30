@@ -28,7 +28,8 @@ enum class PlanType : uint16_t {
     MATERIALIZATION  = 0b0100'0000,
     SORT             = 0b1000'0000,
     LIMIT          = 0b1'1000'0000,
-    AGGREGATE     = 0b10'1000'0000
+    AGGREGATE     = 0b10'1000'0000,
+    GPU_FILTER   = 0b100'0000'1000  // Include JOIN bit so materialization path is used
 };
 // clang-format on
 

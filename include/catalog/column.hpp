@@ -62,6 +62,14 @@ public:
                             std::vector<Value>&& values,
                             DataLocation location = DataLocation::HOST);
 
+    /**
+     * @brief Adopt an already-built ValueVector<OrdinalString>.
+     *
+     * This is used by StringColumnBuilder to efficiently create VARCHAR columns
+     * without going through the Value-based buildFrom path.
+     */
+    static Column adopt(std::unique_ptr<DataType> type, ValueVector<OrdinalString>&& vec);
+
     static Column createFromDeviceBuffers(std::unique_ptr<DataType> type,
                                           void* data,
                                           BitVector::Element* bitmap_data,

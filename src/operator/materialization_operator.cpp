@@ -12,7 +12,6 @@ MaterializationOperator::MaterializationOperator(ExecutionContext& context,
                                                  Schema output_schema,
                                                  std::unique_ptr<AbstractOperator> child)
     : UnaryOperator(context, std::move(output_schema), std::move(child))
-    , produced_(false)
 {
     // Identify available tables and their RowID column index from the input child operator
     // The child operator (Projection of RowIDs) must output columns named "TableName.$_rowid"
@@ -86,16 +85,21 @@ MaterializationOperator::MaterializationOperator(ExecutionContext& context,
 
 Result<RowBatch> MaterializationOperator::next()
 {
-    if (produced_) {
-        return Result<RowBatch>::success(RowBatch());
+    // Streaming mode: get one batch from upstream, materialize it, return
+    auto result = child_->next();
+    if (!result) {
+        return result;
     }
-    auto join_batch = collectBatches(*child_);
-    PROFILE_SCOPE("MaterializationOperator::next");
+
+    auto join_batch = std::move(result.value());
     if (join_batch.getRowCount() == 0) {
-        produced_ = true;
-        return Result<RowBatch>::success(RowBatch());
+        return Result<RowBatch>::success(RowBatch()); // End of stream
     }
-    join_batch.to(DataLocation::HOST);
+
+    PROFILE_SCOPE("MaterializationOperator::next");
+    // Use HOST_PAGEABLE to avoid exhausting pinned memory pool
+    // StagedTransfer will handle the D2H transfer in chunks
+    join_batch.to(DataLocation::HOST_PAGEABLE);
 
     size_t num_columns = col_map_.size();
     std::vector<Column> output_columns;
@@ -109,7 +113,6 @@ Result<RowBatch> MaterializationOperator::next()
 
     RowBatch materialized_batch = buildBatchFromColumns(std::move(output_columns));
     setNumRowsForBatch(materialized_batch, join_batch.getRowCount());
-    produced_ = true;
     return Result<RowBatch>::success(std::move(materialized_batch));
 }
 

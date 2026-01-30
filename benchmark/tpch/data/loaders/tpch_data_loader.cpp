@@ -7,12 +7,18 @@
 #include <algorithm>
 #include <charconv>
 #include <chrono>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <string_view>
 #include <unordered_set>
+
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace velodb::benchmark::tpch {
 
@@ -213,9 +219,71 @@ Result<Value> TPCHDataLoader::parseValue(std::string_view str_value, const DataT
             return Result<Value>::failure(fmt::format("Parse error for BIGINT: '{}'", std::string(str_value)));
         }
         case DataTypeId::DOUBLE: {
-            std::string temp(str_value);
-            double double_val = std::stod(temp);
-            return Result<Value>::success(Value::createDouble(double_val));
+            // Use std::from_chars for double if available (C++17), otherwise fallback
+#if defined(__cpp_lib_to_chars) && __cpp_lib_to_chars >= 201611L
+            double double_val;
+            auto [ptr, ec] = std::from_chars(str_value.data(), str_value.data() + str_value.size(), double_val);
+            if (ec == std::errc()) {
+                return Result<Value>::success(Value::createDouble(double_val));
+            }
+            return Result<Value>::failure(fmt::format("Parse error for DOUBLE: '{}'", std::string(str_value)));
+#else
+            // Fast manual parsing for common decimal format (e.g., "1234.56")
+            double result = 0.0;
+            bool negative = false;
+            const char* p = str_value.data();
+            const char* end = p + str_value.size();
+
+            if (p < end && *p == '-') {
+                negative = true;
+                ++p;
+            } else if (p < end && *p == '+') {
+                ++p;
+            }
+
+            // Integer part
+            while (p < end && *p >= '0' && *p <= '9') {
+                result = result * 10.0 + (*p - '0');
+                ++p;
+            }
+
+            // Fractional part
+            if (p < end && *p == '.') {
+                ++p;
+                double fraction = 0.1;
+                while (p < end && *p >= '0' && *p <= '9') {
+                    result += (*p - '0') * fraction;
+                    fraction *= 0.1;
+                    ++p;
+                }
+            }
+
+            // Handle scientific notation (e.g., "1.23e-4")
+            if (p < end && (*p == 'e' || *p == 'E')) {
+                ++p;
+                bool exp_negative = false;
+                if (p < end && *p == '-') {
+                    exp_negative = true;
+                    ++p;
+                } else if (p < end && *p == '+') {
+                    ++p;
+                }
+                int exp = 0;
+                while (p < end && *p >= '0' && *p <= '9') {
+                    exp = exp * 10 + (*p - '0');
+                    ++p;
+                }
+                if (exp_negative) {
+                    for (int i = 0; i < exp; ++i)
+                        result *= 0.1;
+                } else {
+                    for (int i = 0; i < exp; ++i)
+                        result *= 10.0;
+                }
+            }
+
+            return Result<Value>::success(Value::createDouble(negative ? -result : result));
+#endif
         }
         case DataTypeId::VARCHAR: {
             return Result<Value>::success(Value::createString(std::string(str_value)));
@@ -240,29 +308,88 @@ Result<size_t> TPCHDataLoader::loadTableGeneric(const std::string& table_name,
                                                 const std::string& file_path,
                                                 const Schema& schema)
 {
-    std::ifstream file(file_path);
-    if (!file.is_open()) {
+    // Use memory-mapped I/O for faster file reading
+    int fd = open(file_path.c_str(), O_RDONLY);
+    if (fd == -1) {
         return Result<size_t>::failure(fmt::format("Cannot open file: {}", file_path));
     }
 
+    struct stat sb;
+    if (fstat(fd, &sb) == -1) {
+        close(fd);
+        return Result<size_t>::failure(fmt::format("Cannot get file size: {}", file_path));
+    }
+
+    size_t file_size = sb.st_size;
+    if (file_size == 0) {
+        close(fd);
+        TableBuilder builder(table_name, schema.clone(), current_location_);
+        auto table = std::move(builder).build();
+        if (!catalog_.addTable(std::move(table))) {
+            return Result<size_t>::failure(fmt::format("Failed to add table data"));
+        }
+        return Result<size_t>::success(0);
+    }
+
+    // Memory map the file for fast access
+    char* mapped = static_cast<char*>(mmap(nullptr, file_size, PROT_READ, MAP_PRIVATE, fd, 0));
+    if (mapped == MAP_FAILED) {
+        close(fd);
+        return Result<size_t>::failure(fmt::format("Cannot mmap file: {}", file_path));
+    }
+
+    // Advise kernel about sequential access pattern
+    madvise(mapped, file_size, MADV_SEQUENTIAL);
+
+    // Estimate row count for pre-allocation (average line length estimate)
+    // lineitem has ~16 columns, roughly 150 bytes per line on average
+    size_t estimated_rows = file_size / 100; // Conservative estimate
+
     TableBuilder builder(table_name, schema.clone(), current_location_);
 
-    std::string line;
+    // Enable streaming mode for memory-efficient loading
+    // This avoids the ~7x memory amplification from Value objects
+    builder.enableStreamingMode(estimated_rows);
+
+    const char* data = mapped;
+    const char* end = mapped + file_size;
     size_t rows_loaded = 0;
 
-    while (std::getline(file, line)) {
-        if (line.empty())
-            continue;
-
-        auto values_result = parseCSVLine(line, schema);
-        if (!values_result) {
-            return Result<size_t>::failure(
-                fmt::format("Failed to parse line {}: {}", rows_loaded + 1, values_result.error()));
+    // Process file line by line using memory mapped data
+    while (data < end) {
+        // Find end of line
+        const char* line_end = static_cast<const char*>(memchr(data, '\n', end - data));
+        if (line_end == nullptr) {
+            line_end = end;
         }
 
-        builder.insertRow(std::move(values_result.value()));
-        rows_loaded++;
+        size_t line_len = line_end - data;
+        if (line_len > 0) {
+            // Handle potential '\r\n' line ending
+            if (line_len > 0 && data[line_len - 1] == '\r') {
+                line_len--;
+            }
+
+            if (line_len > 0) {
+                std::string_view line(data, line_len);
+                auto values_result = parseCSVLine(line, schema);
+                if (!values_result) {
+                    munmap(mapped, file_size);
+                    close(fd);
+                    return Result<size_t>::failure(
+                        fmt::format("Failed to parse line {}: {}", rows_loaded + 1, values_result.error()));
+                }
+
+                builder.insertRow(std::move(values_result.value()));
+                rows_loaded++;
+            }
+        }
+
+        data = line_end + 1;
     }
+
+    munmap(mapped, file_size);
+    close(fd);
 
     auto table = std::move(builder).build();
     if (!catalog_.addTable(std::move(table))) {

@@ -18,6 +18,7 @@
 #include "expression/logical_expression.hpp"
 #include "planner/abstract_plan_node.hpp"
 #include "planner/filter_compaction_plan_node.hpp"
+#include "planner/gpu_filter_plan_node.hpp"
 #include "planner/hash_join_plan_node.hpp"
 #include "planner/limit_plan_node.hpp"
 #include "planner/materialization_plan_node.hpp"
@@ -421,6 +422,30 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef*
                                            right_node.source_tables.end());
 
             active_plans.erase(it);
+        }
+
+        // 4d. Apply remaining join predicates as filters
+        // Some predicates like "c_nationkey = s_nationkey" connect two tables
+        // that were both already joined, so they weren't used as join conditions.
+        // These must be applied as post-join filters.
+        std::unique_ptr<AbstractExpression> remaining_predicate = nullptr;
+        for (auto& pred : join_predicates) {
+            if (pred) {
+                if (!remaining_predicate) {
+                    remaining_predicate = std::move(pred);
+                } else {
+                    remaining_predicate = std::make_unique<BinaryLogicalExpression>(ConnectiveType::AND,
+                                                                                    std::move(remaining_predicate),
+                                                                                    std::move(pred));
+                }
+            }
+        }
+        if (remaining_predicate) {
+            // Use GpuFilterPlanNode to apply remaining join predicates on GPU
+            auto& in_schema = root_node.plan->getOutputSchema();
+            auto filter_plan = std::make_unique<GpuFilterPlanNode>(in_schema.clone(), std::move(remaining_predicate));
+            filter_plan->addChild(std::move(root_node.plan));
+            root_node.plan = std::move(filter_plan);
         }
 
         return std::move(root_node.plan);

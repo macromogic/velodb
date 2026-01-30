@@ -14,7 +14,9 @@ QueryResult::QueryResult(Schema schema)
 
 void QueryResult::append(RowBatch batch)
 {
-    batch.to(DataLocation::HOST);
+    // Use HOST_PAGEABLE to avoid exhausting the limited pinned memory pool.
+    // Query results are typically accessed sequentially and don't need DMA transfers.
+    batch.to(DataLocation::HOST_PAGEABLE);
     auto batch_row_count = batch.getRowCount();
     batches_.push_back(std::move(batch));
     row_offsets_.push_back(row_count_);

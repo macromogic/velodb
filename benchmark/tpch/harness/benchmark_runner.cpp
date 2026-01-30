@@ -78,6 +78,14 @@ Result<TPCHBenchmarkRunner::BenchmarkResults> TPCHBenchmarkRunner::runPowerTest(
 
         results.data_load_time += (load_end - load_start);
 
+        // Print data loading profiling and reset profiler for query execution
+        if (config.with_profiling) {
+            fmt::println("\n=== Data Loading Profile Report ===");
+            Profiler::getInstance().printReport();
+            Profiler::getInstance().reset();
+            fmt::println("===================================\n");
+        }
+
         // Run queries for this scale factor
         for (int query_number : config.query_numbers) {
             for (int iteration = 1; iteration <= config.iterations; ++iteration) {
@@ -89,6 +97,17 @@ Result<TPCHBenchmarkRunner::BenchmarkResults> TPCHBenchmarkRunner::runPowerTest(
                 results.query_results.push_back(query_result);
                 if (config.verbose && !query_result.success) {
                     fmt::println("  FAILED: {}", query_result.error_message);
+                }
+
+                // Print and reset profiler after each query if enabled
+                if (config.with_profiling && config.profile_per_query) {
+                    fmt::println("\n=== Profile Report for Q{} (SF={}, iteration {}) ===",
+                                 query_number,
+                                 scale_factor,
+                                 iteration);
+                    Profiler::getInstance().printReport();
+                    Profiler::getInstance().reset();
+                    fmt::println("===================================================\n");
                 }
 
                 // Reset pinned memory pool between queries to prevent fragmentation

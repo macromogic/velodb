@@ -10,8 +10,8 @@ FROM
     orders,
     lineitem
 WHERE
-    c_custkey = o_custkey
-    AND o_orderkey = l_orderkey
+    o_custkey = c_custkey
+    AND l_orderkey = o_orderkey
 ORDER BY
     o_totalprice DESC,
     o_orderdate

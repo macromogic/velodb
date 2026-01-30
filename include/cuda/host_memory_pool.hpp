@@ -125,12 +125,12 @@ public:
 
     static HostMemoryPool& getInstance()
     {
-        // Reduced from 16GB to 512MB since main data now uses pageable memory
-        // This pinned pool is mainly used for:
-        // - Intermediate results during query execution
-        // - Small tables that benefit from fast DMA
-        // - Device->Host transfers that need pinned memory
-        constexpr size_t pool_size = 512ul << 20; // 512MB
+        // This pinned pool is used for:
+        // - Intermediate results during query execution that need pinned memory
+        // - Small temporary buffers
+        // Main data uses pageable memory (HOST_PAGEABLE) and VIEW data goes
+        // directly to CUDA via staged transfer, so pinned memory needs are reduced.
+        constexpr size_t pool_size = 4ul << 30; // 4GB
         static HostMemoryPool instance(pool_size);
         return instance;
     }

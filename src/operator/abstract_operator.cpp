@@ -1,6 +1,7 @@
 #include "operator/abstract_operator.hpp"
 
 #include "catalog/execution_context.hpp"
+#include "common/profiler.hpp"
 
 #include <deque>
 
@@ -15,8 +16,10 @@ AbstractOperator::AbstractOperator(ExecutionContext& context, Schema output_sche
 
 RowBatch AbstractOperator::collectBatches(AbstractOperator& child)
 {
+    PROFILE_SCOPE("collectBatches");
     std::deque<RowBatch> buffer;
     size_t n_rows = 0;
+    size_t batch_count = 0;
     while (true) {
         auto result = child.next();
         if (!result) {
@@ -27,6 +30,7 @@ RowBatch AbstractOperator::collectBatches(AbstractOperator& child)
             break; // End of stream
         }
         n_rows += batch.getRowCount();
+        batch_count++;
         buffer.push_back(std::move(batch));
     }
 

@@ -27,6 +27,19 @@ public:
     Value getValue(size_t row_id, size_t column_index) const;
     void to(DataLocation location);
 
+    /**
+     * @brief Create a non-owning slice view of the batch.
+     *
+     * Returns a new RowBatch where each column is a VIEW (HOST) or CUDA_VIEW
+     * pointing to a portion of the original data. The original batch must
+     * remain valid while the slice is in use.
+     *
+     * @param start Start row index (inclusive)
+     * @param end End row index (exclusive)
+     * @return RowBatch A new batch with VIEW/CUDA_VIEW columns
+     */
+    RowBatch slice(size_t start, size_t end) const;
+
     BatchIterator begin() const;
     BatchIterator end() const;
 

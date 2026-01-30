@@ -46,20 +46,15 @@ Result<RowBatch> LimitOperator::next()
     if (rows_to_take == 0) {
         return Result<RowBatch>::success(RowBatch()); // Limit reached
     }
-    std::vector<void*> buffers;
-    std::vector<BitVector::Element*> bitmap_buffers;
-    buffers.reserve(input_batch.getColumnCount());
-    bitmap_buffers.reserve(input_batch.getColumnCount());
-    // auto& task_manager = context_.getTaskManager();
+
+    // Process columns one at a time to reduce peak GPU memory usage
     auto stream_handle = StreamPool::getInstance().acquire().value();
-    // uint64_t last_id;
-    for (auto& col : input_batch.getColumns()) {
+    for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
+        auto& col = input_batch.getColumn(col_idx);
         auto* data_ptr = col.rawData();
         auto* bitmap_ptr = col.rawBitmapData();
         auto* temp_buffer = col.getDeviceBuffer();
         auto* temp_bitmap_buffer = col.getDeviceBitmapBuffer();
-        buffers.push_back(temp_buffer);
-        bitmap_buffers.push_back(temp_bitmap_buffer);
 
         auto data_size = col.getType().size();
         CHECKED_CALL_THROW(cudaMemcpyAsync(temp_buffer,
@@ -74,14 +69,12 @@ Result<RowBatch> LimitOperator::next()
                             rows_to_take * sizeof(BitVector::Element),
                             cudaMemcpyDeviceToDevice,
                             stream_handle->get()));
-    }
-    stream_handle->synchronize();
-    // task_manager.waitCommand(last_id);
 
-    for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
-        auto& col = input_batch.getColumn(col_idx);
-        col.setFromDeviceBuffers(buffers[col_idx], bitmap_buffers[col_idx]);
+        // Synchronize and swap buffers immediately to free old GPU memory
+        stream_handle->synchronize();
+        col.setFromDeviceBuffers(temp_buffer, temp_bitmap_buffer);
     }
+
     setNumRowsForBatch(input_batch, rows_to_take);
     return Result<RowBatch>::success(std::move(input_batch));
 }
