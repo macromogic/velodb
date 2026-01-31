@@ -3,11 +3,29 @@
 #include "common/exception.hpp"
 #include "common/profiler.hpp"
 #include "operator/projection_operator.hpp"
+#include "planner/seq_scan_plan_node.hpp"
 
 #include <SQLParser.h>
 #include <fmt/core.h>
 
 namespace velodb {
+
+// Helper to collect table names from plan tree
+static void collectAccessedTables(const AbstractPlanNode* node, std::vector<std::string>& tables)
+{
+    if (!node) {
+        return;
+    }
+
+    if (node->getPlanType() == PlanType::SEQ_SCAN) {
+        const auto* scan = static_cast<const SeqScanPlanNode*>(node);
+        tables.push_back(scan->getTable().getName());
+    }
+
+    for (const auto& child : node->getChildren()) {
+        collectAccessedTables(child.get(), tables);
+    }
+}
 
 // ExecutionEngine implementation
 ExecutionEngine::ExecutionEngine(Catalog& catalog, TaskManager& task_manager)
@@ -69,7 +87,27 @@ Result<QueryResult> ExecutionEngine::executeQuery(const std::string& sql, QueryS
     auto t0 = std::chrono::high_resolution_clock::now();
     auto plan = planner_.planSelect(static_cast<const hsql::SelectStatement*>(statement));
     auto t1 = std::chrono::high_resolution_clock::now();
+
+    // Collect accessed tables and notify oblivious manager
+    std::vector<std::string> accessed_tables;
+    collectAccessedTables(plan.get(), accessed_tables);
+
+    // Begin oblivious query (wait for pending shuffles)
+    if (catalog_.hasObliviousManager()) {
+        catalog_.getObliviousManager().beginQuery(accessed_tables);
+        // Mark all tables as accessed
+        for (const auto& table_name : accessed_tables) {
+            catalog_.getObliviousManager().markAccessed(table_name);
+        }
+    }
+
     auto query_result = executePlan(std::move(plan));
+
+    // End oblivious query (trigger async shuffles)
+    if (catalog_.hasObliviousManager()) {
+        catalog_.getObliviousManager().endQuery();
+    }
+
     auto t2 = std::chrono::high_resolution_clock::now();
     if (stats) {
         stats->planning_time = std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0);

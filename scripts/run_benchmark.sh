@@ -10,6 +10,8 @@ ITERATIONS=3
 WITH_PROFILING=false
 SKIP_BENCHMARK=false
 SKIP_BASELINE=false
+SKIP_PLOT=false
+ALL_SF=(0.01 0.1 1)
 ALL_QUERIES=1,3,4,5,6,10,12,14,15,17,18,19
 
 # Parse command line arguments
@@ -19,9 +21,12 @@ function usage() {
     echo "Options:"
     echo "  -d, --benchmark-dir DIR   Set benchmark directory (default: \$BASE_DIR/benchmark_tpch)"
     echo "  -i, --iterations N        Set number of iterations (default: 3)"
+    echo "  -q, --queries LIST        Comma-separated list of TPC-H query numbers to run (default: all queries)"
+    echo "  -s, --scale-factors LIST  Comma-separated list of scale factors to run (default: 0.01,0.1,1)"
     echo "  -p, --with-profiling      Run performance breakdown with profiling"
     echo "  --skip-benchmark          Skip running VelODB benchmarks"
     echo "  --skip-baseline           Skip running baseline (Pandas) benchmarks"
+    echo "  --skip-plot               Skip plotting benchmark results"
     echo "  -h, --help                Show this help message"
     exit 1
 }
@@ -36,6 +41,14 @@ while [[ $# -gt 0 ]]; do
             ITERATIONS="$2"
             shift 2
             ;;
+        -q|--queries)
+            ALL_QUERIES="$2"
+            shift 2
+            ;;
+        -s|--scale-factors)
+            IFS=',' read -ra ALL_SF <<< "$2"
+            shift 2
+            ;;
         -p|--with-profiling)
             WITH_PROFILING=true
             shift
@@ -46,6 +59,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --skip-baseline)
             SKIP_BASELINE=true
+            shift
+            ;;
+        --skip-plot)
+            SKIP_PLOT=true
             shift
             ;;
         -h|--help)
@@ -85,7 +102,8 @@ function ensure_conda_env() {
 function run_bench() {
     local SF=$1
     local QUERIES=$2
-    local ADDITIONAL_ARGS=${3:-}
+    shift 2
+    local ADDITIONAL_ARGS="$@"
     DATA_DIR="$BENCHMARK_DIR/data/sf_$SF"
     if [ ! -d "$DATA_DIR" ]; then
         echo "Generating TPC-H data for scale factor $SF..."
@@ -113,9 +131,9 @@ echo "*" > "$BENCHMARK_DIR/data/.gitignore"
 # Run benchmarks
 if [ "$SKIP_BENCHMARK" = false ]; then
     build
-    run_bench 0.01 "$ALL_QUERIES"
-    run_bench 0.1 "$ALL_QUERIES"
-    run_bench 1 "$ALL_QUERIES"
+    for SF in "${ALL_SF[@]}"; do
+        run_bench "$SF" "$ALL_QUERIES"
+    done
 else
     echo "Skipping VelODB benchmarks (--skip-benchmark)"
 fi
@@ -132,7 +150,7 @@ if [ "$SKIP_BASELINE" = false ]; then
     PANDAS_CSV="$BENCHMARK_DIR/results/pandas_results.csv"
     python3 -u "$SCRIPTS_DIR/bench_pandas.py" \
         -i "$ITERATIONS" \
-        -t 20 \
+        -t 60 \
         --data-dir "$BENCHMARK_DIR/data/sf_1" \
         -q "$ALL_QUERIES" \
         -o "$PANDAS_CSV"
@@ -141,22 +159,23 @@ else
     PANDAS_CSV="$BENCHMARK_DIR/results/pandas_results.csv"
 fi
 
-# Collect benchmark results
-COMBINED_CSV="$BENCHMARK_DIR/results/benchmark_results.csv"
-echo "Query,Iteration,Engine,Time(ms)" > "$COMBINED_CSV"
-tail -n +2 "$VELODB_CSV" | awk -F',' '{print $1","$3",VelODB,"$4}' >> "$COMBINED_CSV"
-tail -n +2 "$PANDAS_CSV" | awk -F',' '{print $1","$2",Pandas,"$3}' >> "$COMBINED_CSV"
-echo "Combined results saved to: $COMBINED_CSV"
+if [ "$SKIP_PLOT" = false ]; then
+    # Collect benchmark results
+    COMBINED_CSV="$BENCHMARK_DIR/results/benchmark_results.csv"
+    echo "Query,Iteration,Engine,Time(ms)" > "$COMBINED_CSV"
+    tail -n +2 "$VELODB_CSV" | awk -F',' '{print $1","$3",VelODB,"$4}' >> "$COMBINED_CSV"
+    tail -n +2 "$PANDAS_CSV" | awk -F',' '{print $1","$2",Pandas,"$3}' >> "$COMBINED_CSV"
+    echo "Combined results saved to: $COMBINED_CSV"
 
-# Plot benchmark results
-BENCHMARK_PLOT="$BENCHMARK_DIR/results/benchmark_comparison.png"
-python3 "$SCRIPTS_DIR/plot_benchmark.py" -i "$COMBINED_CSV" -o "$BENCHMARK_PLOT"
+    # Plot benchmark results
+    BENCHMARK_PLOT="$BENCHMARK_DIR/results/benchmark_comparison.png"
+    python3 "$SCRIPTS_DIR/plot_benchmark.py" -i "$COMBINED_CSV" -o "$BENCHMARK_PLOT"
+fi
 
 # Performance breakdown with profiling
 if [ "$WITH_PROFILING" = true ]; then
     build release
-    IFS=',' read -ra QUERY_ARRAY <<< "$ALL_QUERIES"
-    for QUERY_ID in "${QUERY_ARRAY[@]}"; do
-        run_bench 1 "$QUERY_ID" "--with-profiling"
+    for SF in "${ALL_SF[@]}"; do
+        run_bench "$SF" "$ALL_QUERIES" --with-profiling --profile-per-query
     done
 fi

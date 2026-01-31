@@ -41,6 +41,15 @@ std::optional<std::reference_wrapper<const Table>> Catalog::getTable(const char*
     return getTable(std::string(table_name));
 }
 
+Table* Catalog::getTableMutable(const std::string& table_name)
+{
+    auto it = tables_.find(table_name);
+    if (it == tables_.end()) {
+        return nullptr;
+    }
+    return &it->second;
+}
+
 std::vector<std::string> Catalog::getTableNames() const
 {
     std::vector<std::string> names;
@@ -60,8 +69,45 @@ size_t Catalog::getTableRowCount(const std::string& table_name) const
     return 0;
 }
 
+void Catalog::initObliviousManager(TaskManager& task_manager)
+{
+    oblivious_manager_ = std::make_unique<ObliviousTableManager>(task_manager);
+}
+
+ObliviousTableManager& Catalog::getObliviousManager()
+{
+    if (!oblivious_manager_) {
+        throw std::runtime_error("Oblivious manager not initialized. Call initObliviousManager first.");
+    }
+    return *oblivious_manager_;
+}
+
+const ObliviousTableManager& Catalog::getObliviousManager() const
+{
+    if (!oblivious_manager_) {
+        throw std::runtime_error("Oblivious manager not initialized. Call initObliviousManager first.");
+    }
+    return *oblivious_manager_;
+}
+
+void Catalog::registerAllTablesAsOblivious()
+{
+    if (!oblivious_manager_) {
+        throw std::runtime_error("Oblivious manager not initialized. Call initObliviousManager first.");
+    }
+
+    for (auto& [name, table] : tables_) {
+        oblivious_manager_->registerTable(name, &table);
+    }
+}
+
 void Catalog::clear()
 {
+    // Clear oblivious manager first (it holds references to tables)
+    if (oblivious_manager_) {
+        oblivious_manager_->syncAllShuffles();
+        oblivious_manager_.reset();
+    }
     tables_.clear();
 }
 
@@ -71,6 +117,13 @@ std::string Catalog::toString() const
 
     for (const auto& [_, table] : tables_) {
         result += fmt::format("  Table: {}\n", table);
+    }
+
+    if (oblivious_manager_) {
+        auto stats = oblivious_manager_->getStats();
+        result += fmt::format("  Oblivious: {} tables registered, {} total shuffles\n",
+                              stats.tables_registered,
+                              stats.total_shuffles);
     }
 
     return result;

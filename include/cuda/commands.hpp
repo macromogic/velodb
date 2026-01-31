@@ -25,6 +25,8 @@ enum class OpCode : uint32_t {
     OP_HASH_JOIN_COUNT,
     OP_HASH_JOIN_WRITE,
     OP_COMPARE_EQ,
+    OP_COMPOSE_POSITION_MAP,
+    OP_ENRICH_POSITIONS,
     OP_TERMINATE = 0xFFFFFFFF
 };
 
@@ -146,6 +148,20 @@ union alignas(16) CommandArgs {
         size_t n;
         DataTypeId type_id;
     } compare_eq;
+
+    struct ComposePositionMapArgs {
+        const uint32_t* old_map;
+        const uint32_t* sigma;
+        uint32_t* new_map;
+        size_t n;
+    } compose_position_map;
+
+    struct EnrichPositionsArgs {
+        const uint32_t* record_ids;
+        const uint32_t* position_map;
+        uint32_t* positions;
+        size_t n;
+    } enrich_positions;
 };
 
 struct alignas(16) Command {

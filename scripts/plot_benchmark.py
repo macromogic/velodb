@@ -9,6 +9,8 @@ def main():
     parser = argparse.ArgumentParser(description='Plot TPC-H benchmark results')
     parser.add_argument('-i', '--input', type=str, default='data.csv', help='Input CSV file path')
     parser.add_argument('-o', '--output', type=str, default='benchmark_comparison.png', help='Output image file path')
+    parser.add_argument('--log-scale', action='store_true', help='Enable log scale for y-axis')
+    parser.add_argument('-t', '--title', type=str, default='TPC-H Benchmark (SF=1)', help='Title for the plot')
     args = parser.parse_args()
 
     if not os.path.exists(args.input):
@@ -83,9 +85,13 @@ def main():
     )
 
     # Add labels and title
-    plt.title('TPC-H Benchmark (SF=1)', fontsize=16)
+    plt.title(args.title, fontsize=16)
     plt.xlabel('Query', fontsize=12)
     plt.ylabel('Time (ms)', fontsize=12)
+
+    # Apply log scale if requested
+    if args.log_scale:
+        ax.set_yscale('log')
 
     # Get the y-axis limit for positioning timeout labels
     y_max = ax.get_ylim()[1]

@@ -4,6 +4,7 @@
 #include "cuda/compare.cuh"
 #include "cuda/gather.cuh"
 #include "cuda/hash_join.cuh"
+#include "cuda/oblivious_shuffle.cuh"
 #include "cuda/permute.cuh"
 #include "cuda/persistent_kernel.cuh"
 #include "cuda/scatter.cuh"
@@ -59,6 +60,14 @@ __device__ __forceinline__ void dispatchCommand(Command& cmd, cg::grid_group& gr
 
     case OpCode::OP_COMPARE_EQ:
         executeCompareEq(cmd.args.compare_eq, grid);
+        break;
+
+    case OpCode::OP_COMPOSE_POSITION_MAP:
+        executeComposePositionMap(cmd.args.compose_position_map, grid);
+        break;
+
+    case OpCode::OP_ENRICH_POSITIONS:
+        executeEnrichPositions(cmd.args.enrich_positions, grid);
         break;
 
     case OpCode::OP_NOP: // Do nothing
