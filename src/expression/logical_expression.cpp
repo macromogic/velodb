@@ -3,10 +3,27 @@
 #include "catalog/column.hpp"
 #include "catalog/row_batch.hpp"
 #include "common/fmt.hpp"
+#include "common/profiler.hpp"
+#include "expression/comparison_expression.hpp"
 
 #include <fmt/format.h>
 
+#include <algorithm>
+
 namespace velodb {
+
+// Helper to flatten AND chain into a list of leaf expressions
+static void flattenAndChain(const AbstractExpression* expr, std::vector<const AbstractExpression*>& leaves)
+{
+    if (auto* logical = dynamic_cast<const BinaryLogicalExpression*>(expr)) {
+        if (logical->getConnectiveType() == ConnectiveType::AND) {
+            flattenAndChain(&logical->getLeftExpression(), leaves);
+            flattenAndChain(&logical->getRightExpression(), leaves);
+            return;
+        }
+    }
+    leaves.push_back(expr);
+}
 
 BinaryLogicalExpression::BinaryLogicalExpression(ConnectiveType connective_type,
                                                  std::unique_ptr<AbstractExpression> left,
@@ -43,9 +60,53 @@ const Value BinaryLogicalExpression::evaluate(const Tuple& tuple, const Schema& 
 
 Column BinaryLogicalExpression::evaluateBatch(const RowBatch& batch, const Schema& schema) const
 {
+    PROFILE_SCOPE("BinaryLogicalExpression::evaluateBatch");
+    size_t count = batch.getRowCount();
+
+    // Optimization: flatten AND chains to evaluate all conditions into a single result
+    // This avoids creating intermediate Column objects for (A AND B AND C AND D)
+    if (connective_type_ == ConnectiveType::AND) {
+        std::vector<const AbstractExpression*> leaves;
+        flattenAndChain(this, leaves);
+
+        if (leaves.size() > 2) {
+            // Fused AND evaluation: evaluate all leaves and AND them together
+            Column result(DataType::createType(DataTypeId::BOOLEAN), count);
+            uint8_t* res_data = static_cast<uint8_t*>(result.rawData());
+
+            // Initialize result to all 1s (true)
+            std::fill_n(res_data, count, static_cast<uint8_t>(1));
+
+            // Evaluate each leaf and AND into result
+            for (const auto* leaf : leaves) {
+                Column leaf_col = leaf->evaluateBatch(batch, schema);
+                const uint8_t* leaf_data = static_cast<const uint8_t*>(leaf_col.rawData());
+                const auto* leaf_nulls = leaf_col.rawBitmapData();
+
+                if (leaf_nulls == nullptr) {
+                    // Fast path: AND without null checks
+                    for (size_t i = 0; i < count; ++i) {
+                        res_data[i] &= leaf_data[i];
+                    }
+                } else {
+                    // With nulls - any null makes result null (for AND, we set to 0)
+                    for (size_t i = 0; i < count; ++i) {
+                        if (leaf_nulls[i]) {
+                            res_data[i] = 0;
+                        } else {
+                            res_data[i] &= leaf_data[i];
+                        }
+                    }
+                }
+            }
+            setSizeForColumn(result, count);
+            return result;
+        }
+    }
+
+    // Standard path for OR or simple AND
     Column left_col = left_->evaluateBatch(batch, schema);
     Column right_col = right_->evaluateBatch(batch, schema);
-    size_t count = batch.getRowCount();
 
     Column result(DataType::createType(DataTypeId::BOOLEAN), count);
 
@@ -60,15 +121,33 @@ Column BinaryLogicalExpression::evaluateBatch(const RowBatch& batch, const Schem
     uint8_t* res_data = static_cast<uint8_t*>(result.rawData());
     BitVector::Element* res_nulls = result.rawBitmapData();
 
-    for (size_t i = 0; i < count; ++i) {
-        if ((l_nulls && l_nulls[i]) || (r_nulls && r_nulls[i])) {
-            res_nulls[i] = 1; // Set NULL
-            continue;
-        }
+    bool has_l_nulls = (l_nulls != nullptr);
+    bool has_r_nulls = (r_nulls != nullptr);
+
+    if (!has_l_nulls && !has_r_nulls) {
+        // Fast path: no null checks needed - use tight loop for auto-vectorization
         if (connective_type_ == ConnectiveType::AND) {
-            res_data[i] = l_data[i] && r_data[i];
+            for (size_t i = 0; i < count; ++i) {
+                res_data[i] = l_data[i] & r_data[i];
+            }
         } else {
-            res_data[i] = l_data[i] || r_data[i];
+            for (size_t i = 0; i < count; ++i) {
+                res_data[i] = l_data[i] | r_data[i];
+            }
+        }
+    } else {
+        // Slow path: need null checks
+        for (size_t i = 0; i < count; ++i) {
+            if ((has_l_nulls && l_nulls[i]) || (has_r_nulls && r_nulls[i])) {
+                res_nulls[i] = 1; // Set NULL
+                res_data[i] = 0;
+                continue;
+            }
+            if (connective_type_ == ConnectiveType::AND) {
+                res_data[i] = l_data[i] & r_data[i];
+            } else {
+                res_data[i] = l_data[i] | r_data[i];
+            }
         }
     }
     setSizeForColumn(result, count);

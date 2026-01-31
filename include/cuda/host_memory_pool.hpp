@@ -130,7 +130,8 @@ public:
         // - Small temporary buffers
         // Main data uses pageable memory (HOST_PAGEABLE) and VIEW data goes
         // directly to CUDA via staged transfer, so pinned memory needs are reduced.
-        constexpr size_t pool_size = 4ul << 30; // 4GB
+        // Increased to 8GB to support prefetch double-buffering and larger batches.
+        constexpr size_t pool_size = 8ul << 30; // 8GB
         static HostMemoryPool instance(pool_size);
         return instance;
     }

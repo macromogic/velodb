@@ -189,6 +189,8 @@ Result<void> TPCHBenchmarkRunner::loadBenchmarkData(const BenchmarkConfig& confi
     load_config.data_directory = config.data_directory;
     load_config.scale_factor = target_scale;
     load_config.verbose = config.verbose;
+    // Keep data in HOST_PAGEABLE (default) - uses PageableMemoryPool (unlimited)
+    // Transfers use small StagingBufferPool (256MB pinned) for DMA
 
     // Check if data files exist
     if (!TPCHDataLoader::dataFilesExist(load_config.data_directory, target_scale)) {

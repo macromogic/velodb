@@ -156,7 +156,12 @@ int main(int argc, char* argv[])
             fmt::println("Iterations: {}", config.iterations);
             fmt::println("Join Strategy: {}", velodb::joinStrategyToString(config.join_strategy));
             fmt::println("Data Directory: {}", std::string(config.data_directory));
-            fmt::println("Results Directory: {}\n", std::string(config.results_directory));
+            fmt::println("Results Directory: {}", std::string(config.results_directory));
+            fmt::println("Profiling: {}", config.with_profiling ? "Enabled" : "Disabled");
+            if (config.with_profiling) {
+                fmt::println("Profile Per Query: {}", config.profile_per_query ? "Yes" : "No");
+            }
+            fmt::println("");
         }
 
         // Create and run benchmark

@@ -10,9 +10,10 @@ constexpr int VERSION_MINOR = @PROJECT_VERSION_MINOR@;
 constexpr int VERSION_PATCH = @PROJECT_VERSION_PATCH@;
 constexpr const char* VERSION_STRING = "@PROJECT_VERSION@";
 
-// Reduced from 1<<25 to 1<<22 to reduce GPU memory pressure for large scale factors
-// 1<<22 = 4M rows, which is a good balance between throughput and memory usage
-constexpr size_t MAX_BATCH_SIZE = 1ul << 22;
+// Batch size for query processing
+// 1<<23 = 8M rows - larger batches improve GPU utilization and reduce scheduling overhead
+// Requires sufficient pinned memory for H2D transfers (~1GB per batch with staging)
+constexpr size_t MAX_BATCH_SIZE = 1ul << 23;
 constexpr size_t MAX_SORT_COLUMNS = 8;
 
 }

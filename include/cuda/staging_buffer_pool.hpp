@@ -46,10 +46,10 @@ public:
 
     /**
      * @brief Construct a staging buffer pool.
-     * @param buffer_size Size of each staging buffer (default: 64MB)
-     * @param num_buffers Number of buffers in the pool (default: 4)
+     * @param buffer_size Size of each staging buffer (default: 256MB for better throughput)
+     * @param num_buffers Number of buffers in the pool (default: 8 for prefetch support)
      */
-    explicit StagingBufferPool(size_t buffer_size = 64 * 1024 * 1024, size_t num_buffers = 4)
+    explicit StagingBufferPool(size_t buffer_size = 256 * 1024 * 1024, size_t num_buffers = 8)
         : buffer_size_(buffer_size)
         , num_buffers_(num_buffers)
         , shutdown_(false)

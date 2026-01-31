@@ -30,7 +30,9 @@ bool TaskManager::start()
     }
 
     int block_size = 256;
-    int shmem_size = 48 * (1 << 10);
+    // Actual shared memory usage is minimal (~100 bytes for scatter).
+    // Use small value to maximize blocks per SM (occupancy).
+    int shmem_size = 1 * (1 << 10); // 1KB is plenty
     CHECKED_CALL_THROW(
         cudaFuncSetAttribute(cuda::persistentKernel, cudaFuncAttributeMaxDynamicSharedMemorySize, shmem_size));
     CHECKED_CALL_THROW(

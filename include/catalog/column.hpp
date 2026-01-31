@@ -118,6 +118,7 @@ private:
 
     friend class RowBatch;
     friend class AbstractExpression;
+    friend class SeqScanOperator;
 };
 
 } // namespace velodb

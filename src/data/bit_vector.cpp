@@ -283,13 +283,13 @@ void BitVector::to(DataLocation location)
     // Optimize: copy directly to target location instead of always going through HOST_PINNED
     if (location_ == DataLocation::VIEW) {
         if (target == DataLocation::CUDA) {
-            // VIEW -> CUDA: use staged transfer (VIEW data is in pageable memory)
+            // VIEW -> CUDA: use pipelined staged transfer (VIEW data is in pageable memory)
             auto stream_handle = StreamPool::getInstance().acquire().value();
             Element* device_data;
             CHECKED_CALL_THROW(
                 cudaMallocAsync(&device_data, element_capacity_ * sizeof(Element), stream_handle->get()));
             stream_handle->synchronize();
-            StagedTransfer::toDevice(device_data, data_, element_capacity_ * sizeof(Element));
+            StagedTransfer::toDevicePipelined(device_data, data_, element_capacity_ * sizeof(Element));
             data_ = device_data;
             location_ = DataLocation::CUDA;
         } else if (target == DataLocation::HOST_PAGEABLE) {
@@ -379,9 +379,9 @@ void BitVector::to(DataLocation location)
                                                stream_handle->get()));
             HostMemoryPool::getInstance().deallocate(data_, element_capacity_ * sizeof(Element));
         } else {
-            // HOST_PAGEABLE -> CUDA: staged transfer
+            // HOST_PAGEABLE -> CUDA: use pipelined staged transfer for better throughput
             stream_handle->synchronize(); // Ensure device_data is allocated
-            StagedTransfer::toDevice(device_data, data_, element_capacity_ * sizeof(Element));
+            StagedTransfer::toDevicePipelined(device_data, data_, element_capacity_ * sizeof(Element));
             PageableMemoryPool::getInstance().deallocate(data_, element_capacity_ * sizeof(Element));
         }
         stream_handle->synchronize();

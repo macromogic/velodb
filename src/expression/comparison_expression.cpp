@@ -4,51 +4,183 @@
 #include "catalog/row_batch.hpp"
 #include "common/exception.hpp"
 #include "common/fmt.hpp"
+#include "common/profiler.hpp"
 #include "expression/constant_expression.hpp"
 
 namespace velodb {
 
+// Fast path for column vs scalar comparison (no right column needed)
+template <typename T>
+void computeComparisonWithScalar(const Column& left, T scalar_value, Column& result, ComparisonType op, size_t count)
+{
+    PROFILE_SCOPE("computeComparisonWithScalar<T>");
+    const T* left_data = static_cast<const T*>(left.rawData());
+    const auto* left_nulls = left.rawBitmapData();
+
+    uint8_t* result_data = static_cast<uint8_t*>(result.rawData());
+    auto* result_nulls = result.rawBitmapData();
+
+    bool has_left_nulls = (left_nulls != nullptr);
+
+    if (!has_left_nulls) {
+        // Fast path: no null checks needed
+        switch (op) {
+        case ComparisonType::EQUAL:
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] == scalar_value);
+            }
+            break;
+        case ComparisonType::NOT_EQUAL:
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] != scalar_value);
+            }
+            break;
+        case ComparisonType::LESS_THAN:
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] < scalar_value);
+            }
+            break;
+        case ComparisonType::LESS_THAN_OR_EQUAL:
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] <= scalar_value);
+            }
+            break;
+        case ComparisonType::GREATER_THAN:
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] > scalar_value);
+            }
+            break;
+        case ComparisonType::GREATER_THAN_OR_EQUAL:
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] >= scalar_value);
+            }
+            break;
+        default:
+            break;
+        }
+    } else {
+        for (size_t i = 0; i < count; ++i) {
+            if (left_nulls[i]) {
+                result_nulls[i] = 1;
+                result_data[i] = 0;
+                continue;
+            }
+            T l = left_data[i];
+            switch (op) {
+            case ComparisonType::EQUAL:
+                result_data[i] = (l == scalar_value);
+                break;
+            case ComparisonType::NOT_EQUAL:
+                result_data[i] = (l != scalar_value);
+                break;
+            case ComparisonType::LESS_THAN:
+                result_data[i] = (l < scalar_value);
+                break;
+            case ComparisonType::LESS_THAN_OR_EQUAL:
+                result_data[i] = (l <= scalar_value);
+                break;
+            case ComparisonType::GREATER_THAN:
+                result_data[i] = (l > scalar_value);
+                break;
+            case ComparisonType::GREATER_THAN_OR_EQUAL:
+                result_data[i] = (l >= scalar_value);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+}
+
 template <typename T>
 void computeComparison(const Column& left, const Column& right, Column& result, ComparisonType op, size_t count)
 {
+    PROFILE_SCOPE("computeComparison<T>");
     const T* left_data = static_cast<const T*>(left.rawData());
     const T* right_data = static_cast<const T*>(right.rawData());
     const auto* left_nulls = left.rawBitmapData();
     const auto* right_nulls = right.rawBitmapData();
 
-    for (size_t i = 0; i < count; ++i) {
-        if ((left_nulls && left_nulls[i]) || (right_nulls && right_nulls[i])) {
-            result.append(Value::createNull(DataTypeId::BOOLEAN));
-            continue;
-        }
+    // Direct access to result buffer - avoid append() overhead
+    uint8_t* result_data = static_cast<uint8_t*>(result.rawData());
+    auto* result_nulls = result.rawBitmapData();
 
-        bool res = false;
-        T l = left_data[i];
-        T r = right_data[i];
+    // Optimize for common case: no nulls
+    bool has_left_nulls = (left_nulls != nullptr);
+    bool has_right_nulls = (right_nulls != nullptr);
+
+    if (!has_left_nulls && !has_right_nulls) {
+        // Fast path: no null checks needed
         switch (op) {
         case ComparisonType::EQUAL:
-            res = (l == r);
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] == right_data[i]);
+            }
             break;
         case ComparisonType::NOT_EQUAL:
-            res = (l != r);
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] != right_data[i]);
+            }
             break;
         case ComparisonType::LESS_THAN:
-            res = (l < r);
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] < right_data[i]);
+            }
             break;
         case ComparisonType::LESS_THAN_OR_EQUAL:
-            res = (l <= r);
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] <= right_data[i]);
+            }
             break;
         case ComparisonType::GREATER_THAN:
-            res = (l > r);
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] > right_data[i]);
+            }
             break;
         case ComparisonType::GREATER_THAN_OR_EQUAL:
-            res = (l >= r);
+            for (size_t i = 0; i < count; ++i) {
+                result_data[i] = (left_data[i] >= right_data[i]);
+            }
             break;
         default:
             break;
         }
-        result.append(Value::createBoolean(res));
+    } else {
+        // Slow path: need null checks
+        for (size_t i = 0; i < count; ++i) {
+            if ((has_left_nulls && left_nulls[i]) || (has_right_nulls && right_nulls[i])) {
+                result_nulls[i] = 1;
+                result_data[i] = 0;
+                continue;
+            }
+
+            T l = left_data[i];
+            T r = right_data[i];
+            switch (op) {
+            case ComparisonType::EQUAL:
+                result_data[i] = (l == r);
+                break;
+            case ComparisonType::NOT_EQUAL:
+                result_data[i] = (l != r);
+                break;
+            case ComparisonType::LESS_THAN:
+                result_data[i] = (l < r);
+                break;
+            case ComparisonType::LESS_THAN_OR_EQUAL:
+                result_data[i] = (l <= r);
+                break;
+            case ComparisonType::GREATER_THAN:
+                result_data[i] = (l > r);
+                break;
+            case ComparisonType::GREATER_THAN_OR_EQUAL:
+                result_data[i] = (l >= r);
+                break;
+            default:
+                break;
+            }
+        }
     }
+    // Note: caller must call setSizeForColumn(result, count) after this function
 }
 
 static auto format_as(ComparisonType comp_type)
@@ -88,22 +220,57 @@ const Value ComparisonExpression::evaluate(const Tuple& tuple, const Schema& sch
 
 Column ComparisonExpression::evaluateBatch(const RowBatch& batch, const Schema& schema) const
 {
+    // Fast path: check if right side is a constant expression
+    auto* const_expr = dynamic_cast<ConstantExpression*>(right_.get());
+    size_t count = batch.getRowCount();
+    Column result(DataType::createType(DataTypeId::BOOLEAN), count);
+
+    if (const_expr != nullptr) {
+        // Right side is constant - use optimized scalar comparison
+        Column left_col = left_->evaluateBatch(batch, schema);
+        Value const_val = const_expr->getValue();
+
+        if (!const_val.isNull() && left_col.getType().getTypeId() == const_val.getTypeId()) {
+            switch (const_val.getTypeId()) {
+            case DataTypeId::INTEGER:
+                computeComparisonWithScalar<int32_t>(left_col, const_val.getInteger(), result, comp_type_, count);
+                setSizeForColumn(result, count);
+                return result;
+            case DataTypeId::BIGINT:
+                computeComparisonWithScalar<int64_t>(left_col, const_val.getBigInt(), result, comp_type_, count);
+                setSizeForColumn(result, count);
+                return result;
+            case DataTypeId::DOUBLE:
+                computeComparisonWithScalar<double>(left_col, const_val.getDouble(), result, comp_type_, count);
+                setSizeForColumn(result, count);
+                return result;
+            case DataTypeId::DATE:
+                computeComparisonWithScalar<uint32_t>(left_col, const_val.get<uint32_t>(), result, comp_type_, count);
+                setSizeForColumn(result, count);
+                return result;
+            default:
+                break; // Fall through to general path
+            }
+        }
+    }
+
+    // General path: evaluate both sides
     Column left_col = left_->evaluateBatch(batch, schema);
     Column right_col = right_->evaluateBatch(batch, schema);
-
-    Column result(DataType::createType(DataTypeId::BOOLEAN), batch.getRowCount());
-    size_t count = batch.getRowCount();
 
     if (left_col.getType().getTypeId() == right_col.getType().getTypeId()) {
         switch (left_col.getType().getTypeId()) {
         case DataTypeId::INTEGER:
             computeComparison<int32_t>(left_col, right_col, result, comp_type_, count);
+            setSizeForColumn(result, count);
             return result;
         case DataTypeId::BIGINT:
             computeComparison<int64_t>(left_col, right_col, result, comp_type_, count);
+            setSizeForColumn(result, count);
             return result;
         case DataTypeId::DOUBLE:
             computeComparison<double>(left_col, right_col, result, comp_type_, count);
+            setSizeForColumn(result, count);
             return result;
         case DataTypeId::VARCHAR:
             // Optimization: if right side is constant (or uniform), we can map its ordinal

@@ -152,13 +152,13 @@ public:
             // capacity_ for VIEW represents max accessible range, not actual data size
             size_t transfer_size = size_;
             if (target == DataLocation::CUDA) {
-                // VIEW -> CUDA: use staged transfer (VIEW data is in pageable memory)
+                // VIEW -> CUDA: use pipelined staged transfer (VIEW data is in pageable memory)
                 auto stream_handle = StreamPool::getInstance().acquire().value();
                 size_t new_capacity = nextPow2(transfer_size);
                 DType* device_data;
                 CHECKED_CALL_THROW(cudaMallocAsync(&device_data, new_capacity * sizeof(DType), stream_handle->get()));
                 stream_handle->synchronize();
-                StagedTransfer::toDevice(device_data, data_, transfer_size * sizeof(DType));
+                StagedTransfer::toDevicePipelined(device_data, data_, transfer_size * sizeof(DType));
                 data_ = device_data;
                 capacity_ = new_capacity;
                 location_ = DataLocation::CUDA;
@@ -261,9 +261,9 @@ public:
                                                    stream_handle->get()));
                 HostMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
             } else {
-                // HOST_PAGEABLE -> CUDA: staged transfer
+                // HOST_PAGEABLE -> CUDA: use pipelined staged transfer for better throughput
                 stream_handle->synchronize(); // Ensure device_data is allocated
-                StagedTransfer::toDevice(device_data, data_, capacity_ * sizeof(DType));
+                StagedTransfer::toDevicePipelined(device_data, data_, capacity_ * sizeof(DType));
                 PageableMemoryPool::getInstance().deallocate(data_, capacity_ * sizeof(DType));
             }
             stream_handle->synchronize();

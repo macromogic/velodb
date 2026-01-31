@@ -5,6 +5,7 @@
 #include "catalog/schema.hpp"
 #include "catalog/table.hpp"
 #include "common/constants.hpp"
+#include "common/profiler.hpp"
 #include "common/result.hpp"
 #include "cuda/commands.hpp"
 
@@ -19,22 +20,49 @@ FilterCompactionOperator::FilterCompactionOperator(ExecutionContext& context,
 {
 }
 
-Result<RowBatch> FilterCompactionOperator::next()
+FilterCompactionOperator::~FilterCompactionOperator()
 {
-    auto child_result = child_->next();
-    if (!child_result) {
-        return child_result; // Propagate error from child
+    // Wait for any pending prefetch to complete
+    if (prefetch_future_.valid()) {
+        prefetch_future_.wait();
     }
-    PROFILE_SCOPE("FilterCompactionOperator::next");
-    auto& batch = child_result.value();
-    batch.to(DataLocation::CUDA);
-    size_t n_rows = batch.getRowCount();
-    if (n_rows == 0) {
-        return child_result; // End of stream
-    }
-    auto& task_manager = context_.getTaskManager();
+}
 
-    // We assume $_mask always exists, possibly with a table prefix
+void FilterCompactionOperator::startPrefetch()
+{
+    // Launch async task to fetch and transfer next batch
+    prefetch_future_ = std::async(std::launch::async, [this]() {
+        PROFILE_SCOPE("FilterCompaction: prefetch H2D");
+        auto child_result = child_->next();
+        if (!child_result || child_result.value().getRowCount() == 0) {
+            prefetched_batch_ = std::nullopt;
+            return;
+        }
+
+        auto batch = std::move(child_result.value());
+        // Transfer to GPU asynchronously
+        batch.to(DataLocation::CUDA);
+        prefetched_batch_ = std::move(batch);
+    });
+}
+
+std::optional<RowBatch> FilterCompactionOperator::waitPrefetch()
+{
+    if (prefetch_future_.valid()) {
+        prefetch_future_.wait();
+    }
+    auto result = std::move(prefetched_batch_);
+    prefetched_batch_ = std::nullopt;
+    return result;
+}
+
+Result<RowBatch> FilterCompactionOperator::processBatchOnGpu(RowBatch& batch)
+{
+    PROFILE_SCOPE("FilterCompaction: GPU processing");
+
+    size_t n_rows = batch.getRowCount();
+
+    // Find mask column
     size_t mask_index = -1;
     bool found_mask = false;
     for (size_t i = 0; i < output_schema_.getColumnCount(); ++i) {
@@ -47,13 +75,14 @@ Result<RowBatch> FilterCompactionOperator::next()
     }
 
     if (!found_mask) {
-        // Fallback or explicit check
         mask_index = output_schema_.getColumnIndex("$_mask");
     }
 
+    auto& task_manager = context_.getTaskManager();
     auto& mask_column = batch.getColumn(mask_index);
     auto stream_handle = StreamPool::getInstance().acquire().value();
     const uint8_t* mask_data = static_cast<const uint8_t*>(mask_column.rawData());
+
     int32_t* d_scatter_indices;
     CHECKED_CALL_THROW(
         cudaMallocAsync(&d_scatter_indices, batch.getRowCount() * sizeof(int32_t), stream_handle->get()));
@@ -64,63 +93,76 @@ Result<RowBatch> FilterCompactionOperator::next()
 
     // Scatter command to compact rows based on mask
     uint64_t last_id;
-    Command scatter_cmd = {};
-    scatter_cmd.opcode = OpCode::OP_SCATTER;
-    scatter_cmd.args = {
-            .scatter = {
-                .out_indices = d_scatter_indices,
-                .out_count = d_scatter_count,
-                .in_mask = mask_data,
-                .n = n_rows,
-            },
-        };
-    last_id = task_manager.submitCommand(scatter_cmd);
+    {
+        PROFILE_SCOPE("FilterCompaction: scatter command");
+        Command scatter_cmd = {};
+        scatter_cmd.opcode = OpCode::OP_SCATTER;
+        scatter_cmd.args = {
+                .scatter = {
+                    .out_indices = d_scatter_indices,
+                    .out_count = d_scatter_count,
+                    .in_mask = mask_data,
+                    .n = n_rows,
+                },
+            };
+        last_id = task_manager.submitCommand(scatter_cmd);
+    }
 
     // Gather command to collect the valid rows
-    // Process columns one at a time to reduce peak GPU memory usage
-    // This trades off some parallelism for memory efficiency
     size_t n_cols = batch.getColumnCount();
     std::vector<void*> buffers(n_cols, nullptr);
     std::vector<BitVector::Element*> bitmap_buffers(n_cols, nullptr);
 
-    for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
-        auto& input_col = batch.getColumn(col_idx);
-        auto* data_ptr = input_col.rawData();
-        auto* bitmap_ptr = input_col.rawBitmapData();
-        auto* temp_buffer = input_col.getDeviceBuffer();
-        auto* temp_bitmap_buffer = input_col.getDeviceBitmapBuffer();
-        buffers[col_idx] = temp_buffer;
-        bitmap_buffers[col_idx] = temp_bitmap_buffer;
+    {
+        PROFILE_SCOPE("FilterCompaction: gather all columns");
 
-        Command gather_cmd = {};
-        gather_cmd.opcode = OpCode::OP_GATHER;
-        gather_cmd.args = {
-            .gather = {
-                .out_data = static_cast<void*>(temp_buffer),
-                .in_data = static_cast<void*>(data_ptr),
-                .in_indices = d_scatter_indices,
-                .in_mask = mask_data,
-                .n = n_rows,
-                .type_id = input_col.getType().getTypeId(),
-            },
-        };
-        task_manager.submitCommand(gather_cmd);
+        // Phase 1: Submit all gather commands without waiting
+        for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
+            auto& input_col = batch.getColumn(col_idx);
+            auto* data_ptr = input_col.rawData();
+            auto* bitmap_ptr = input_col.rawBitmapData();
+            auto* temp_buffer = input_col.getDeviceBuffer();
+            auto* temp_bitmap_buffer = input_col.getDeviceBitmapBuffer();
+            buffers[col_idx] = temp_buffer;
+            bitmap_buffers[col_idx] = temp_bitmap_buffer;
 
-        Command gather_bits_cmd = {};
-        gather_bits_cmd.opcode = OpCode::OP_GATHER;
-        gather_bits_cmd.args = { .gather = {
-                                     .out_data = static_cast<void*>(temp_bitmap_buffer),
-                                     .in_data = static_cast<void*>(bitmap_ptr),
-                                     .in_indices = d_scatter_indices,
-                                     .in_mask = mask_data,
-                                     .n = n_rows,
-                                     .type_id = DataTypeId::BOOLEAN,
-                                 } };
-        last_id = task_manager.submitCommand(gather_bits_cmd);
+            Command gather_cmd = {};
+            gather_cmd.opcode = OpCode::OP_GATHER;
+            gather_cmd.args = {
+                .gather = {
+                    .out_data = static_cast<void*>(temp_buffer),
+                    .in_data = static_cast<void*>(data_ptr),
+                    .in_indices = d_scatter_indices,
+                    .in_mask = mask_data,
+                    .n = n_rows,
+                    .type_id = input_col.getType().getTypeId(),
+                },
+            };
+            task_manager.submitCommand(gather_cmd);
 
-        // Wait and swap buffers immediately to free old GPU memory
-        task_manager.waitCommand(last_id);
-        input_col.setFromDeviceBuffers(temp_buffer, temp_bitmap_buffer);
+            Command gather_bits_cmd = {};
+            gather_bits_cmd.opcode = OpCode::OP_GATHER;
+            gather_bits_cmd.args = { .gather = {
+                                         .out_data = static_cast<void*>(temp_bitmap_buffer),
+                                         .in_data = static_cast<void*>(bitmap_ptr),
+                                         .in_indices = d_scatter_indices,
+                                         .in_mask = mask_data,
+                                         .n = n_rows,
+                                         .type_id = DataTypeId::BOOLEAN,
+                                     } };
+            last_id = task_manager.submitCommand(gather_bits_cmd);
+        }
+
+        // Phase 2: Wait once for all commands to complete
+        {
+            PROFILE_SCOPE("FilterCompaction: wait all columns");
+            task_manager.waitCommand(last_id);
+        }
+
+        // Phase 3: Swap buffers for all columns
+        for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
+            batch.getColumn(col_idx).setFromDeviceBuffers(buffers[col_idx], bitmap_buffers[col_idx]);
+        }
     }
 
     size_t h_scatter_count = 0;
@@ -130,12 +172,61 @@ Result<RowBatch> FilterCompactionOperator::next()
                                        cudaMemcpyDeviceToHost,
                                        stream_handle->get()));
     stream_handle->synchronize();
-    // Buffers already swapped in the loop above
     setNumRowsForBatch(batch, h_scatter_count);
 
     CHECKED_CALL_THROW(cudaFreeAsync(d_scatter_indices, stream_handle->get()));
     CHECKED_CALL_THROW(cudaFreeAsync(d_scatter_count, stream_handle->get()));
+
     return Result<RowBatch>::success(std::move(batch));
+}
+
+Result<RowBatch> FilterCompactionOperator::next()
+{
+    PROFILE_SCOPE("FilterCompactionOperator::next");
+
+    if (first_call_) {
+        first_call_ = false;
+
+        // First call: fetch first batch synchronously, then start prefetch for second
+        auto child_result = child_->next();
+        if (!child_result) {
+            return child_result;
+        }
+
+        auto& batch = child_result.value();
+        if (batch.getRowCount() == 0) {
+            return child_result;
+        }
+
+        // Transfer first batch to GPU
+        {
+            PROFILE_SCOPE("FilterCompaction: batch.to(CUDA)");
+            batch.to(DataLocation::CUDA);
+        }
+
+        // Start prefetching next batch while we process this one
+        startPrefetch();
+
+        return processBatchOnGpu(batch);
+    }
+
+    // Subsequent calls: use prefetched batch
+    auto prefetched = waitPrefetch();
+
+    if (!prefetched.has_value()) {
+        // No more data - return empty batch
+        return Result<RowBatch>::success(RowBatch());
+    }
+
+    auto batch = std::move(prefetched.value());
+    if (batch.getRowCount() == 0) {
+        return Result<RowBatch>::success(std::move(batch));
+    }
+
+    // Start prefetching next batch while we process this one
+    startPrefetch();
+
+    return processBatchOnGpu(batch);
 }
 
 } // namespace velodb
