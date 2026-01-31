@@ -19,7 +19,12 @@ ObliviousTableManager::ObliviousTableManager(TaskManager& task_manager)
 ObliviousTableManager::~ObliviousTableManager()
 {
     // Wait for all shuffles to complete
-    syncAllShuffles();
+    // Note: This may fail if TaskManager is already stopped, so we catch exceptions
+    try {
+        syncAllShuffles();
+    } catch (...) {
+        // Ignore errors during destruction - TaskManager might already be stopped
+    }
 }
 
 ObliviousTableManager::ObliviousTableManager(ObliviousTableManager&& other) noexcept
@@ -145,8 +150,7 @@ void ObliviousTableManager::endQuery()
 void ObliviousTableManager::enrichPositions(const std::string& table_name,
                                             const uint32_t* d_record_ids,
                                             uint32_t* d_positions,
-                                            size_t n,
-                                            cudaStream_t stream)
+                                            size_t n)
 {
     PROFILE_SCOPE("ObliviousTableManager::enrichPositions");
 

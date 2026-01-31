@@ -29,6 +29,7 @@ RowBatch AbstractOperator::collectBatches(AbstractOperator& child)
         if (batch.getRowCount() == 0) {
             break; // End of stream
         }
+        batch.to(DataLocation::CUDA);
         n_rows += batch.getRowCount();
         batch_count++;
         buffer.push_back(std::move(batch));

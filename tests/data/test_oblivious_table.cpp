@@ -190,7 +190,7 @@ TEST_F(ObliviousTableTest, PositionEnrichment)
 
     cudaMemcpyAsync(d_record_ids, h_record_ids.data(), n * sizeof(uint32_t), cudaMemcpyHostToDevice, stream);
 
-    mgr.enrichPositions("test_table", d_record_ids, d_positions, n, stream);
+    mgr.enrichPositions("test_table", d_record_ids, d_positions, n);
 
     // Copy back and verify
     std::vector<uint32_t> h_positions(n);

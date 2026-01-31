@@ -111,13 +111,8 @@ public:
      * @param d_record_ids  Device pointer to input record IDs
      * @param d_positions   Device pointer to output positions
      * @param n             Number of records
-     * @param stream        CUDA stream for the operation
      */
-    void enrichPositions(const std::string& table_name,
-                         const uint32_t* d_record_ids,
-                         uint32_t* d_positions,
-                         size_t n,
-                         cudaStream_t stream = 0);
+    void enrichPositions(const std::string& table_name, const uint32_t* d_record_ids, uint32_t* d_positions, size_t n);
 
     // ========================================================================
     // Utility

@@ -12,3 +12,22 @@ target_compile_options(test_operator PRIVATE -Wall -Wextra -g)
 
 add_test(NAME TestOperator COMMAND test_operator)
 set_tests_properties(TestOperator PROPERTIES TIMEOUT 30)
+
+# Oblivious Materialization Tests
+add_executable(test_oblivious_materialization test_oblivious_materialization.cpp
+                                              ../test_main.cpp)
+
+target_link_libraries(test_oblivious_materialization ${ALL_OBJS}
+                      ${DEPENDENCY_LIBS} GTest::GTest GTest::Main pthread)
+
+set_property(TARGET test_oblivious_materialization PROPERTY CXX_STANDARD 17)
+set_property(TARGET test_oblivious_materialization
+             PROPERTY CXX_STANDARD_REQUIRED ON)
+set_property(TARGET test_oblivious_materialization
+             PROPERTY RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tests)
+
+target_compile_options(test_oblivious_materialization PRIVATE -Wall -Wextra -g)
+
+add_test(NAME TestObliviousMaterialization
+         COMMAND test_oblivious_materialization)
+set_tests_properties(TestObliviousMaterialization PROPERTIES TIMEOUT 60)

@@ -65,6 +65,14 @@ namespace test {
             // Optional: Print profile report after each test
             // Uncomment if you want detailed profiling for each test
             Profiler::getInstance().printReport();
+
+            // Sync and clear oblivious manager BEFORE stopping task manager
+            // to avoid use-after-free when ObliviousTableManager::~ObliviousTableManager
+            // tries to wait for shuffles
+            if (catalog_.hasObliviousManager()) {
+                catalog_.getObliviousManager().syncAllShuffles();
+            }
+
             task_manager_.stop(0);
         }
 
