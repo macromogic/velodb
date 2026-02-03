@@ -45,12 +45,9 @@ std::string ColumnInfo::toString() const
 // Helper function to create the appropriate ValueVector based on data type
 static Column::DataSource createDataSource(const DataType& type, size_t initial_capacity, DataLocation location)
 {
-    PROFILE_SCOPE("createDataSource");
-
     switch (type.getTypeId()) {
 #define X(name, DT, VT)                                                                                                \
     case DataTypeId::name: {                                                                                           \
-        PROFILE_SCOPE("Creating ValueVector for " #name);                                                              \
         return ValueVector<VT>(initial_capacity, location);                                                            \
     }
         LIST_TYPES(X)
@@ -68,7 +65,6 @@ Column::Column(std::unique_ptr<DataType> type, size_t initial_capacity, DataLoca
 
 Column Column::buildFrom(std::unique_ptr<DataType> type, std::vector<Value>&& values, DataLocation location)
 {
-    PROFILE_SCOPE(fmt::format("Column::buildFrom({}, n={})", type->toString(), values.size()).c_str());
     switch (type->getTypeId()) {
 #define X(name, DT, VT)                                                                                                \
     case DataTypeId::name: {                                                                                           \

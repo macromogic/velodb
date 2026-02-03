@@ -239,8 +239,6 @@ void ObliviousTable::waitForShuffle()
 
 std::vector<uint32_t> ObliviousTable::generatePermutation(size_t n, uint64_t seed)
 {
-    PROFILE_SCOPE("generatePermutation");
-
     std::vector<uint32_t> perm(n);
     std::iota(perm.begin(), perm.end(), 0);
 

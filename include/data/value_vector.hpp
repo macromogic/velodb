@@ -217,7 +217,7 @@ public:
 
         if (current == DataLocation::CUDA) {
             // CUDA -> HOST_PINNED or CUDA -> HOST_PAGEABLE
-            PROFILE_SCOPE("ValueVector D2H Transfer");
+            PROFILE_SCOPE("D2H Transfer: ValueVector");
 
             if (target == DataLocation::HOST_PINNED) {
                 // CUDA -> HOST_PINNED: direct DMA with oblivious transfer (padded)
@@ -247,7 +247,7 @@ public:
             location_ = target;
         } else if (target == DataLocation::CUDA) {
             // HOST_PINNED -> CUDA or HOST_PAGEABLE -> CUDA
-            PROFILE_SCOPE("ValueVector H2D Transfer");
+            PROFILE_SCOPE("H2D Transfer: ValueVector");
             size_t padded_capacity = nextPow2(capacity_);
             DType* device_data;
             CHECKED_CALL_THROW(cudaMallocAsync(&device_data, padded_capacity * sizeof(DType), stream_handle->get()));

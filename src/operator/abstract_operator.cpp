@@ -16,7 +16,6 @@ AbstractOperator::AbstractOperator(ExecutionContext& context, Schema output_sche
 
 RowBatch AbstractOperator::collectBatches(AbstractOperator& child)
 {
-    PROFILE_SCOPE("collectBatches");
     std::deque<RowBatch> buffer;
     size_t n_rows = 0;
     size_t batch_count = 0;
@@ -46,7 +45,6 @@ RowBatch AbstractOperator::collectBatches(AbstractOperator& child)
     }
     size_t n_cols = gathered_batch.getColumnCount();
     if (!buffer.empty()) {
-        PROFILE_SCOPE("Merge collected batches");
         auto stream_handle = StreamPool::getInstance().acquire().value();
         size_t offset = gathered_batch.getRowCount();
         for (const auto& batch : buffer) {

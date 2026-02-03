@@ -19,18 +19,14 @@ Table::Table(std::string name, Schema schema)
 
 void Table::initializeColumns()
 {
-    PROFILE_SCOPE("initializeColumns");
     const size_t column_count = schema_.getColumnCount();
     {
         {
-            PROFILE_SCOPE("columns reserve");
             columns_.reserve(column_count);
         }
 
         {
-            PROFILE_SCOPE("columns creation loop");
             for (auto& info : schema_) {
-                PROFILE_SCOPE("single column emplace_back");
                 columns_.emplace_back(info.getType().cloneUnique());
             }
         }

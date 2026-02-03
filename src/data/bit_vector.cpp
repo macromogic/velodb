@@ -340,7 +340,6 @@ void BitVector::to(DataLocation location)
 
     if (current == DataLocation::CUDA) {
         // CUDA -> HOST_PINNED or CUDA -> HOST_PAGEABLE
-        PROFILE_SCOPE("BitVector D2H Transfer");
 
         if (target == DataLocation::HOST_PINNED) {
             // CUDA -> HOST_PINNED: direct DMA
@@ -366,7 +365,6 @@ void BitVector::to(DataLocation location)
         location_ = target;
     } else if (target == DataLocation::CUDA) {
         // HOST_PINNED -> CUDA or HOST_PAGEABLE -> CUDA
-        PROFILE_SCOPE("BitVector H2D Transfer");
         Element* device_data;
         CHECKED_CALL_THROW(cudaMallocAsync(&device_data, element_capacity_ * sizeof(Element), stream_handle->get()));
 
@@ -389,7 +387,6 @@ void BitVector::to(DataLocation location)
         location_ = DataLocation::CUDA;
     } else {
         // HOST_PINNED <-> HOST_PAGEABLE
-        PROFILE_SCOPE("BitVector Host Memory Transfer");
         if (current == DataLocation::HOST_PINNED && target == DataLocation::HOST_PAGEABLE) {
             Element* pageable_data = static_cast<Element*>(
                 PageableMemoryPool::getInstance().allocate(element_capacity_ * sizeof(Element)));

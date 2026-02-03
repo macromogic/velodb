@@ -48,7 +48,7 @@ Result<RowBatch> SortMergeJoinOperator::next()
         return Result<RowBatch>::success(RowBatch());
     }
 
-    PROFILE_SCOPE("SortMergeJoinOperator::next");
+    PROFILE_SCOPE("SortMergeJoin");
     // Assumption: both `left_batch` and `right_batch` are sorted ascending by join key.
 
     // Validate key indices

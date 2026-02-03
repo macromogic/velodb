@@ -41,7 +41,7 @@ Result<RowBatch> SortOperator::next()
         return Result<RowBatch>::success(RowBatch()); // End of stream
     }
 
-    PROFILE_SCOPE("SortOperator::next");
+    PROFILE_SCOPE("Sort");
     gathered_batch.to(DataLocation::CUDA);
     size_t n_rows = gathered_batch.getRowCount();
     size_t n_padded_rows = nextPow2(n_rows);

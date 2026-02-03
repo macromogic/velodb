@@ -36,7 +36,7 @@ Result<RowBatch> GpuFilterOperator::next()
         return child_result; // End of stream
     }
 
-    PROFILE_SCOPE("GpuFilterOperator::next");
+    PROFILE_SCOPE("Post-join Filter");
     batch.to(DataLocation::CUDA);
     size_t n_rows = batch.getRowCount();
 

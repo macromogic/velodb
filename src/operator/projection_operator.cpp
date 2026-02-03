@@ -26,7 +26,7 @@ Result<RowBatch> ProjectionOperator::next()
     if (!child_result) {
         return child_result; // Propagate error from child
     }
-    PROFILE_SCOPE("ProjectionOperator::next");
+    PROFILE_SCOPE("Projection");
     auto& child_batch = child_result.value();
     if (child_batch.getRowCount() == 0) {
         return child_result; // No rows to process

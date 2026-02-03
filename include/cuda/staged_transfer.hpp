@@ -137,7 +137,7 @@ public:
      */
     static void toDevicePipelined(void* device_dst, const void* pageable_src, size_t total_bytes)
     {
-        PROFILE_SCOPE("StagedTransfer::toDevicePipelined");
+        PROFILE_SCOPE("H2D Transfer: StagedTransfer");
 
         if (total_bytes == 0) {
             return;
@@ -212,7 +212,7 @@ public:
      */
     static void toHostPipelined(void* pageable_dst, const void* device_src, size_t total_bytes)
     {
-        PROFILE_SCOPE("StagedTransfer::toHostPipelined");
+        PROFILE_SCOPE("D2H Transfer: StagedTransfer");
 
         if (total_bytes == 0) {
             return;

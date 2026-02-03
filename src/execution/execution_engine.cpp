@@ -66,12 +66,8 @@ ExecutionEngine& ExecutionEngine::operator=(ExecutionEngine&& other) noexcept
 
 Result<QueryResult> ExecutionEngine::executeQuery(const std::string& sql, QueryStatistics* stats)
 {
-    PROFILE_SCOPE("Execute Query (full)");
     hsql::SQLParserResult sql_result;
-    {
-        PROFILE_SCOPE("SQL Parsing");
-        hsql::SQLParser::parse(sql, &sql_result);
-    }
+    hsql::SQLParser::parse(sql, &sql_result);
 
     if (!sql_result.isValid()) {
         return Result<QueryResult>::failure("SQL parsing error: " + std::string(sql_result.errorMsg()));
@@ -125,32 +121,22 @@ Result<QueryResult> ExecutionEngine::executePlan(std::unique_ptr<AbstractPlanNod
         return Result<QueryResult>::failure("Cannot execute null plan");
     }
 
-    std::unique_ptr<AbstractOperator> operator_tree;
-    {
-        PROFILE_SCOPE("Create Operator Tree");
-        operator_tree = plan->createOperator(context_);
-    }
+    auto operator_tree = plan->createOperator(context_);
     if (!operator_tree) {
         return Result<QueryResult>::failure("Failed to create operator tree from plan");
     }
 
     QueryResult result(operator_tree->getOutputSchema().clone());
-    {
-        PROFILE_SCOPE("Execute Operator Tree");
-        while (true) {
-            auto batch_result = operator_tree->next();
-            if (!batch_result) {
-                return Result<QueryResult>::failure(batch_result.error());
-            }
-            auto batch = std::move(batch_result.value());
-            if (batch.getRowCount() == 0) {
-                break; // No more results
-            }
-            {
-                PROFILE_SCOPE("Append Batch to Result");
-                result.append(std::move(batch));
-            }
+    while (true) {
+        auto batch_result = operator_tree->next();
+        if (!batch_result) {
+            return Result<QueryResult>::failure(batch_result.error());
         }
+        auto batch = std::move(batch_result.value());
+        if (batch.getRowCount() == 0) {
+            break; // No more results
+        }
+        result.append(std::move(batch));
     }
     return Result<QueryResult>::success(std::move(result));
 }

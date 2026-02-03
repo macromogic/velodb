@@ -531,7 +531,7 @@ Result<RowBatch> MaterializationOperator::next()
         return Result<RowBatch>::success(RowBatch()); // End of stream
     }
 
-    PROFILE_SCOPE("MaterializationOperator::next (Oblivious)");
+    PROFILE_SCOPE("Materialization");
 
     // Transfer to host for oblivious processing
     join_batch.to(DataLocation::HOST_PAGEABLE);

@@ -54,13 +54,9 @@ void HashJoinOperator::cleanup()
 
 bool HashJoinOperator::buildHashTable()
 {
-    PROFILE_SCOPE("HashJoin: build hash table");
-
     // Collect all build side data
-    {
-        PROFILE_SCOPE("HashJoin: collect build side");
-        build_batch_ = collectBatches(*left_child_);
-    }
+    build_batch_ = collectBatches(*left_child_);
+    PROFILE_SCOPE("HashJoin: build hash table");
 
     build_size_ = build_batch_.getRowCount();
     if (build_size_ == 0) {
@@ -361,8 +357,6 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
 
 Result<RowBatch> HashJoinOperator::next()
 {
-    PROFILE_SCOPE("HashJoinOperator::next");
-
     // Already finished - return empty batch
     if (finished_) {
         return Result<RowBatch>::success(RowBatch());
@@ -380,7 +374,6 @@ Result<RowBatch> HashJoinOperator::next()
 
     // Stream probe batches from right child
     while (true) {
-        PROFILE_SCOPE("HashJoin: collect probe side");
         auto probe_result = right_child_->next();
         if (!probe_result) {
             return probe_result;

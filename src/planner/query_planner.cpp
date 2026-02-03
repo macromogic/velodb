@@ -109,7 +109,6 @@ QueryPlanner::QueryPlanner(Catalog& catalog, JoinStrategy join_strategy)
 
 std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectStatement* select_stmt)
 {
-    PROFILE_SCOPE("Query Planning");
     // Plan FROM clause
     auto* table_ref = select_stmt->fromTable;
     VELODB_ASSERT_MSG(table_ref != nullptr, "SELECT without FROM not supported");

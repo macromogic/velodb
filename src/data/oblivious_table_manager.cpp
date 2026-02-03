@@ -107,7 +107,7 @@ void ObliviousTableManager::beginQuery(const std::vector<std::string>& table_nam
         if (hasTable(name)) {
             auto& table = getTable(name);
             if (table.isShuffling()) {
-                PROFILE_SCOPE("Wait for shuffle: " + name);
+                PROFILE_SCOPE("Wait for shuffle");
                 table.waitForShuffle();
             }
             // Ensure position map is on GPU

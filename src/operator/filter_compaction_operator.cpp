@@ -32,7 +32,6 @@ void FilterCompactionOperator::startPrefetch()
 {
     // Launch async task to fetch and transfer next batch
     prefetch_future_ = std::async(std::launch::async, [this]() {
-        PROFILE_SCOPE("FilterCompaction: prefetch H2D");
         auto child_result = child_->next();
         if (!child_result || child_result.value().getRowCount() == 0) {
             prefetched_batch_ = std::nullopt;
@@ -58,8 +57,6 @@ std::optional<RowBatch> FilterCompactionOperator::waitPrefetch()
 
 Result<RowBatch> FilterCompactionOperator::processBatchOnGpu(RowBatch& batch)
 {
-    PROFILE_SCOPE("FilterCompaction: GPU processing");
-
     size_t n_rows = batch.getRowCount();
 
     // Find mask column
@@ -94,7 +91,6 @@ Result<RowBatch> FilterCompactionOperator::processBatchOnGpu(RowBatch& batch)
     // Scatter command to compact rows based on mask
     uint64_t last_id;
     {
-        PROFILE_SCOPE("FilterCompaction: scatter command");
         Command scatter_cmd = {};
         scatter_cmd.opcode = OpCode::OP_SCATTER;
         scatter_cmd.args = {
@@ -114,8 +110,6 @@ Result<RowBatch> FilterCompactionOperator::processBatchOnGpu(RowBatch& batch)
     std::vector<BitVector::Element*> bitmap_buffers(n_cols, nullptr);
 
     {
-        PROFILE_SCOPE("FilterCompaction: gather all columns");
-
         // Phase 1: Submit all gather commands without waiting
         for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
             auto& input_col = batch.getColumn(col_idx);
@@ -155,7 +149,6 @@ Result<RowBatch> FilterCompactionOperator::processBatchOnGpu(RowBatch& batch)
 
         // Phase 2: Wait once for all commands to complete
         {
-            PROFILE_SCOPE("FilterCompaction: wait all columns");
             task_manager.waitCommand(last_id);
         }
 
@@ -182,8 +175,6 @@ Result<RowBatch> FilterCompactionOperator::processBatchOnGpu(RowBatch& batch)
 
 Result<RowBatch> FilterCompactionOperator::next()
 {
-    PROFILE_SCOPE("FilterCompactionOperator::next");
-
     if (first_call_) {
         first_call_ = false;
 
@@ -192,6 +183,7 @@ Result<RowBatch> FilterCompactionOperator::next()
         if (!child_result) {
             return child_result;
         }
+        PROFILE_SCOPE("FilterCompaction: First Batch");
 
         auto& batch = child_result.value();
         if (batch.getRowCount() == 0) {
@@ -200,7 +192,6 @@ Result<RowBatch> FilterCompactionOperator::next()
 
         // Transfer first batch to GPU
         {
-            PROFILE_SCOPE("FilterCompaction: batch.to(CUDA)");
             batch.to(DataLocation::CUDA);
         }
 
@@ -209,6 +200,8 @@ Result<RowBatch> FilterCompactionOperator::next()
 
         return processBatchOnGpu(batch);
     }
+
+    PROFILE_SCOPE("FilterCompaction: Subsequent Batches");
 
     // Subsequent calls: use prefetched batch
     auto prefetched = waitPrefetch();

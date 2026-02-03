@@ -60,7 +60,6 @@ const Value BinaryLogicalExpression::evaluate(const Tuple& tuple, const Schema& 
 
 Column BinaryLogicalExpression::evaluateBatch(const RowBatch& batch, const Schema& schema) const
 {
-    PROFILE_SCOPE("BinaryLogicalExpression::evaluateBatch");
     size_t count = batch.getRowCount();
 
     // Optimization: flatten AND chains to evaluate all conditions into a single result

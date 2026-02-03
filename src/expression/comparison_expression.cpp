@@ -13,7 +13,6 @@ namespace velodb {
 template <typename T>
 void computeComparisonWithScalar(const Column& left, T scalar_value, Column& result, ComparisonType op, size_t count)
 {
-    PROFILE_SCOPE("computeComparisonWithScalar<T>");
     const T* left_data = static_cast<const T*>(left.rawData());
     const auto* left_nulls = left.rawBitmapData();
 
