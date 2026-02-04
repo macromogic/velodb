@@ -3,9 +3,8 @@
 #include "common/constants.hpp"
 #include "cuda/commands.hpp"
 #include "cuda/hash_table.hpp"
+#include "data/type_traits.hpp"
 #include "expression/expression.hpp"
-
-#include <numeric>
 
 #include <cuda_runtime.h>
 
@@ -24,6 +23,7 @@ HashJoinOperator::HashJoinOperator(ExecutionContext& context,
     , left_source_tables_(std::move(left_source_tables))
     , right_source_tables_(std::move(right_source_tables))
     , join_type_(join_type)
+    , key_type_id_(left_child_->getOutputSchema().getColumnInfo(join_key_indices_.first).getType().getTypeId())
 {
 }
 
@@ -32,17 +32,48 @@ HashJoinOperator::~HashJoinOperator()
     cleanup();
 }
 
+void HashJoinOperator::initHashTable(DataTypeId type_id, uint32_t capacity, uint32_t num_buckets)
+{
+    ht_.capacity = capacity;
+    ht_.num_buckets = num_buckets;
+
+    size_t entry_size = 0;
+    switch (type_id) {
+#define X(name, DT, VT)                                                                                                \
+    case DataTypeId::name:                                                                                             \
+        entry_size = sizeof(HashTableEntry<DT>);                                                                       \
+        break;
+        LIST_TYPES(X)
+    default:
+        VELODB_THROW(ExecutionError, fmt::format("Invalid type ID: {}", static_cast<uint32_t>(type_id)));
+    }
+
+    auto stream_handle = StreamPool::getInstance().acquire().value();
+    CHECKED_CALL_THROW(cudaMallocAsync(&ht_.entries, capacity * entry_size, stream_handle->get()));
+    CHECKED_CALL_THROW(cudaMallocAsync(&ht_.heads, num_buckets * sizeof(uint32_t), stream_handle->get()));
+    CHECKED_CALL_THROW(cudaMallocAsync(&ht_.counter, sizeof(uint32_t), stream_handle->get()));
+
+    CHECKED_CALL_THROW(cudaMemsetAsync(ht_.entries, 0xFF, capacity * entry_size, stream_handle->get()));
+    CHECKED_CALL_THROW(cudaMemsetAsync(ht_.heads, 0xFF, num_buckets * sizeof(uint32_t), stream_handle->get()));
+    CHECKED_CALL_THROW(cudaMemsetAsync(ht_.counter, 0, sizeof(uint32_t), stream_handle->get()));
+    stream_handle->synchronize();
+}
+
 void HashJoinOperator::cleanup()
 {
-    if (d_ht_entries_ || d_ht_heads_) {
+    if (ht_.entries || ht_.heads || ht_.counter) {
         auto stream_handle = StreamPool::getInstance().acquire().value();
-        if (d_ht_entries_) {
-            cudaFreeAsync(d_ht_entries_, stream_handle->get());
-            d_ht_entries_ = nullptr;
+        if (ht_.entries) {
+            cudaFreeAsync(ht_.entries, stream_handle->get());
+            ht_.entries = nullptr;
         }
-        if (d_ht_heads_) {
-            cudaFreeAsync(d_ht_heads_, stream_handle->get());
-            d_ht_heads_ = nullptr;
+        if (ht_.heads) {
+            cudaFreeAsync(ht_.heads, stream_handle->get());
+            ht_.heads = nullptr;
+        }
+        if (ht_.counter) {
+            cudaFreeAsync(ht_.counter, stream_handle->get());
+            ht_.counter = nullptr;
         }
         stream_handle->synchronize();
     }
@@ -68,76 +99,19 @@ bool HashJoinOperator::buildHashTable()
         VELODB_THROW(ExecutionError, "Left join key index out of bounds");
     }
 
-    key_type_id_ = build_batch_.getColumn(join_key_indices_.first).getType().getTypeId();
-
     auto& task_manager = context_.getTaskManager();
-    auto stream_handle = StreamPool::getInstance().acquire().value();
 
-    // ========================================================================
-    // Step 1: Allocate Hash Table
-    // ========================================================================
-    ht_capacity_ = static_cast<uint32_t>(build_size_);
-    ht_num_buckets_ = static_cast<uint32_t>(nextPow2(build_size_ * 2));
+    auto capacity = static_cast<uint32_t>(build_size_);
+    auto num_buckets = static_cast<uint32_t>(nextPow2(build_size_ * 2));
+    initHashTable(key_type_id_, capacity, num_buckets);
 
-    // Calculate entry size based on key type
-    size_t entry_size;
-    switch (key_type_id_) {
-    case DataTypeId::INTEGER:
-        entry_size = sizeof(HashTableEntry<int32_t>);
-        break;
-    case DataTypeId::BIGINT:
-        entry_size = sizeof(HashTableEntry<int64_t>);
-        break;
-    case DataTypeId::DOUBLE:
-        entry_size = sizeof(HashTableEntry<double>);
-        break;
-    default:
-        VELODB_THROW(ExecutionError, "Unsupported key type for Hash Join");
-    }
-
-    CHECKED_CALL_THROW(cudaMalloc(&d_ht_entries_, ht_capacity_ * entry_size));
-    CHECKED_CALL_THROW(cudaMalloc(&d_ht_heads_, ht_num_buckets_ * sizeof(uint32_t)));
-
-    uint32_t* d_ht_counter;
-    CHECKED_CALL_THROW(cudaMallocAsync(&d_ht_counter, sizeof(uint32_t), stream_handle->get()));
-
-    // Initialize hash table
-    CHECKED_CALL_THROW(cudaMemsetAsync(d_ht_entries_, 0xFF, ht_capacity_ * entry_size, stream_handle->get()));
-    CHECKED_CALL_THROW(cudaMemsetAsync(d_ht_heads_, 0xFF, ht_num_buckets_ * sizeof(uint32_t), stream_handle->get()));
-    CHECKED_CALL_THROW(cudaMemsetAsync(d_ht_counter, 0, sizeof(uint32_t), stream_handle->get()));
-
-    // Prepare build side indices [0, 1, ..., N-1]
-    int64_t* d_build_indices;
-    CHECKED_CALL_THROW(cudaMallocAsync(&d_build_indices, build_size_ * sizeof(int64_t), stream_handle->get()));
-    std::vector<int64_t> h_build_indices(build_size_);
-    std::iota(h_build_indices.begin(), h_build_indices.end(), 0);
-    CHECKED_CALL_THROW(cudaMemcpyAsync(d_build_indices,
-                                       h_build_indices.data(),
-                                       build_size_ * sizeof(int64_t),
-                                       cudaMemcpyHostToDevice,
-                                       stream_handle->get()));
-    stream_handle->synchronize();
-
-    // ========================================================================
-    // Step 2: Build Hash Table
-    // ========================================================================
     Command cmd_build = {};
     cmd_build.opcode = OpCode::OP_HASH_JOIN_BUILD;
     cmd_build.args.hash_join_build = { .keys = build_batch_.getColumn(join_key_indices_.first).rawData(),
-                                       .rowids = d_build_indices,
                                        .n = build_size_,
-                                       .ht_entries = d_ht_entries_,
-                                       .ht_heads = d_ht_heads_,
-                                       .ht_counter = d_ht_counter,
-                                       .ht_capacity = ht_capacity_,
-                                       .ht_num_buckets = ht_num_buckets_,
+                                       .ht = ht_,
                                        .type_id = key_type_id_ };
     task_manager.waitCommand(task_manager.submitCommand(cmd_build));
-
-    // Cleanup temporary buffers
-    CHECKED_CALL_THROW(cudaFreeAsync(d_build_indices, stream_handle->get()));
-    CHECKED_CALL_THROW(cudaFreeAsync(d_ht_counter, stream_handle->get()));
-    stream_handle->synchronize();
 
     return true; // Hash table built successfully
 }
@@ -170,10 +144,7 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
     cmd_count.opcode = OpCode::OP_HASH_JOIN_COUNT;
     cmd_count.args.hash_join_count = { .probe_keys = probe_batch.getColumn(join_key_indices_.second).rawData(),
                                        .probe_n = probe_n,
-                                       .ht_entries = d_ht_entries_,
-                                       .ht_heads = d_ht_heads_,
-                                       .ht_capacity = ht_capacity_,
-                                       .ht_num_buckets = ht_num_buckets_,
+                                       .ht = ht_,
                                        .out_count = d_match_count,
                                        .type_id = key_type_id_ };
     task_manager.waitCommand(task_manager.submitCommand(cmd_count));
@@ -181,8 +152,8 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
     size_t h_match_count = 0;
     CHECKED_CALL_THROW(
         cudaMemcpyAsync(&h_match_count, d_match_count, sizeof(size_t), cudaMemcpyDeviceToHost, stream_handle->get()));
-    stream_handle->synchronize();
     CHECKED_CALL_THROW(cudaFreeAsync(d_match_count, stream_handle->get()));
+    stream_handle->synchronize();
 
     if (h_match_count == 0) {
         // No matches for this batch - return empty but continue probing
@@ -223,10 +194,7 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
     cmd_write.args.hash_join_write = { .probe_keys = probe_batch.getColumn(join_key_indices_.second).rawData(),
                                        .probe_rowids = d_probe_indices,
                                        .probe_n = probe_n,
-                                       .ht_entries = d_ht_entries_,
-                                       .ht_heads = d_ht_heads_,
-                                       .ht_capacity = ht_capacity_,
-                                       .ht_num_buckets = ht_num_buckets_,
+                                       .ht = ht_,
                                        .out_left = d_out_left_indices,
                                        .out_right = d_out_right_indices,
                                        .write_offset = d_write_offset,

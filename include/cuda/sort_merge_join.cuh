@@ -192,21 +192,7 @@ __device__ void executeSortMergeJoinCount(const CommandArgs::SortMergeJoinCountA
     }
 }
 
-// Step 2: fill random rowids
-__device__ void executeSortMergeJoinPrepare(const CommandArgs::SortMergeJoinPrepareArgs& args, cg::grid_group& grid)
-{
-    int64_t* rowids = args.rowids;
-    size_t n = args.n;
-    size_t n_rows = args.n_rows;
-    uint64_t seed = args.seed;
-    size_t tid = grid.thread_rank();
-    size_t total_threads = grid.size();
-    for (size_t idx = tid; idx < n; idx += total_threads) {
-        rowids[idx] = static_cast<int64_t>(splitMix64(seed + idx) % n_rows);
-    }
-}
-
-// Step 3: write matching rowids using precomputed blocks
+// Step 2: write matching rowids using precomputed blocks
 __device__ void executeSortMergeJoinWrite(const CommandArgs::SortMergeJoinWriteArgs& args, cg::grid_group& grid)
 {
     sortMergeJoinWriteImpl(args.left, args.right, args.blocks, args.n_blocks, args.out_left, args.out_right, grid);

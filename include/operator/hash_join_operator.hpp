@@ -34,6 +34,7 @@ private:
         return static_cast<int64_t>(seed);
     }
 
+    void initHashTable(DataTypeId type_id, uint32_t capacity, uint32_t num_buckets);
     bool buildHashTable();
 
     Result<RowBatch> probeWithBatch(RowBatch& probe_batch);
@@ -54,13 +55,9 @@ private:
     // Build side data (kept for the duration of probing)
     RowBatch build_batch_;
     size_t build_size_ { 0 };
-    DataTypeId key_type_id_ { DataTypeId::INTEGER };
+    DataTypeId key_type_id_;
 
-    // GPU Hash Table (persists across probe calls)
-    void* d_ht_entries_ { nullptr };
-    uint32_t* d_ht_heads_ { nullptr };
-    uint32_t ht_capacity_ { 0 };
-    uint32_t ht_num_buckets_ { 0 };
+    HashTable ht_ {};
 };
 
 } // namespace velodb

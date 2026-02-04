@@ -13,9 +13,8 @@ struct HashTableEntry {
     uint32_t next; // HASH_TABLE_EMPTY if end of chain
 };
 
-template <typename T>
 struct HashTable {
-    HashTableEntry<T>* entries;
+    void* entries;
     uint32_t* heads;
     uint32_t* counter;
     uint32_t capacity;

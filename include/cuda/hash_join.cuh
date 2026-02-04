@@ -99,7 +99,6 @@ __device__ __forceinline__ void probeHashTableWrite(HashTableEntry<KeyT>* entrie
 
 template <typename KeyT>
 __device__ __forceinline__ void hashJoinBuildImpl(const KeyT* keys,
-                                                  const int64_t* rowids,
                                                   size_t n,
                                                   HashTableEntry<KeyT>* ht_entries,
                                                   uint32_t* ht_heads,
@@ -112,7 +111,7 @@ __device__ __forceinline__ void hashJoinBuildImpl(const KeyT* keys,
     size_t stride = grid.size();
 
     for (size_t i = tid; i < n; i += stride) {
-        insertHashTable<KeyT>(ht_entries, ht_heads, ht_counter, ht_num_buckets, ht_capacity, keys[i], rowids[i]);
+        insertHashTable<KeyT>(ht_entries, ht_heads, ht_counter, ht_num_buckets, ht_capacity, keys[i], i);
     }
 }
 
@@ -181,13 +180,12 @@ __device__ inline void executeHashJoinBuild(const CommandArgs::HashJoinBuildArgs
 #define X(name, DT, VT)                                                                                                \
     case DataTypeId::name: {                                                                                           \
         hashJoinBuildImpl<DT>(static_cast<const DT*>(args.keys),                                                       \
-                              args.rowids,                                                                             \
                               args.n,                                                                                  \
-                              static_cast<HashTableEntry<DT>*>(args.ht_entries),                                       \
-                              args.ht_heads,                                                                           \
-                              args.ht_counter,                                                                         \
-                              args.ht_capacity,                                                                        \
-                              args.ht_num_buckets,                                                                     \
+                              static_cast<HashTableEntry<DT>*>(args.ht.entries),                                       \
+                              args.ht.heads,                                                                           \
+                              args.ht.counter,                                                                         \
+                              args.ht.capacity,                                                                        \
+                              args.ht.num_buckets,                                                                     \
                               grid);                                                                                   \
         break;                                                                                                         \
     }
@@ -205,9 +203,9 @@ __device__ inline void executeHashJoinCount(const CommandArgs::HashJoinCountArgs
     case DataTypeId::name: {                                                                                           \
         hashJoinCountImpl<DT>(static_cast<const DT*>(args.probe_keys),                                                 \
                               args.probe_n,                                                                            \
-                              static_cast<HashTableEntry<DT>*>(args.ht_entries),                                       \
-                              args.ht_heads,                                                                           \
-                              args.ht_num_buckets,                                                                     \
+                              static_cast<HashTableEntry<DT>*>(args.ht.entries),                                       \
+                              args.ht.heads,                                                                           \
+                              args.ht.num_buckets,                                                                     \
                               args.out_count,                                                                          \
                               grid);                                                                                   \
         break;                                                                                                         \
@@ -227,9 +225,9 @@ __device__ inline void executeHashJoinWrite(const CommandArgs::HashJoinWriteArgs
         hashJoinWriteImpl<DT>(static_cast<const DT*>(args.probe_keys),                                                 \
                               args.probe_rowids,                                                                       \
                               args.probe_n,                                                                            \
-                              static_cast<HashTableEntry<DT>*>(args.ht_entries),                                       \
-                              args.ht_heads,                                                                           \
-                              args.ht_num_buckets,                                                                     \
+                              static_cast<HashTableEntry<DT>*>(args.ht.entries),                                       \
+                              args.ht.heads,                                                                           \
+                              args.ht.num_buckets,                                                                     \
                               args.out_left,                                                                           \
                               args.out_right,                                                                          \
                               args.write_offset,                                                                       \

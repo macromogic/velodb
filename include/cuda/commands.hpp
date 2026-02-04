@@ -2,6 +2,7 @@
 
 #include "common/constants.hpp"
 #include "common/copy_traits.hpp"
+#include "cuda/hash_table.hpp"
 #include "data/data_type.hpp"
 
 #include <atomic>
@@ -19,7 +20,6 @@ enum class OpCode : uint32_t {
     OP_SORT,
     OP_PERMUTE,
     OP_SORT_MERGE_JOIN_COUNT,
-    OP_SORT_MERGE_JOIN_PREPARE,
     OP_SORT_MERGE_JOIN_WRITE,
     OP_HASH_JOIN_BUILD,
     OP_HASH_JOIN_COUNT,
@@ -88,13 +88,6 @@ union alignas(16) CommandArgs {
         DataTypeId type_id;
     } sort_merge_join_count;
 
-    struct SortMergeJoinPrepareArgs {
-        int64_t* rowids;
-        size_t n;
-        size_t n_rows;
-        int64_t seed;
-    } sort_merge_join_prepare;
-
     struct SortMergeJoinWriteArgs {
         JoinColumn left;
         JoinColumn right;
@@ -106,23 +99,15 @@ union alignas(16) CommandArgs {
 
     struct HashJoinBuildArgs {
         void* keys;
-        int64_t* rowids;
         size_t n;
-        void* ht_entries; // HashTableEntry<T>*
-        uint32_t* ht_heads;
-        uint32_t* ht_counter;
-        uint32_t ht_capacity;
-        uint32_t ht_num_buckets;
+        HashTable ht;
         DataTypeId type_id;
     } hash_join_build;
 
     struct HashJoinCountArgs {
         void* probe_keys;
         size_t probe_n;
-        void* ht_entries;
-        uint32_t* ht_heads;
-        uint32_t ht_capacity;
-        uint32_t ht_num_buckets;
+        HashTable ht;
         size_t* out_count;
         DataTypeId type_id;
     } hash_join_count;
@@ -131,10 +116,7 @@ union alignas(16) CommandArgs {
         void* probe_keys;
         int64_t* probe_rowids;
         size_t probe_n;
-        void* ht_entries;
-        uint32_t* ht_heads;
-        uint32_t ht_capacity;
-        uint32_t ht_num_buckets;
+        HashTable ht;
         int64_t* out_left;
         int64_t* out_right;
         uint32_t* write_offset;
