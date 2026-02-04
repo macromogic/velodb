@@ -34,20 +34,7 @@ public:
 
     Table build() &&;
 
-    /**
-     * @brief Enable streaming mode for memory-efficient loading.
-     *
-     * In streaming mode, data is directly appended to Column objects
-     * instead of being buffered in pending_columns_. This reduces peak
-     * memory usage from ~2x data size to ~1x for large tables.
-     *
-     * @param estimated_rows Estimated number of rows for pre-allocation
-     */
     void enableStreamingMode(size_t estimated_rows = 0);
-
-    /**
-     * @brief Check if streaming mode is enabled.
-     */
     bool isStreamingMode() const { return streaming_mode_; }
 
 private:

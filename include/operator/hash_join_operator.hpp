@@ -13,17 +13,6 @@ namespace velodb {
 // Forward declarations
 class AbstractExpression;
 
-/**
- * @brief Streaming Hash Join Operator
- *
- * Build phase: Collects all rows from build side (left child) and constructs hash table.
- * Probe phase: Streams probe batches from right child, probing hash table per batch.
- *
- * This streaming approach avoids creating a single massive output batch, which:
- * 1. Reduces peak memory usage
- * 2. Allows downstream operators (like MaterializationOperator) to process smaller
- *    batches with much less bitonic sort padding overhead
- */
 class HashJoinOperator : public BinaryOperator {
 public:
     HashJoinOperator(ExecutionContext& context,
@@ -45,20 +34,10 @@ private:
         return static_cast<int64_t>(seed);
     }
 
-    /**
-     * @brief Build the hash table from left child (one-time operation)
-     * @return true if build succeeded and has data, false if empty
-     */
     bool buildHashTable();
 
-    /**
-     * @brief Probe hash table with a single batch from probe side
-     */
     Result<RowBatch> probeWithBatch(RowBatch& probe_batch);
 
-    /**
-     * @brief Cleanup GPU resources
-     */
     void cleanup();
 
     // Configuration

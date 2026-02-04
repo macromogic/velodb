@@ -8,13 +8,6 @@
 
 namespace velodb {
 
-/**
- * @brief FilterCompactionOperator performs oblivious compaction on GPU.
- *
- * This operator uses double-buffering to overlap H2D transfers with GPU computation:
- * - While GPU processes current batch, next batch is being transferred
- * - This hides most of the H2D transfer latency
- */
 class FilterCompactionOperator : public UnaryOperator {
 public:
     FilterCompactionOperator(ExecutionContext& context, Schema output_schema, std::unique_ptr<AbstractOperator> child);

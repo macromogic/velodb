@@ -7,31 +7,11 @@
 
 namespace velodb {
 
-/**
- * @brief A simple memory pool for pageable (regular) host memory.
- *
- * This class provides a unified interface for allocating and deallocating
- * regular host memory. Unlike HostMemoryPool which uses cudaMallocHost for
- * pinned memory, this uses standard malloc/free.
- *
- * The main advantages of pageable memory:
- * - No limit on total allocation size (unlike pinned memory)
- * - Works well in memory-constrained environments (TDX+CC)
- * - Can be swapped to disk if needed
- *
- * The main disadvantage:
- * - Cannot be used directly for DMA transfers; requires staging through pinned memory
- */
 class PageableMemoryPool : private NonCopyable {
 public:
     PageableMemoryPool() = default;
     ~PageableMemoryPool() = default;
 
-    /**
-     * @brief Allocate memory from the pool.
-     * @param size Number of bytes to allocate
-     * @return Pointer to allocated memory, or nullptr on failure
-     */
     void* allocate(size_t size)
     {
         if (size == 0) {
@@ -53,11 +33,6 @@ public:
         return ptr;
     }
 
-    /**
-     * @brief Deallocate memory back to the pool.
-     * @param ptr Pointer to memory to deallocate
-     * @param size Size of the allocation (for tracking purposes)
-     */
     void deallocate(void* ptr, size_t size)
     {
         if (!ptr) {
@@ -75,36 +50,24 @@ public:
         }
     }
 
-    /**
-     * @brief Get the current amount of allocated memory.
-     */
     size_t currentAllocated() const
     {
         std::lock_guard<std::mutex> lock(stats_mutex_);
         return current_allocated_;
     }
 
-    /**
-     * @brief Get the peak amount of allocated memory.
-     */
     size_t peakAllocated() const
     {
         std::lock_guard<std::mutex> lock(stats_mutex_);
         return peak_allocated_;
     }
 
-    /**
-     * @brief Get the total amount of memory allocated over the lifetime of the pool.
-     */
     size_t totalAllocated() const
     {
         std::lock_guard<std::mutex> lock(stats_mutex_);
         return total_allocated_;
     }
 
-    /**
-     * @brief Get the singleton instance.
-     */
     static PageableMemoryPool& getInstance()
     {
         static PageableMemoryPool instance;

@@ -134,29 +134,6 @@ Result<RowBatch> SortMergeJoinOperator::next()
     int64_t* d_out_right_indices; // Contains indices into Right Batch
     CHECKED_CALL_THROW(cudaMallocAsync(&d_out_right_indices, h_padded_rows * sizeof(int64_t), stream_handle->get()));
 
-    // Initialize output indices with random VALID indices from batch to satisfy Oblivious RAM access pattern
-    // We use PREPARE to generate random indices in range [0, batch_size)
-    // Note: This fills the 'dummy' slots. Real matches will be overwritten by WRITE.
-    Command cmd_prepare_left = {};
-    cmd_prepare_left.opcode = OpCode::OP_SORT_MERGE_JOIN_PREPARE;
-    cmd_prepare_left.args = { .sort_merge_join_prepare = {
-                                  .rowids = d_out_left_indices,
-                                  .n = h_padded_rows,
-                                  .n_rows = left_batch.getRowCount(), // Random range comes from this
-                                  .seed = getSeed(),
-                              } };
-    task_manager.submitCommand(cmd_prepare_left);
-
-    Command cmd_prepare_right = {};
-    cmd_prepare_right.opcode = OpCode::OP_SORT_MERGE_JOIN_PREPARE;
-    cmd_prepare_right.args = { .sort_merge_join_prepare = {
-                                   .rowids = d_out_right_indices,
-                                   .n = h_padded_rows,
-                                   .n_rows = right_batch.getRowCount(), // Random range comes from this
-                                   .seed = getSeed(),
-                               } };
-    task_manager.waitCommand(task_manager.submitCommand(cmd_prepare_right));
-
     // Perform Write (Overwrite hits with correct indices)
     Command cmd_join = {};
     cmd_join.opcode = OpCode::OP_SORT_MERGE_JOIN_WRITE;

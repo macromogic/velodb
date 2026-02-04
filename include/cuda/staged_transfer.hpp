@@ -12,27 +12,8 @@
 
 namespace velodb {
 
-/**
- * @brief Staged data transfer utilities for pageable memory <-> device memory.
- *
- * Since pageable memory cannot be used directly for DMA transfers, we use
- * a staging buffer (pinned memory) as an intermediate step:
- *
- * Pageable -> Device: pageable --memcpy--> staging --cudaMemcpyAsync--> device
- * Device -> Pageable: device --cudaMemcpyAsync--> staging --memcpy--> pageable
- *
- * The transfers are done in chunks to allow pipelining and overlap with computation.
- */
 class StagedTransfer {
 public:
-    /**
-     * @brief Transfer data from pageable host memory to device memory.
-     *
-     * @param device_dst Destination pointer in device memory
-     * @param pageable_src Source pointer in pageable host memory
-     * @param total_bytes Total number of bytes to transfer
-     * @param stream CUDA stream to use for async operations (optional, uses staging buffer's stream if null)
-     */
     static void toDevice(void* device_dst, const void* pageable_src, size_t total_bytes, cudaStream_t stream = nullptr)
     {
         PROFILE_SCOPE("StagedTransfer::toDevice");
@@ -75,14 +56,6 @@ public:
         }
     }
 
-    /**
-     * @brief Transfer data from device memory to pageable host memory.
-     *
-     * @param pageable_dst Destination pointer in pageable host memory
-     * @param device_src Source pointer in device memory
-     * @param total_bytes Total number of bytes to transfer
-     * @param stream CUDA stream to use for async operations (optional, uses staging buffer's stream if null)
-     */
     static void toHost(void* pageable_dst, const void* device_src, size_t total_bytes, cudaStream_t stream = nullptr)
     {
         PROFILE_SCOPE("StagedTransfer::toHost");
@@ -125,16 +98,6 @@ public:
         }
     }
 
-    /**
-     * @brief Transfer data with double buffering for better throughput.
-     *
-     * Uses two staging buffers to overlap CPU memcpy with GPU DMA transfers.
-     * This can significantly improve throughput for large transfers.
-     *
-     * @param device_dst Destination pointer in device memory
-     * @param pageable_src Source pointer in pageable host memory
-     * @param total_bytes Total number of bytes to transfer
-     */
     static void toDevicePipelined(void* device_dst, const void* pageable_src, size_t total_bytes)
     {
         PROFILE_SCOPE("H2D Transfer: StagedTransfer");
@@ -203,13 +166,6 @@ public:
         pool.release(staging2);
     }
 
-    /**
-     * @brief Transfer data from device to pageable with double buffering.
-     *
-     * @param pageable_dst Destination pointer in pageable host memory
-     * @param device_src Source pointer in device memory
-     * @param total_bytes Total number of bytes to transfer
-     */
     static void toHostPipelined(void* pageable_dst, const void* device_src, size_t total_bytes)
     {
         PROFILE_SCOPE("D2H Transfer: StagedTransfer");

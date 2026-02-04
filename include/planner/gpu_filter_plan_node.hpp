@@ -8,13 +8,6 @@
 
 namespace velodb {
 
-/**
- * @brief Plan node for GPU-based filtering.
- *
- * This is used to apply filter predicates on data that is already on the GPU,
- * such as intermediate join results. Unlike FilterCompactionPlanNode which relies
- * on a pre-computed $_mask column, this node evaluates the predicate directly.
- */
 class GpuFilterPlanNode : public AbstractPlanNode {
 public:
     GpuFilterPlanNode(Schema output_schema, std::unique_ptr<AbstractExpression> predicate);

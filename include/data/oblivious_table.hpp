@@ -15,22 +15,6 @@
 
 namespace velodb {
 
-/**
- * @brief Memory-efficient oblivious table using virtual shuffle
- *
- * Instead of physically moving data, we maintain a position map that
- * represents a "virtual" shuffled view of the table. Each query access
- * goes through the position map, and after each query we compose a new
- * random permutation into the position map.
- *
- * Memory overhead: O(N) for position map only (~4 bytes per row)
- *
- * The shuffle is performed via persistent kernel command queue:
- * 1. CPU generates random permutation σ (Fisher-Yates)
- * 2. Upload σ to GPU
- * 3. Submit OP_COMPOSE_POSITION_MAP command
- * 4. Next query waits only if accessing same table
- */
 class ObliviousTable : private NonCopyable {
 public:
     ObliviousTable(const std::string& name, Table* source, TaskManager& task_manager);
@@ -48,45 +32,20 @@ public:
     // Position Map Access
     // ========================================================================
 
-    /**
-     * @brief Get physical position for a logical record ID
-     *
-     * Note: During shuffle, this returns from the "active" map.
-     */
     uint32_t getPosition(uint32_t record_id) const { return h_position_map_[record_id]; }
 
-    /**
-     * @brief Get GPU pointer to active position map
-     */
     uint32_t* getPositionMapDevice() const { return d_position_map_active_; }
 
-    /**
-     * @brief Ensure position map is uploaded to GPU (if dirty)
-     */
     void syncPositionMapToGPU();
 
     // ========================================================================
     // Async Virtual Shuffle
     // ========================================================================
 
-    /**
-     * @brief Start asynchronous virtual shuffle via command queue
-     *
-     * Generates a new random permutation and submits a compose command.
-     * Non-blocking - returns immediately.
-     */
     void startAsyncShuffle();
 
-    /**
-     * @brief Wait for pending shuffle to complete
-     *
-     * After this returns, the new position map is active.
-     */
     void waitForShuffle();
 
-    /**
-     * @brief Check if a shuffle is in progress
-     */
     bool isShuffling() const { return shuffle_in_progress_.load(); }
 
     // ========================================================================

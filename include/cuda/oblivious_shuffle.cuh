@@ -7,11 +7,6 @@
 
 namespace velodb::cuda {
 
-/**
- * @brief Compose position map with permutation (device function)
- *
- * new_map[i] = old_map[sigma[i]]
- */
 __device__ __forceinline__ void executeComposePositionMap(CommandArgs::ComposePositionMapArgs& args,
                                                           [[maybe_unused]] cg::grid_group& grid)
 {
@@ -25,11 +20,6 @@ __device__ __forceinline__ void executeComposePositionMap(CommandArgs::ComposePo
     }
 }
 
-/**
- * @brief Enrich record IDs with physical positions (device function)
- *
- * positions[i] = position_map[record_ids[i]]
- */
 __device__ __forceinline__ void executeEnrichPositions(CommandArgs::EnrichPositionsArgs& args,
                                                        [[maybe_unused]] cg::grid_group& grid)
 {

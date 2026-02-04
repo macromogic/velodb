@@ -82,12 +82,6 @@ public:
         }
     }
 
-    /**
-     * @brief Reset the memory pool to its initial state.
-     *
-     * This should only be called when no allocations are active.
-     * Used to defragment the pool between benchmark runs.
-     */
     void reset()
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -95,9 +89,6 @@ public:
         free_blocks_[base_ptr_] = total_size_;
     }
 
-    /**
-     * @brief Get the total free memory available in the pool.
-     */
     size_t totalFreeMemory() const
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -108,9 +99,6 @@ public:
         return total;
     }
 
-    /**
-     * @brief Get the largest contiguous free block available.
-     */
     size_t largestFreeBlock() const
     {
         std::lock_guard<std::mutex> lock(mutex_);

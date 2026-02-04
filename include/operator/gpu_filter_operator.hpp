@@ -7,13 +7,6 @@
 
 namespace velodb {
 
-/**
- * @brief GPU-based filter operator.
- *
- * Evaluates a predicate on GPU data and compacts the result.
- * This is used for post-join filtering when some join predicates
- * couldn't be applied during the join itself.
- */
 class GpuFilterOperator : public UnaryOperator {
 public:
     GpuFilterOperator(ExecutionContext& context,

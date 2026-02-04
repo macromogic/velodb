@@ -210,19 +210,6 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
                                        stream_handle->get()));
     stream_handle->synchronize();
 
-    // Fill output with random valid indices for ORAM padding
-    Command cmd_prepare_left = {};
-    cmd_prepare_left.opcode = OpCode::OP_SORT_MERGE_JOIN_PREPARE;
-    cmd_prepare_left.args.sort_merge_join_prepare
-        = { .rowids = d_out_left_indices, .n = h_padded_rows, .n_rows = build_size_, .seed = getSeed() };
-    task_manager.submitCommand(cmd_prepare_left);
-
-    Command cmd_prepare_right = {};
-    cmd_prepare_right.opcode = OpCode::OP_SORT_MERGE_JOIN_PREPARE;
-    cmd_prepare_right.args.sort_merge_join_prepare
-        = { .rowids = d_out_right_indices, .n = h_padded_rows, .n_rows = probe_n, .seed = getSeed() };
-    task_manager.waitCommand(task_manager.submitCommand(cmd_prepare_right));
-
     // ========================================================================
     // Step 3: Write join results
     // ========================================================================

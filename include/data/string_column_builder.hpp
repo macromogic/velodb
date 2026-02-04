@@ -13,22 +13,6 @@
 
 namespace velodb {
 
-/**
- * @brief Memory-efficient builder for string columns.
- *
- * Instead of storing Value objects (~80 bytes each), this builder uses:
- * 1. A compact string pool (all strings concatenated)
- * 2. Offset array to locate each string
- * 3. Hash map for deduplication during insert
- *
- * Memory usage comparison for N strings of average length L:
- * - Value-based: N * 80 bytes (Value overhead)
- * - This builder: N * 4 bytes (offsets) + N * L bytes (unique strings)
- *
- * For TPC-H lineitem (300M rows, SF=50):
- * - Value-based: ~24 GB just for Value objects
- * - This builder: ~1.2 GB for offsets + string data
- */
 class StringColumnBuilder : private NonCopyable {
 public:
     explicit StringColumnBuilder(size_t estimated_rows = 0)
@@ -39,10 +23,6 @@ public:
         }
     }
 
-    /**
-     * @brief Append a string value.
-     * @param str The string to append (will be deduplicated)
-     */
     void append(std::string_view str)
     {
         null_flags_.push_back(false);
@@ -65,28 +45,16 @@ public:
         ordinals_.push_back(id);
     }
 
-    /**
-     * @brief Append a null value.
-     */
     void appendNull()
     {
         null_flags_.push_back(true);
         ordinals_.push_back(0); // Placeholder, won't be used
     }
 
-    /**
-     * @brief Get the number of rows.
-     */
     size_t size() const { return ordinals_.size(); }
 
-    /**
-     * @brief Get the number of unique strings.
-     */
     size_t uniqueCount() const { return unique_strings_.size(); }
 
-    /**
-     * @brief Get approximate memory usage in bytes.
-     */
     size_t memoryUsage() const
     {
         size_t usage = ordinals_.capacity() * sizeof(size_t);
@@ -98,15 +66,6 @@ public:
         return usage;
     }
 
-    /**
-     * @brief Build a ValueVector<OrdinalString> from the collected data.
-     *
-     * This method sorts the dictionary and remaps ordinals to maintain
-     * the sorted order required by OrdinalString comparison operations.
-     *
-     * @param location Where to allocate the result
-     * @return A complete ValueVector<OrdinalString>
-     */
     ValueVector<OrdinalString> build(DataLocation location = DataLocation::HOST)
     {
         size_t n = ordinals_.size();
@@ -167,9 +126,6 @@ public:
         return vec;
     }
 
-    /**
-     * @brief Reserve capacity for the expected number of rows.
-     */
     void reserve(size_t row_count)
     {
         ordinals_.reserve(row_count);

@@ -14,19 +14,6 @@
 
 namespace velodb {
 
-/**
- * @brief A pool of fixed-size pinned memory buffers for staging data transfers.
- *
- * This class provides a small set of reusable pinned memory buffers that can be used
- * as intermediate staging areas for transfers between pageable host memory and device memory.
- * This allows the main data to reside in regular (pageable) memory while only using a small
- * amount of pinned memory for actual DMA transfers.
- *
- * Key features:
- * - Fixed number of fixed-size buffers allocated at startup
- * - Thread-safe acquire/release with blocking wait when all buffers are in use
- * - Designed to work with persistent kernels (no cudaFreeHost during operation)
- */
 class StagingBufferPool : private NonCopyable {
 public:
     struct StagingBuffer {
@@ -44,11 +31,6 @@ public:
         }
     };
 
-    /**
-     * @brief Construct a staging buffer pool.
-     * @param buffer_size Size of each staging buffer (default: 256MB for better throughput)
-     * @param num_buffers Number of buffers in the pool (default: 8 for prefetch support)
-     */
     explicit StagingBufferPool(size_t buffer_size = 256 * 1024 * 1024, size_t num_buffers = 8)
         : buffer_size_(buffer_size)
         , num_buffers_(num_buffers)
@@ -97,11 +79,6 @@ public:
         }
     }
 
-    /**
-     * @brief Acquire a staging buffer from the pool.
-     * Blocks if no buffer is available.
-     * @return Pointer to a StagingBuffer, or nullopt if pool is shutting down
-     */
     std::optional<StagingBuffer*> acquire()
     {
         std::unique_lock<std::mutex> lock(mutex_);
@@ -130,10 +107,6 @@ public:
         return std::nullopt; // Should not reach here
     }
 
-    /**
-     * @brief Try to acquire a staging buffer without blocking.
-     * @return Pointer to a StagingBuffer, or nullopt if none available
-     */
     std::optional<StagingBuffer*> tryAcquire()
     {
         std::unique_lock<std::mutex> lock(mutex_);
@@ -148,10 +121,6 @@ public:
         return std::nullopt;
     }
 
-    /**
-     * @brief Release a staging buffer back to the pool.
-     * @param buffer The buffer to release
-     */
     void release(StagingBuffer* buffer)
     {
         if (!buffer)
@@ -166,19 +135,9 @@ public:
         cv_.notify_one();
     }
 
-    /**
-     * @brief Get the size of each staging buffer.
-     */
     size_t bufferSize() const { return buffer_size_; }
-
-    /**
-     * @brief Get the number of buffers in the pool.
-     */
     size_t numBuffers() const { return num_buffers_; }
 
-    /**
-     * @brief Get the singleton instance of the staging buffer pool.
-     */
     static StagingBufferPool& getInstance()
     {
         // Default: 4 buffers of 64MB each = 256MB total pinned memory
@@ -196,9 +155,6 @@ private:
     std::atomic<bool> shutdown_;
 };
 
-/**
- * @brief RAII wrapper for staging buffer acquisition.
- */
 class StagingBufferGuard : private NonCopyable {
 public:
     explicit StagingBufferGuard(StagingBufferPool& pool)
