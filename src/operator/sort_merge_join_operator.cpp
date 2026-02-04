@@ -180,7 +180,7 @@ Result<RowBatch> SortMergeJoinOperator::next()
         cmd_permute.args.permute = { .out_data = d_out_data,
                                      .in_data = col.rawData(),
                                      .in_indices = static_cast<const int64_t*>(left_indices_col.rawData()),
-                                     .n = h_padded_rows,
+                                     .n = h_row_count,
                                      .type_id = type_id };
         last_id = task_manager.submitCommand(cmd_permute);
 
@@ -193,7 +193,7 @@ Result<RowBatch> SortMergeJoinOperator::next()
         cmd_mask.args.permute = { .out_data = d_out_mask,
                                   .in_data = col.rawBitmapData(),
                                   .in_indices = static_cast<const int64_t*>(left_indices_col.rawData()),
-                                  .n = h_padded_rows,
+                                  .n = h_row_count,
                                   .type_id = DataTypeId::BOOLEAN };
         last_id = task_manager.submitCommand(cmd_mask);
 
@@ -218,7 +218,7 @@ Result<RowBatch> SortMergeJoinOperator::next()
         cmd_permute.args.permute = { .out_data = d_out_data,
                                      .in_data = col.rawData(),
                                      .in_indices = static_cast<const int64_t*>(right_indices_col.rawData()),
-                                     .n = h_padded_rows,
+                                     .n = h_row_count,
                                      .type_id = type_id };
         last_id = task_manager.submitCommand(cmd_permute);
 
@@ -231,7 +231,7 @@ Result<RowBatch> SortMergeJoinOperator::next()
         cmd_mask.args.permute = { .out_data = d_out_mask,
                                   .in_data = col.rawBitmapData(),
                                   .in_indices = static_cast<const int64_t*>(right_indices_col.rawData()),
-                                  .n = h_padded_rows,
+                                  .n = h_row_count,
                                   .type_id = DataTypeId::BOOLEAN };
         last_id = task_manager.submitCommand(cmd_mask);
 

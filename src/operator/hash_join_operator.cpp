@@ -264,25 +264,27 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
 
         void* d_out_data;
         CHECKED_CALL_THROW(cudaMallocAsync(&d_out_data, h_padded_rows * type_size, stream_handle->get()));
+        stream_handle->synchronize();
 
         Command cmd_permute = {};
         cmd_permute.opcode = OpCode::OP_PERMUTE;
         cmd_permute.args.permute = { .out_data = d_out_data,
                                      .in_data = col.rawData(),
                                      .in_indices = static_cast<const int64_t*>(left_indices_col.rawData()),
-                                     .n = h_padded_rows,
+                                     .n = h_match_count,
                                      .type_id = type_id };
         last_id = task_manager.submitCommand(cmd_permute);
 
         void* d_out_mask;
         CHECKED_CALL_THROW(cudaMallocAsync(&d_out_mask, h_padded_rows * sizeof(uint8_t), stream_handle->get()));
+        stream_handle->synchronize();
 
         Command cmd_mask = {};
         cmd_mask.opcode = OpCode::OP_PERMUTE;
         cmd_mask.args.permute = { .out_data = d_out_mask,
                                   .in_data = col.rawBitmapData(),
                                   .in_indices = static_cast<const int64_t*>(left_indices_col.rawData()),
-                                  .n = h_padded_rows,
+                                  .n = h_match_count,
                                   .type_id = DataTypeId::BOOLEAN };
         last_id = task_manager.submitCommand(cmd_mask);
 
@@ -301,25 +303,27 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
 
         void* d_out_data;
         CHECKED_CALL_THROW(cudaMallocAsync(&d_out_data, h_padded_rows * type_size, stream_handle->get()));
+        stream_handle->synchronize();
 
         Command cmd_permute = {};
         cmd_permute.opcode = OpCode::OP_PERMUTE;
         cmd_permute.args.permute = { .out_data = d_out_data,
                                      .in_data = col.rawData(),
                                      .in_indices = static_cast<const int64_t*>(right_indices_col.rawData()),
-                                     .n = h_padded_rows,
+                                     .n = h_match_count,
                                      .type_id = type_id };
         last_id = task_manager.submitCommand(cmd_permute);
 
         void* d_out_mask;
         CHECKED_CALL_THROW(cudaMallocAsync(&d_out_mask, h_padded_rows * sizeof(uint8_t), stream_handle->get()));
+        stream_handle->synchronize();
 
         Command cmd_mask = {};
         cmd_mask.opcode = OpCode::OP_PERMUTE;
         cmd_mask.args.permute = { .out_data = d_out_mask,
                                   .in_data = col.rawBitmapData(),
                                   .in_indices = static_cast<const int64_t*>(right_indices_col.rawData()),
-                                  .n = h_padded_rows,
+                                  .n = h_match_count,
                                   .type_id = DataTypeId::BOOLEAN };
         last_id = task_manager.submitCommand(cmd_mask);
 
