@@ -99,6 +99,7 @@ union alignas(16) CommandArgs {
 
     struct HashJoinBuildArgs {
         void* keys;
+        const uint8_t* mask;
         size_t n;
         HashTable ht;
         DataTypeId type_id;
@@ -106,6 +107,7 @@ union alignas(16) CommandArgs {
 
     struct HashJoinCountArgs {
         void* probe_keys;
+        const uint8_t* probe_mask;
         size_t probe_n;
         HashTable ht;
         size_t* out_count;
@@ -114,6 +116,7 @@ union alignas(16) CommandArgs {
 
     struct HashJoinWriteArgs {
         void* probe_keys;
+        const uint8_t* probe_mask;
         int64_t* probe_rowids;
         size_t probe_n;
         HashTable ht;

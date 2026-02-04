@@ -19,8 +19,8 @@ fi
 # Collect benchmark results
 COMBINED_CSV="$BENCHMARK_DIR/results/benchmark_results.csv"
 echo "Query,Iteration,Engine,Time" > "$COMBINED_CSV"
-tail -n +2 "$VELODB_CSV" | awk -F',' '{print $1","$3",VelODB,"$4}' >> "$COMBINED_CSV"
-tail -n +2 "$PANDAS_CSV" | awk -F',' '{print $1","$2",Pandas,"$3}' >> "$COMBINED_CSV"
+tail -n +2 "$VELODB_CSV" | awk -F',' '{print $1","$3",VelODB,"$4/1000}' >> "$COMBINED_CSV"
+tail -n +2 "$PANDAS_CSV" | awk -F',' '{print $1","$2",Pandas,"($3=="TIMEOUT"?$3:$3/1000)}' >> "$COMBINED_CSV"
 
 # Plot benchmark results
 source "$SCRIPTS_DIR/ensure_conda_env.sh"
@@ -30,8 +30,9 @@ BENCHMARK_PLOT="$FIGURE_DIR/benchmark_pandas.pdf"
 python3 "$SCRIPTS_DIR/plot_bars.py" \
     -i "$COMBINED_CSV" \
     -o "$BENCHMARK_PLOT" \
+    --ylabel "Time (s)" \
     --bar-labels \
     --rotate-labels \
     --figsize 6,4 \
-    --timeout-label ">60000" \
+    --timeout-label ">60" \
     --ylim-scale 1.2

@@ -49,6 +49,7 @@ private:
         std::unique_ptr<AbstractPlanNode> plan;
         std::vector<std::string> table_aliases;
         std::vector<const Table*> source_tables;
+        Schema seq_scan_schema; // Original schema from SeqScan (includes mask column)
     };
 
     std::unique_ptr<AbstractPlanNode> planTables(const hsql::TableRef* table_ref,

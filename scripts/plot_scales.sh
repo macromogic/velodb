@@ -12,7 +12,7 @@ for SF in 1 2 3 5 10; do
         echo "Error: No benchmark results found in $BENCHMARK_DIR/results/sf_$SF"
         exit 1
     fi
-    tail -n +2 "$VELODB_CSV" | awk -F',' -v SF="$SF" '{print $1","$3","SF","$4}' >> "$COMBINED_CSV"
+    tail -n +2 "$VELODB_CSV" | awk -F',' -v SF="$SF" '{print $1","$3","SF","$4/1000}' >> "$COMBINED_CSV"
 done
 
 # Plot benchmark results
@@ -22,12 +22,14 @@ mkdir -p "$FIGURE_DIR"
 python3 "$SCRIPTS_DIR/plot_lines.py" \
     -i "$COMBINED_CSV" \
     -o "$FIGURE_DIR/benchmark_scales_binary_join.pdf" \
+    --ylabel "Time (s)" \
     --hue "Query" \
-    --figsize 4,5 \
+    --figsize 4,4 \
     --queries "Q4,Q12,Q15"
 python3 "$SCRIPTS_DIR/plot_lines.py" \
     -i "$COMBINED_CSV" \
     -o "$FIGURE_DIR/benchmark_scales_multi_join.pdf" \
+    --ylabel "Time (s)" \
     --hue "Query" \
-    --figsize 4,5 \
+    --figsize 4,4 \
     --queries "Q5,Q10,Q18"

@@ -232,8 +232,11 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef*
 
     // 4. Greedy Join Loop
     if (active_plans.size() == 1) {
-        // For single table, we skip the join logic
-        return std::move(active_plans.front().plan);
+        // For single table, always add FilterCompaction (no join to handle mask)
+        auto& node_info = active_plans.front();
+        auto filter = std::make_unique<FilterCompactionPlanNode>(std::move(node_info.seq_scan_schema));
+        filter->addChild(std::move(node_info.plan));
+        return std::move(filter);
     } else {
         // 4a. Pre-process: Collect all join keys for each table (deduplicated)
         std::unordered_map<std::string, std::unordered_set<std::string>> table_join_key_set;
@@ -265,7 +268,7 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef*
             table_join_key_set[std::string(right_alias)].insert(std::string(right_name));
         }
 
-        // 4b. Add projection to each leaf node: join keys + $_rowid
+        // 4b. Add projection to each leaf node: join keys + $_rowid (+ $_mask for hash join)
         for (auto& node_info : active_plans) {
             const auto& alias = node_info.table_aliases.front();
             auto it = table_join_key_set.find(alias);
@@ -273,12 +276,20 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef*
             const auto& keys = it->second;
 
             auto rowid_col_name = fmt::format("{}.$_rowid", alias);
+            auto mask_col_name = fmt::format("{}.$_mask", alias);
             auto& in_schema = node_info.plan->getOutputSchema();
+
+            // For sort-merge join, add FilterCompaction before projection (mask will be dropped)
+            if (join_strategy_ != JoinStrategy::HASH_JOIN) {
+                auto filter = std::make_unique<FilterCompactionPlanNode>(std::move(node_info.seq_scan_schema));
+                filter->addChild(std::move(node_info.plan));
+                node_info.plan = std::move(filter);
+            }
 
             std::vector<std::unique_ptr<AbstractExpression>> proj_exprs;
             std::vector<ColumnInfo> proj_cols;
-            proj_exprs.reserve(keys.size() + 1);
-            proj_cols.reserve(keys.size() + 1);
+            proj_exprs.reserve(keys.size() + 2);
+            proj_cols.reserve(keys.size() + 2);
 
             // Add all join key columns
             for (const auto& key : keys) {
@@ -294,6 +305,15 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef*
             proj_exprs.push_back(
                 std::make_unique<ColumnRefExpression>("", rowid_col_name, DataType::createType(DataTypeId::BIGINT)));
             proj_cols.push_back(rowid_col_info.clone());
+
+            // For hash join, also add $_mask column (will be consumed by hash join operator)
+            if (join_strategy_ == JoinStrategy::HASH_JOIN) {
+                const auto& mask_col_info = in_schema.getColumnInfo(mask_col_name);
+                proj_exprs.push_back(std::make_unique<ColumnRefExpression>("",
+                                                                           mask_col_name,
+                                                                           DataType::createType(DataTypeId::BOOLEAN)));
+                proj_cols.push_back(mask_col_info.clone());
+            }
 
             auto proj_plan = std::make_unique<ProjectionPlanNode>(in_schema.clone(),
                                                                   Schema(std::move(proj_cols)),
@@ -363,19 +383,48 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef*
             size_t left_key_idx = root_node.plan->getOutputSchema().getColumnIndex(root_col->getColumnName());
             size_t right_key_idx = right_node.plan->getOutputSchema().getColumnIndex(next_col->getColumnName());
 
-            // Merge Metadata for output schema
-            auto output_schema = root_node.plan->getOutputSchema().clone();
-            for (const auto& col : right_node.plan->getOutputSchema()) {
-                output_schema.addColumnInfo(col.clone());
-            }
-
             std::unique_ptr<AbstractPlanNode> join_node;
             if (join_strategy_ == JoinStrategy::HASH_JOIN) {
-                // Hash join: no pre-sorting required
+                // Hash join: find mask columns and build output schema without them
+                const auto& left_schema = root_node.plan->getOutputSchema();
+                const auto& right_schema = right_node.plan->getOutputSchema();
+
+                // Find mask column indices in left and right schemas
+                ssize_t left_mask_idx = -1;
+                ssize_t right_mask_idx = -1;
+                for (size_t i = 0; i < left_schema.getColumnCount(); ++i) {
+                    const auto& [table_alias, col_name] = splitName(left_schema.getColumnInfo(i).getName());
+                    if (col_name == "$_mask") {
+                        left_mask_idx = static_cast<ssize_t>(i);
+                        break;
+                    }
+                }
+                for (size_t i = 0; i < right_schema.getColumnCount(); ++i) {
+                    const auto& [table_alias, col_name] = splitName(right_schema.getColumnInfo(i).getName());
+                    if (col_name == "$_mask") {
+                        right_mask_idx = static_cast<ssize_t>(i);
+                        break;
+                    }
+                }
+
+                // Build output schema without mask columns
+                Schema output_schema;
+                for (size_t i = 0; i < left_schema.getColumnCount(); ++i) {
+                    if (static_cast<ssize_t>(i) != left_mask_idx) {
+                        output_schema.addColumnInfo(left_schema.getColumnInfo(i).clone());
+                    }
+                }
+                for (size_t i = 0; i < right_schema.getColumnCount(); ++i) {
+                    if (static_cast<ssize_t>(i) != right_mask_idx) {
+                        output_schema.addColumnInfo(right_schema.getColumnInfo(i).clone());
+                    }
+                }
+
                 join_node = std::make_unique<HashJoinPlanNode>(std::move(output_schema),
                                                                std::move(root_node.plan),
                                                                std::move(right_node.plan),
                                                                std::make_pair(left_key_idx, right_key_idx),
+                                                               std::make_pair(left_mask_idx, right_mask_idx),
                                                                root_node.source_tables,
                                                                right_node.source_tables);
             } else {
@@ -399,8 +448,8 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef*
                     right_node.plan = std::move(sort);
                 }
 
-                // Update output_schema after sorting (schema is the same, but plans changed)
-                output_schema = root_node.plan->getOutputSchema().clone();
+                // Build output_schema after sorting
+                Schema output_schema = root_node.plan->getOutputSchema().clone();
                 for (const auto& col : right_node.plan->getOutputSchema()) {
                     output_schema.addColumnInfo(col.clone());
                 }
@@ -558,11 +607,8 @@ QueryPlanner::JoinNodeInfo QueryPlanner::planTableLeaf(const hsql::TableRef* tab
     filters.clear();
     auto seq_scan = std::make_unique<SeqScanPlanNode>(*table, seq_scan_schema.clone(), std::move(predicate));
 
-    // 2. Filter Compaction
-    auto filter = std::make_unique<FilterCompactionPlanNode>(std::move(seq_scan_schema));
-    filter->addChild(std::move(seq_scan));
-
-    return { std::move(filter), { alias }, { &table->get() } };
+    // Return seq_scan directly - caller decides whether to add FilterCompaction
+    return { std::move(seq_scan), { alias }, { &table->get() }, std::move(seq_scan_schema) };
 }
 
 bool QueryPlanner::expressionReferencesTables(const AbstractExpression* expr, const std::vector<std::string>& tables)

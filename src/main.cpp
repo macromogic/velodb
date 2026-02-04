@@ -31,7 +31,7 @@ int main(int argc, char* argv[])
 
     program.add_argument("--join-strategy", "-j")
         .help("Join strategy to use {sort_merge, hash}")
-        .default_value(std::string("sort_merge"))
+        .default_value(std::string("hash"))
         .choices("sort_merge", "sort-merge", "smj", "hash", "hj");
 
     program.add_argument("--verbose").help("Enable verbose output").flag();

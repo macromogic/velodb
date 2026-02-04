@@ -20,6 +20,7 @@ public:
                      std::unique_ptr<AbstractOperator> left_child,
                      std::unique_ptr<AbstractOperator> right_child,
                      std::pair<size_t, size_t> join_key_indices,
+                     std::pair<ssize_t, ssize_t> mask_indices,
                      std::vector<const Table*> left_source_tables,
                      std::vector<const Table*> right_source_tables,
                      JoinType join_type = JoinType::INNER);
@@ -43,6 +44,7 @@ private:
 
     // Configuration
     std::pair<size_t, size_t> join_key_indices_;
+    std::pair<ssize_t, ssize_t> mask_indices_; // {build_mask_idx, probe_mask_idx}, -1 means no mask
     std::vector<const Table*> left_source_tables_;
     std::vector<const Table*> right_source_tables_;
     JoinType join_type_;

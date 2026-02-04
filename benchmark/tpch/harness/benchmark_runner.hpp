@@ -22,6 +22,7 @@ public:
         std::vector<double> scale_factors = { 0.01, 0.1, 1.0 };
         std::vector<int> query_numbers = { 1, 6, 12 }; // Start with simple queries
         int iterations = 3;
+        int warmup_iterations = 1; // Number of warmup runs before timing (results discarded)
         bool validate_results = true;
         bool verbose = true;
         bool with_profiling = false;

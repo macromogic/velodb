@@ -6,7 +6,7 @@ import argparse
 import os
 import numpy as np
 
-TIMEOUT_PLACEHOLDER = 0.01  # Will be replaced visually
+TIMEOUT_PLACEHOLDER = 1e-4
 
 
 def parse_query_num(query):
@@ -144,7 +144,7 @@ def main():
                         bar.set_visible(False)
                     else:
                         # Has some successful runs but also timeouts
-                        labels.append(f'{bar_height:.1f}\n(+{args.timeout_label})')
+                        labels.append(f'{bar_height:.2f}\n(+{args.timeout_label})')
                 elif bar_height <= 0:
                     labels.append('')
                 else:
@@ -153,12 +153,12 @@ def main():
                         base_time = base_values[query]
                         if base_time <= TIMEOUT_PLACEHOLDER:
                             # Base is timeout, just show absolute value
-                            labels.append(f'{bar_height:.1f}')
+                            labels.append(f'{bar_height:.2f}')
                         else:
                             speedup = bar_height / base_time
                             labels.append(f'{speedup:.2f}x')
                     else:
-                        labels.append(f'{bar_height:.1f}')
+                        labels.append(f'{bar_height:.2f}')
             label_rotation = 90 if args.rotate_labels else 0
             barplot.bar_label(container, labels=labels, padding=1, fontsize=8, fontweight='bold', rotation=label_rotation)
 

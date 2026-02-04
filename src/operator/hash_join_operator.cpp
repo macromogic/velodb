@@ -15,11 +15,13 @@ HashJoinOperator::HashJoinOperator(ExecutionContext& context,
                                    std::unique_ptr<AbstractOperator> left_child,
                                    std::unique_ptr<AbstractOperator> right_child,
                                    std::pair<size_t, size_t> join_key_indices,
+                                   std::pair<ssize_t, ssize_t> mask_indices,
                                    std::vector<const Table*> left_source_tables,
                                    std::vector<const Table*> right_source_tables,
                                    JoinType join_type)
     : BinaryOperator(context, std::move(output_schema), std::move(left_child), std::move(right_child))
     , join_key_indices_(join_key_indices)
+    , mask_indices_(mask_indices)
     , left_source_tables_(std::move(left_source_tables))
     , right_source_tables_(std::move(right_source_tables))
     , join_type_(join_type)
@@ -105,9 +107,16 @@ bool HashJoinOperator::buildHashTable()
     auto num_buckets = static_cast<uint32_t>(nextPow2(build_size_ * 2));
     initHashTable(key_type_id_, capacity, num_buckets);
 
+    // Get build side mask if available
+    const uint8_t* build_mask = nullptr;
+    if (mask_indices_.first >= 0) {
+        build_mask = static_cast<const uint8_t*>(build_batch_.getColumn(mask_indices_.first).rawData());
+    }
+
     Command cmd_build = {};
     cmd_build.opcode = OpCode::OP_HASH_JOIN_BUILD;
     cmd_build.args.hash_join_build = { .keys = build_batch_.getColumn(join_key_indices_.first).rawData(),
+                                       .mask = build_mask,
                                        .n = build_size_,
                                        .ht = ht_,
                                        .type_id = key_type_id_ };
@@ -132,6 +141,12 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
     auto& task_manager = context_.getTaskManager();
     auto stream_handle = StreamPool::getInstance().acquire().value();
 
+    // Get probe side mask if available
+    const uint8_t* probe_mask = nullptr;
+    if (mask_indices_.second >= 0) {
+        probe_mask = static_cast<const uint8_t*>(probe_batch.getColumn(mask_indices_.second).rawData());
+    }
+
     // ========================================================================
     // Step 1: Count matches for this probe batch
     // ========================================================================
@@ -143,6 +158,7 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
     Command cmd_count = {};
     cmd_count.opcode = OpCode::OP_HASH_JOIN_COUNT;
     cmd_count.args.hash_join_count = { .probe_keys = probe_batch.getColumn(join_key_indices_.second).rawData(),
+                                       .probe_mask = probe_mask,
                                        .probe_n = probe_n,
                                        .ht = ht_,
                                        .out_count = d_match_count,
@@ -192,6 +208,7 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
     Command cmd_write = {};
     cmd_write.opcode = OpCode::OP_HASH_JOIN_WRITE;
     cmd_write.args.hash_join_write = { .probe_keys = probe_batch.getColumn(join_key_indices_.second).rawData(),
+                                       .probe_mask = probe_mask,
                                        .probe_rowids = d_probe_indices,
                                        .probe_n = probe_n,
                                        .ht = ht_,
@@ -224,8 +241,12 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
 
     size_t last_id = 0;
 
-    // Gather Left (Build) Columns
+    // Gather Left (Build) Columns (skip mask column)
     for (size_t i = 0; i < build_batch_.getColumnCount(); ++i) {
+        // Skip mask column - it's been consumed by the join
+        if (mask_indices_.first >= 0 && i == static_cast<size_t>(mask_indices_.first)) {
+            continue;
+        }
         auto& col = build_batch_.getColumn(i);
         DataTypeId type_id = col.getType().getTypeId();
         size_t type_size = col.getType().size();
@@ -263,8 +284,12 @@ Result<RowBatch> HashJoinOperator::probeWithBatch(RowBatch& probe_batch)
                                                               h_padded_rows));
     }
 
-    // Gather Right (Probe) Columns
+    // Gather Right (Probe) Columns (skip mask column)
     for (size_t i = 0; i < probe_batch.getColumnCount(); ++i) {
+        // Skip mask column - it's been consumed by the join
+        if (mask_indices_.second >= 0 && i == static_cast<size_t>(mask_indices_.second)) {
+            continue;
+        }
         auto& col = probe_batch.getColumn(i);
         DataTypeId type_id = col.getType().getTypeId();
         size_t type_size = col.getType().size();
@@ -352,6 +377,7 @@ Result<RowBatch> HashJoinOperator::next()
         }
 
         // Probe hash table with this batch
+        probe_batch.to(DataLocation::CUDA);
         auto join_result = probeWithBatch(probe_batch);
         if (!join_result) {
             return join_result;

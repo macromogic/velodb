@@ -99,6 +99,7 @@ __device__ __forceinline__ void probeHashTableWrite(HashTableEntry<KeyT>* entrie
 
 template <typename KeyT>
 __device__ __forceinline__ void hashJoinBuildImpl(const KeyT* keys,
+                                                  const uint8_t* mask,
                                                   size_t n,
                                                   HashTableEntry<KeyT>* ht_entries,
                                                   uint32_t* ht_heads,
@@ -111,7 +112,9 @@ __device__ __forceinline__ void hashJoinBuildImpl(const KeyT* keys,
     size_t stride = grid.size();
 
     for (size_t i = tid; i < n; i += stride) {
-        insertHashTable<KeyT>(ht_entries, ht_heads, ht_counter, ht_num_buckets, ht_capacity, keys[i], i);
+        if (mask == nullptr || mask[i] != 0) {
+            insertHashTable<KeyT>(ht_entries, ht_heads, ht_counter, ht_num_buckets, ht_capacity, keys[i], i);
+        }
     }
 }
 
@@ -121,6 +124,7 @@ __device__ __forceinline__ void hashJoinBuildImpl(const KeyT* keys,
 
 template <typename KeyT>
 __device__ __forceinline__ void hashJoinCountImpl(const KeyT* probe_keys,
+                                                  const uint8_t* probe_mask,
                                                   size_t probe_n,
                                                   HashTableEntry<KeyT>* ht_entries,
                                                   uint32_t* ht_heads,
@@ -132,9 +136,11 @@ __device__ __forceinline__ void hashJoinCountImpl(const KeyT* probe_keys,
     size_t stride = grid.size();
 
     for (size_t i = tid; i < probe_n; i += stride) {
-        uint32_t matches = countHashTableMatches<KeyT>(ht_entries, ht_heads, ht_num_buckets, probe_keys[i]);
-        if (matches > 0) {
-            atomicAdd((unsigned long long*)out_count, matches);
+        if (probe_mask == nullptr || probe_mask[i] != 0) {
+            uint32_t matches = countHashTableMatches<KeyT>(ht_entries, ht_heads, ht_num_buckets, probe_keys[i]);
+            if (matches > 0) {
+                atomicAdd((unsigned long long*)out_count, matches);
+            }
         }
     }
 }
@@ -145,6 +151,7 @@ __device__ __forceinline__ void hashJoinCountImpl(const KeyT* probe_keys,
 
 template <typename KeyT>
 __device__ __forceinline__ void hashJoinWriteImpl(const KeyT* probe_keys,
+                                                  const uint8_t* probe_mask,
                                                   const int64_t* probe_rowids,
                                                   size_t probe_n,
                                                   HashTableEntry<KeyT>* ht_entries,
@@ -159,14 +166,16 @@ __device__ __forceinline__ void hashJoinWriteImpl(const KeyT* probe_keys,
     size_t stride = grid.size();
 
     for (size_t i = tid; i < probe_n; i += stride) {
-        probeHashTableWrite<KeyT>(ht_entries,
-                                  ht_heads,
-                                  ht_num_buckets,
-                                  probe_keys[i],
-                                  probe_rowids[i],
-                                  out_left,
-                                  out_right,
-                                  write_offset);
+        if (probe_mask == nullptr || probe_mask[i] != 0) {
+            probeHashTableWrite<KeyT>(ht_entries,
+                                      ht_heads,
+                                      ht_num_buckets,
+                                      probe_keys[i],
+                                      probe_rowids[i],
+                                      out_left,
+                                      out_right,
+                                      write_offset);
+        }
     }
 }
 
@@ -180,6 +189,7 @@ __device__ inline void executeHashJoinBuild(const CommandArgs::HashJoinBuildArgs
 #define X(name, DT, VT)                                                                                                \
     case DataTypeId::name: {                                                                                           \
         hashJoinBuildImpl<DT>(static_cast<const DT*>(args.keys),                                                       \
+                              args.mask,                                                                               \
                               args.n,                                                                                  \
                               static_cast<HashTableEntry<DT>*>(args.ht.entries),                                       \
                               args.ht.heads,                                                                           \
@@ -202,6 +212,7 @@ __device__ inline void executeHashJoinCount(const CommandArgs::HashJoinCountArgs
 #define X(name, DT, VT)                                                                                                \
     case DataTypeId::name: {                                                                                           \
         hashJoinCountImpl<DT>(static_cast<const DT*>(args.probe_keys),                                                 \
+                              args.probe_mask,                                                                         \
                               args.probe_n,                                                                            \
                               static_cast<HashTableEntry<DT>*>(args.ht.entries),                                       \
                               args.ht.heads,                                                                           \
@@ -223,6 +234,7 @@ __device__ inline void executeHashJoinWrite(const CommandArgs::HashJoinWriteArgs
 #define X(name, DT, VT)                                                                                                \
     case DataTypeId::name: {                                                                                           \
         hashJoinWriteImpl<DT>(static_cast<const DT*>(args.probe_keys),                                                 \
+                              args.probe_mask,                                                                         \
                               args.probe_rowids,                                                                       \
                               args.probe_n,                                                                            \
                               static_cast<HashTableEntry<DT>*>(args.ht.entries),                                       \

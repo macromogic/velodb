@@ -15,7 +15,7 @@ BASELINE_CSV="$SCRIPTS_DIR/obliviator_sf50.csv"
 
 COMBINED_CSV="$BENCHMARK_DIR/results/sf50_benchmark_comparison.csv"
 echo "Query,Iteration,Engine,Time" > "$COMBINED_CSV"
-tail -n +2 "$BASELINE_CSV" | awk -F',' '{if ($1=="OBL") {print $2",1,Obliviator,"$3; print $2",1,OasisDB,"$3/7} else if ($1=="OPQ") {print $2",1,Opaque,"$3}}' >> "$COMBINED_CSV"
+tail -n +2 "$BASELINE_CSV" | awk -F',' '{if ($1=="OBL") {print $2",1,Obliviator,"$3; print $2",1,OasisDB*,"$3/7} else if ($1=="OPQ") {print $2",1,Opaque,"$3}}' >> "$COMBINED_CSV"
 tail -n +2 "$VELODB_CSV" | awk -F',' '$1=="Q3" || $1=="Q5" || $1=="Q6" {print $1","$3",VelODB,"$4/1000}' >> "$COMBINED_CSV"
 
 # Plot benchmark results

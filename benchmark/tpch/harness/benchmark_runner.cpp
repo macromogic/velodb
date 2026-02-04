@@ -35,6 +35,17 @@ TPCHBenchmarkRunner::TPCHBenchmarkRunner()
     , performance_monitor_()
 {
     database_.initialize();
+
+    // CUDA runtime warmup: trigger lazy initialization
+    void* dummy_ptr = nullptr;
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+    cudaMallocAsync(&dummy_ptr, 1, stream);
+    if (dummy_ptr) {
+        cudaFreeAsync(dummy_ptr, stream);
+    }
+    cudaStreamSynchronize(stream);
+    cudaStreamDestroy(stream);
 }
 
 TPCHBenchmarkRunner::~TPCHBenchmarkRunner()
@@ -88,6 +99,24 @@ Result<TPCHBenchmarkRunner::BenchmarkResults> TPCHBenchmarkRunner::runPowerTest(
 
         // Run queries for this scale factor
         for (int query_number : config.query_numbers) {
+            // Warmup iterations (results discarded)
+            for (int warmup = 1; warmup <= config.warmup_iterations; ++warmup) {
+                if (config.verbose) {
+                    fmt::println("Warmup Q{} (SF={}, warmup {})", query_number, scale_factor, warmup);
+                }
+                auto warmup_result = runSingleQuery(query_number, scale_factor, 0 /* iteration 0 = warmup */);
+                if (config.verbose && !warmup_result.success) {
+                    fmt::println("  Warmup FAILED: {}", warmup_result.error_message);
+                }
+                // Reset profiler after warmup
+                if (config.with_profiling) {
+                    Profiler::getInstance().reset();
+                }
+                // Reset pinned memory pool after warmup
+                HostMemoryPool::getInstance().reset();
+            }
+
+            // Actual timed iterations
             for (int iteration = 1; iteration <= config.iterations; ++iteration) {
                 if (config.verbose) {
                     fmt::println("Running Q{} (SF={}, iteration {})", query_number, scale_factor, iteration);
