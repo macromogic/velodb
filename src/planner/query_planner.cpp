@@ -236,7 +236,7 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planTables(const hsql::TableRef*
         auto& node_info = active_plans.front();
         auto filter = std::make_unique<FilterCompactionPlanNode>(std::move(node_info.seq_scan_schema));
         filter->addChild(std::move(node_info.plan));
-        return std::move(filter);
+        return filter;
     } else {
         // 4a. Pre-process: Collect all join keys for each table (deduplicated)
         std::unordered_map<std::string, std::unordered_set<std::string>> table_join_key_set;
