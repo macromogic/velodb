@@ -43,3 +43,6 @@ install(TARGETS tpch_benchmark RUNTIME DESTINATION bin COMPONENT benchmark)
 # Create data directory structure
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/benchmark/data)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/benchmark/results)
+
+# GPU Native benchmark (monolithic kernel implementation)
+add_subdirectory(gpu_native)
