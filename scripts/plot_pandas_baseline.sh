@@ -10,9 +10,9 @@ if [ ! -n "$VELODB_CSV" ]; then
     exit 1
 fi
 
-PANDAS_CSV="$BENCHMARK_DIR/results/pandas_results.csv"
-if [ ! -f "$PANDAS_CSV" ]; then
-    echo "Error: Baseline results $PANDAS_CSV not found"
+DUCKDB_CSV="$BENCHMARK_DIR/results/duckdb_results.csv"
+if [ ! -f "$DUCKDB_CSV" ]; then
+    echo "Error: Baseline results $DUCKDB_CSV not found"
     exit 1
 fi
 
@@ -20,13 +20,13 @@ fi
 COMBINED_CSV="$BENCHMARK_DIR/results/benchmark_results.csv"
 echo "Query,Iteration,Engine,Time" > "$COMBINED_CSV"
 tail -n +2 "$VELODB_CSV" | awk -F',' '{print $1","$3",VelODB,"$4/1000}' >> "$COMBINED_CSV"
-tail -n +2 "$PANDAS_CSV" | awk -F',' '{print $1","$2",Pandas,"($3=="TIMEOUT"?$3:$3/1000)}' >> "$COMBINED_CSV"
+tail -n +2 "$DUCKDB_CSV" | awk -F',' '{print $1","$2",DuckDB,"($3=="TIMEOUT"?$3:$3/1000)}' >> "$COMBINED_CSV"
 
 # Plot benchmark results
 source "$SCRIPTS_DIR/ensure_conda_env.sh"
 FIGURE_DIR="$BASE_DIR/figures"
 mkdir -p "$FIGURE_DIR"
-BENCHMARK_PLOT="$FIGURE_DIR/benchmark_pandas.pdf"
+BENCHMARK_PLOT="$FIGURE_DIR/benchmark_duckdb.pdf"
 python3 "$SCRIPTS_DIR/plot_bars.py" \
     -i "$COMBINED_CSV" \
     -o "$BENCHMARK_PLOT" \

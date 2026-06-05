@@ -125,13 +125,13 @@ fi
 # Run baselines
 if [ "$SKIP_BASELINE" = false ]; then
     source "$SCRIPTS_DIR/ensure_conda_env.sh"
-    PANDAS_CSV="$BENCHMARK_DIR/results/pandas_results.csv"
-    python3 -u "$SCRIPTS_DIR/bench_pandas.py" \
+    DUCKDB_CSV="$BENCHMARK_DIR/results/duckdb_results.csv"
+    python3 -u "$SCRIPTS_DIR/bench_duckdb.py" \
         -i "$ITERATIONS" \
         -t 60 \
         --data-dir "$BENCHMARK_DIR/data/sf_1" \
         -q "$ALL_QUERIES" \
-        -o "$PANDAS_CSV"
+        -o "$DUCKDB_CSV"
 else
     echo "Skipping baseline benchmarks (--skip-baseline)"
 fi
