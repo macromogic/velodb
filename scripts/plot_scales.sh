@@ -7,6 +7,7 @@ BENCHMARK_DIR="$BASE_DIR/benchmark_tpch"
 COMBINED_CSV="$BENCHMARK_DIR/results/scale_results.csv"
 echo "Query,Iteration,SF,Time" > "$COMBINED_CSV"
 for SF in 1 2 3 5 10; do
+    # Exercise caution: this assumes that the latest CSV runs full benchmarks for the given scale factor
     VELODB_CSV=$(ls -t "$BENCHMARK_DIR/results/sf_$SF"/*.csv 2>/dev/null | head -1)
     if [ ! -n "$VELODB_CSV" ]; then
         echo "Error: No benchmark results found in $BENCHMARK_DIR/results/sf_$SF"
@@ -24,12 +25,12 @@ python3 "$SCRIPTS_DIR/plot_lines.py" \
     -o "$FIGURE_DIR/benchmark_scales_binary_join.pdf" \
     --ylabel "Time (s)" \
     --hue "Query" \
-    --figsize 4,4 \
+    --figsize 4,3 \
     --queries "Q4,Q12,Q15"
 python3 "$SCRIPTS_DIR/plot_lines.py" \
     -i "$COMBINED_CSV" \
     -o "$FIGURE_DIR/benchmark_scales_multi_join.pdf" \
     --ylabel "Time (s)" \
     --hue "Query" \
-    --figsize 4,4 \
+    --figsize 4,3 \
     --queries "Q5,Q10,Q18"

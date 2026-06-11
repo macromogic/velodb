@@ -108,13 +108,43 @@ function run_bench() {
         $ADDITIONAL_ARGS
 }
 
+function run_duckdb() {
+    local SF=$1
+    local QUERIES=$2
+    local OUT_CSV=$3
+    shift 3
+    local ADDITIONAL_ARGS="$@"
+    DATA_DIR="$BENCHMARK_DIR/data/sf_$SF"
+    source "$SCRIPTS_DIR/ensure_conda_env.sh"
+    python3 -u "$SCRIPTS_DIR/bench_duckdb.py" \
+        -i "$ITERATIONS" \
+        -t 60 \
+        --data-dir "$DATA_DIR" \
+        -q "$QUERIES" \
+        -o "$OUT_CSV" \
+        $ADDITIONAL_ARGS
+}
+
+function run_gpu_native() {
+    local SF=$1
+    local OUT_CSV=$2
+    DATA_DIR="$BENCHMARK_DIR/data/sf_$SF"
+    stdbuf -oL -eL $BUILD_DIR/bin/gpu_native_benchmark \
+        -d "$DATA_DIR" \
+        -w 1 -r "$ITERATIONS" \
+        -o "$OUT_CSV"
+}
+
 # Setup benchmark directory
 mkdir -p "$BENCHMARK_DIR/data"
 echo "*" > "$BENCHMARK_DIR/data/.gitignore"
 
+if [ "$SKIP_BENCHMARK" = false ] || [ "$SKIP_BASELINE" = false ]; then
+    build "$BUILD_PRESET-no-profiling"
+fi
+
 # Run benchmarks
 if [ "$SKIP_BENCHMARK" = false ]; then
-    build "$BUILD_PRESET-no-profiling"
     for SF in "${ALL_SF[@]}"; do
         run_bench "$SF" "$ALL_QUERIES"
     done
@@ -124,14 +154,9 @@ fi
 
 # Run baselines
 if [ "$SKIP_BASELINE" = false ]; then
-    source "$SCRIPTS_DIR/ensure_conda_env.sh"
-    DUCKDB_CSV="$BENCHMARK_DIR/results/duckdb_results.csv"
-    python3 -u "$SCRIPTS_DIR/bench_duckdb.py" \
-        -i "$ITERATIONS" \
-        -t 60 \
-        --data-dir "$BENCHMARK_DIR/data/sf_1" \
-        -q "$ALL_QUERIES" \
-        -o "$DUCKDB_CSV"
+    run_duckdb 1 "$ALL_QUERIES" "$BENCHMARK_DIR/results/duckdb_results.csv" --single-threaded
+    run_duckdb 1 "$ALL_QUERIES" "$BENCHMARK_DIR/results/duckdb16_results.csv"
+    run_gpu_native 1 "$BENCHMARK_DIR/results/gpu_native_results.csv"
 else
     echo "Skipping baseline benchmarks (--skip-baseline)"
 fi

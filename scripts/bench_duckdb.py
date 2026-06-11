@@ -131,6 +131,7 @@ def main() -> None:
     parser.add_argument('--queries', '-q', type=lambda s: [int(x) for x in s.split(',')], required=False, help='List of query numbers to run (comma-separated)')
     parser.add_argument('--output', '-o', type=str, required=False, help='CSV output file path for benchmark results')
     parser.add_argument('--timeout', '-t', type=int, default=0, help='Timeout in seconds for each query (0 = no timeout)')
+    parser.add_argument('--single-threaded', action='store_true', help='Run queries in single-threaded mode')
     args = parser.parse_args()
 
     csv_file = None
@@ -142,7 +143,8 @@ def main() -> None:
         # Disable optimizer and restrict to single thread for a fair comparison
         # with VelODB, which does not incorporate query optimization.
         con.execute("PRAGMA disable_optimizer")
-        con.execute("PRAGMA threads=1")
+        if args.single_threaded:
+            con.execute("PRAGMA threads=1")
 
         setup_tables(con, args.data_dir)
 

@@ -127,40 +127,53 @@ def main():
                 if not base_row.empty:
                     base_values[query] = base_row['Time'].values[0]
 
+        label_rotation = 90 if args.rotate_labels else 0
         for i, hue_value in enumerate(hue_order):
             container = barplot.containers[i]
-            labels = []
             for j, bar in enumerate(container):
                 query = query_order[j]
                 bar_height = bar.get_height()
+                x = bar.get_x() + bar.get_width() / 2
+
+                label_text = ''
+                label_color = 'black'
+
                 if (query, hue_value) in timeout_set:
                     # Check if this is a timeout-only entry or has partial data
                     avg_row = avg_df[(avg_df['Query'] == query) & (avg_df[hue_column] == hue_value)]
                     original_time = avg_row['Time'].values[0] if not avg_row.empty else 0
                     if original_time <= TIMEOUT_PLACEHOLDER:
-                        # Pure timeout - hide bar and show text
-                        labels.append(args.timeout_label)
+                        # Pure timeout - hide bar and show text in red
+                        label_text = args.timeout_label
+                        label_color = '#b65656'
                         bar.set_height(0)
                         bar.set_visible(False)
+                        y = 0
                     else:
-                        # Has some successful runs but also timeouts
-                        labels.append(f'{bar_height:.2f}\n(+{args.timeout_label})')
+                        # Has some successful runs but also timeouts - show timeout part in text
+                        label_text = f'{bar_height:.2f}\n(+{args.timeout_label})'
+                        label_color = '#b65656'
+                        y = bar_height
                 elif bar_height <= 0:
-                    labels.append('')
+                    continue
                 else:
+                    y = bar_height
                     # Show relative speedup if base_hue is specified
                     if args.base_hue and query in base_values and base_values[query] > 0:
                         base_time = base_values[query]
                         if base_time <= TIMEOUT_PLACEHOLDER:
                             # Base is timeout, just show absolute value
-                            labels.append(f'{bar_height:.2f}')
+                            label_text = f'{bar_height:.2f}'
                         else:
                             speedup = bar_height / base_time
-                            labels.append(f'{speedup:.2f}x')
+                            label_text = f'{speedup:.2f}x'
                     else:
-                        labels.append(f'{bar_height:.2f}')
-            label_rotation = 90 if args.rotate_labels else 0
-            barplot.bar_label(container, labels=labels, padding=1, fontsize=8, fontweight='bold', rotation=label_rotation)
+                        label_text = f'{bar_height:.2f}'
+
+                if label_text:
+                    ax.text(x, y, label_text, ha='center', va='bottom',
+                           fontsize=8, fontweight='bold', rotation=label_rotation,
+                           color=label_color)
 
     plt.tight_layout()
     plt.savefig(args.output)

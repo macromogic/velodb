@@ -136,6 +136,8 @@ void MaterializationOperator::obliviousCompareSwap(SortableTuple& a, SortableTup
 
 void MaterializationOperator::bitonicSortTuples(std::vector<SortableTuple>& tuples)
 {
+    PROFILE_SCOPE("CPU Bitonic Sort (Materialization)");
+
     size_t n = tuples.size();
     if (n <= 1)
         return;
