@@ -45,7 +45,7 @@ The host should keep responsibility for the kernel SGX driver and any host-side 
 From the artifact root:
 
 ```bash
-cd /home/wh25/gputee-odb/obliviator
+cd obliviator
 chmod +x docker/run-container.sh
 ./docker/run-container.sh
 ```
@@ -76,7 +76,7 @@ This is intentionally off by default because it is Azure-specific and not requir
 You can also use Compose:
 
 ```bash
-cd /home/wh25/gputee-odb/obliviator/docker
+cd obliviator/docker
 docker compose run --rm obliviator
 ```
 
