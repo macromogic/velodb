@@ -1,0 +1,19 @@
+services:
+  obliviator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_AZ_DCAP_CLIENT: ${INSTALL_AZ_DCAP_CLIENT:-0}
+    image: ${OBLIVIATOR_IMAGE_NAME:-obliviator-ae:ubuntu20.04}
+    stdin_open: true
+    tty: true
+    working_dir: /root/obliviator
+    environment:
+      OBLIVIATOR_JOIN_KKS_VARIANT: ${OBLIVIATOR_JOIN_KKS_VARIANT:-join_kks_INT_INT}
+    volumes:
+      - ..:/root/obliviator
+      - /var/run/aesmd:/var/run/aesmd
+    devices:
+      - /dev/sgx_enclave:/dev/sgx_enclave
+      - /dev/sgx_provision:/dev/sgx_provision
