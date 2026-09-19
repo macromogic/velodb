@@ -5,8 +5,9 @@
 #include "cuda/stream_pool.hpp"
 #include "cuda/task_manager.hpp"
 
-namespace velodb {
+#include <chrono>
 
+namespace velodb {
 // ============================================================================
 // Constructor / Destructor
 // ============================================================================
@@ -141,6 +142,31 @@ void ObliviousTableManager::endQuery()
 
     // Don't clear accessed_tables_ here - let beginQuery do it
     // This allows inspection of which tables were accessed
+}
+
+void ObliviousTableManager::profileAccessedTableShuffles()
+{
+    std::lock_guard<std::mutex> query_lock(query_mutex_);
+
+    // Exclude overlap and residual wait from the controlled measurement.
+    syncAllShuffles();
+
+    PROFILE_SCOPE("ObliviousTableManager::profileAccessedTableShuffles");
+
+    for (const auto& name : accessed_tables_) {
+        if (!hasTable(name)) {
+            continue;
+        }
+
+        auto& table = getTable(name);
+        const auto start = std::chrono::steady_clock::now();
+        table.startAsyncShuffle();
+        table.waitForShuffle();
+        const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()
+                                                                                   - start);
+
+        Profiler::getInstance().addTiming("Controlled shuffle: " + name, elapsed.count());
+    }
 }
 
 // ============================================================================

@@ -5,12 +5,16 @@
 #include <future>
 #include <memory>
 #include <optional>
+#include <vector>
 
 namespace velodb {
 
 class FilterCompactionOperator : public UnaryOperator {
 public:
-    FilterCompactionOperator(ExecutionContext& context, Schema output_schema, std::unique_ptr<AbstractOperator> child);
+    FilterCompactionOperator(ExecutionContext& context,
+                             Schema output_schema,
+                             std::unique_ptr<AbstractOperator> child,
+                             std::vector<bool> compact_columns = {});
     ~FilterCompactionOperator();
     Result<RowBatch> next() override;
 
@@ -19,6 +23,7 @@ private:
     std::optional<RowBatch> prefetched_batch_;
     std::future<void> prefetch_future_;
     bool first_call_ = true;
+    std::vector<bool> compact_columns_;
 
     // Start async prefetch of next batch
     void startPrefetch();

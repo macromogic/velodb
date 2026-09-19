@@ -45,6 +45,11 @@ public:
 
     void beginQuery(const std::vector<std::string>& table_names);
 
+    // Complete the query-triggered background shuffles, then perform and
+    // profile one controlled end-to-end shuffle for every table accessed by
+    // the most recent query.
+    void profileAccessedTableShuffles();
+
     void markAccessed(const std::string& name);
 
     void endQuery();

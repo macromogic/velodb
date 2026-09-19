@@ -1,0 +1,19 @@
+Engine,Oblivious,Query,Time (s)
+Obliviator,Yes,Q3,3792.392415
+Obliviator,No,Q3,1344.937411
+Opaque,Yes,Q3,8602.089725
+Opaque,No,Q3,1432.573989
+VelODB,Yes,Q3,0.66
+VelODB,No,Q3,0.63
+Obliviator,Yes,Q5,2396.678174
+Obliviator,No,Q5,2333.672817
+Opaque,Yes,Q5,4917.034178
+Opaque,No,Q5,2426.095066
+VelODB,Yes,Q5,1.57
+VelODB,No,Q5,1.57
+Obliviator,Yes,Q6,89.128248
+Obliviator,No,Q6,57.606886
+Opaque,Yes,Q6,395.952329
+Opaque,No,Q6,51.033916
+VelODB,Yes,Q6,0.97
+VelODB,No,Q6,0.97

@@ -87,6 +87,10 @@ Result<TPCHBenchmarkRunner::BenchmarkResults> TPCHBenchmarkRunner::runPowerTest(
             return Result<BenchmarkResults>::success(std::move(results));
         }
 
+        if (config.with_profiling) {
+            database_.enableObliviousTables();
+        }
+
         results.data_load_time += (load_end - load_start);
 
         // Print data loading profiling and reset profiler for query execution
@@ -126,6 +130,11 @@ Result<TPCHBenchmarkRunner::BenchmarkResults> TPCHBenchmarkRunner::runPowerTest(
                 results.query_results.push_back(query_result);
                 if (config.verbose && !query_result.success) {
                     fmt::println("  FAILED: {}", query_result.error_message);
+                }
+                // Profile a fresh end-to-end shuffle for each table used by the
+                // query, after its performance metrics have been finalized.
+                if (config.with_profiling && database_.getCatalog().hasObliviousManager()) {
+                    database_.getCatalog().getObliviousManager().profileAccessedTableShuffles();
                 }
 
                 // Print and reset profiler after each query if enabled

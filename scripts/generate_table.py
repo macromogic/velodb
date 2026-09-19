@@ -11,8 +11,8 @@ def parse_operation_type(operation):
         return '2. Projection'
     elif 'Join' in operation or 'Post-join' in operation:
         return '3. Join'
-    elif 'Bitonic Sort (Materialization)' in operation:
-        return '*. Bitonic Sort (Materialization)'
+    # elif 'Bitonic Sort (Materialization)' in operation:
+    #     return '*. Bitonic Sort (Materialization)'
     elif 'Materialization' in operation:
         return '4. Materialization'
     elif 'Sort' in operation:
