@@ -1,26 +1,29 @@
 #include "enclave/scalable_oblivious_join.h"
+
+#include <liboblivious/algorithms.h>
+#include <liboblivious/primitives.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <stdarg.h>
 #include <threads.h>
-#include <liboblivious/algorithms.h>
-#include <liboblivious/primitives.h>
+
+#include "common/code_conf.h"
 #include "common/elem_t.h"
 #include "common/error.h"
-#include "common/util.h"
 #include "common/ocalls.h"
-#include "common/code_conf.h"
-#include "enclave/mpi_tls.h"
+#include "common/util.h"
 #include "enclave/bitonic.h"
+#include "enclave/mpi_tls.h"
+#include "enclave/oblivious_compact.h"
 #include "enclave/parallel_enc.h"
 #include "enclave/threading.h"
-#include "enclave/oblivious_compact.h"
 
 #ifndef DISTRIBUTED_SGX_SORT_HOSTONLY
-#include <openenclave/enclave.h>
 #include <openenclave/advanced/mallinfo.h>
+#include <openenclave/enclave.h>
+
 #include "enclave/parallel_t.h"
 #endif
 
@@ -28,29 +31,35 @@ bool* control_bit;
 
 static int number_threads;
 
-int tree_node_idx_48[48] = {63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62};
-int tree_node_idx_6[6] = {7, 8, 9, 10, 5, 6};
+int tree_node_idx_48[48] = { 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78,
+                             79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94,
+                             47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62 };
+int tree_node_idx_6[6] = { 7, 8, 9, 10, 5, 6 };
 
-void reverse(char *s) {
+void reverse(char* s)
+{
     int i, j;
     char c;
 
-    for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
+    for (i = 0, j = strlen(s) - 1; i < j; i++, j--) {
         c = s[i];
         s[i] = s[j];
         s[j] = c;
     }
 }
 
-int my_len_key(char *key) {
+int my_len_key(char* key)
+{
     int i = 0;
 
-    while ((key[i] != '\0') && (i < KEY_LENGTH)) i++;
-    
+    while ((key[i] != '\0') && (i < KEY_LENGTH))
+        i++;
+
     return i;
 }
 
-int my_len_key_2(char *key) {
+int my_len_key_2(char* key)
+{
     int i = 0;
     bool flag = true;
 
@@ -58,19 +67,22 @@ int my_len_key_2(char *key) {
         flag = (key[i] != '\0') && flag;
         i += flag;
     }
-    
+
     return i;
 }
 
-int my_len(char *data) {
+int my_len(char* data)
+{
     int i = 0;
 
-    while ((data[i] != '\0') && (i < DATA_LENGTH)) i++;
-    
+    while ((data[i] != '\0') && (i < DATA_LENGTH))
+        i++;
+
     return i;
 }
 
-int o_strcmp(char* str1, char* str2) {
+int o_strcmp(char* str1, char* str2)
+{
     bool flag = false;
     int result = 0;
 
@@ -79,12 +91,14 @@ int o_strcmp(char* str1, char* str2) {
         flag = (!flag && ((str1[i] < str2[i]) || (str1[i] > str2[i]))) || flag;
     }
 
-    result = (my_len_key_2(str1) == my_len_key_2(str2)) * result - (my_len_key_2(str1) < my_len_key_2(str2)) + (my_len_key_2(str1) > my_len_key_2(str2));
+    result = (my_len_key_2(str1) == my_len_key_2(str2)) * result - (my_len_key_2(str1) < my_len_key_2(str2))
+        + (my_len_key_2(str1) > my_len_key_2(str2));
 
     return result;
 }
 
-void itoa(int n, char *s, int *len) {
+void itoa(int n, char* s, int* len)
+{
     int i = 0;
     int sign;
 
@@ -92,34 +106,36 @@ void itoa(int n, char *s, int *len) {
         n = -n;
         i = 0;
     }
-        
+
     do {
         s[i++] = n % 10 + '0';
     } while ((n /= 10) > 0);
-    
+
     if (sign < 0)
         s[i++] = '-';
     s[i] = '\0';
-    
+
     *len = i;
-    
+
     reverse(s);
 }
 
-int scalable_oblivious_join_init(int nthreads) {
-    number_threads = nthreads; 
+int scalable_oblivious_join_init(int nthreads)
+{
+    number_threads = nthreads;
     return 0;
 }
 
-void scalable_oblivious_join_free() {
+void scalable_oblivious_join_free()
+{
     return;
 }
 
-
 struct tree_node_op2* ag_tree;
 
-void aggregation_tree_op2(void *voidargs) {
-    struct args_op2 *args = (struct args_op2*) voidargs;
+void aggregation_tree_op2(void* voidargs)
+{
+    struct args_op2* args = (struct args_op2*)voidargs;
     int index_thread_start = args->index_thread_start;
     int index_thread_end = args->index_thread_end;
     elem_t* arr = args->arr;
@@ -136,7 +152,7 @@ void aggregation_tree_op2(void *voidargs) {
     for (int i = index_thread_start + 1; i < index_thread_end; i++) {
         condition = arr[i].table_0;
         condition2 = (arr[i].key == arr_temp[0].key);
-        o_memcpy(arr_ + i, arr_temp, sizeof(*arr_), ((!condition)&&condition2));
+        o_memcpy(arr_ + i, arr_temp, sizeof(*arr_), ((!condition) && condition2));
         o_memcpy(arr_temp, arr + i, sizeof(*arr), condition);
     }
 
@@ -152,28 +168,30 @@ void aggregation_tree_op2(void *voidargs) {
     ag_tree[cur_tree_node].complete1 = true;
 
     int temp;
-    while(cur_tree_node % 2 == 0 && 0 < cur_tree_node) {
+    while (cur_tree_node % 2 == 0 && 0 < cur_tree_node) {
         temp = (cur_tree_node - 2) / 2;
-        while(!ag_tree[cur_tree_node - 1].complete1) {
+        while (!ag_tree[cur_tree_node - 1].complete1) {
             ;
         };
         condition = ag_tree[cur_tree_node].table0_last;
         /*
         for (int u = 0; u < KEY_LENGTH; u++) {
-            ag_tree[temp].key_last[u] = condition * ag_tree[cur_tree_node].key_last[u] + !condition * ag_tree[cur_tree_node - 1].key_last[u];
+            ag_tree[temp].key_last[u] = condition * ag_tree[cur_tree_node].key_last[u] + !condition *
+        ag_tree[cur_tree_node - 1].key_last[u];
         }
         */
-        ag_tree[temp].key_last = condition * ag_tree[cur_tree_node].key_last + !condition * ag_tree[cur_tree_node - 1].key_last;
+        ag_tree[temp].key_last = condition * ag_tree[cur_tree_node].key_last
+            + !condition * ag_tree[cur_tree_node - 1].key_last;
         ag_tree[temp].table0_last = condition + ag_tree[cur_tree_node - 1].table0_last;
         ag_tree[temp].complete1 = true;
         cur_tree_node = temp;
     }
     int temp1;
 
-    while(cur_tree_node < thread_order) {
+    while (cur_tree_node < thread_order) {
         temp = cur_tree_node * 2 + 2;
         temp1 = cur_tree_node * 2 + 1;
-        while(!ag_tree[cur_tree_node].complete2) {
+        while (!ag_tree[cur_tree_node].complete2) {
             ;
         };
         ag_tree[temp1].table0_prefix = ag_tree[cur_tree_node].table0_prefix;
@@ -181,19 +199,21 @@ void aggregation_tree_op2(void *voidargs) {
         /*
         for (int u = 0; u < KEY_LENGTH; u++) {
             ag_tree[temp1].key_prefix[u] = ag_tree[cur_tree_node].key_prefix[u];
-            ag_tree[temp].key_prefix[u] = ag_tree[temp1].table0_last * ag_tree[temp1].key_last[u] + !ag_tree[temp1].table0_last * ag_tree[cur_tree_node].key_prefix[u];
+            ag_tree[temp].key_prefix[u] = ag_tree[temp1].table0_last * ag_tree[temp1].key_last[u] +
+        !ag_tree[temp1].table0_last * ag_tree[cur_tree_node].key_prefix[u];
         }
         */
-        
+
         ag_tree[temp1].key_prefix = ag_tree[cur_tree_node].key_prefix;
-        ag_tree[temp].key_prefix = ag_tree[temp1].table0_last * ag_tree[temp1].key_last + !ag_tree[temp1].table0_last * ag_tree[cur_tree_node].key_prefix;
+        ag_tree[temp].key_prefix = ag_tree[temp1].table0_last * ag_tree[temp1].key_last
+            + !ag_tree[temp1].table0_last * ag_tree[cur_tree_node].key_prefix;
 
         ag_tree[temp1].complete2 = true;
         ag_tree[temp].complete2 = true;
         cur_tree_node = temp;
     }
-    
-    while(!ag_tree[thread_order].complete2) {
+
+    while (!ag_tree[thread_order].complete2) {
         ;
     };
 
@@ -218,7 +238,8 @@ void aggregation_tree_op2(void *voidargs) {
     return;
 }
 
-void scalable_oblivious_join(elem_t *arr, int length1, int length2, char* output_path) {
+void scalable_oblivious_join(elem_t* arr, int length1, int length2, char* output_path)
+{
     int length = length1 + length2;
     elem_t* arr_ = calloc(length, sizeof(*arr_));
     for (int i = 0; i < length; i++) {
@@ -238,7 +259,7 @@ void scalable_oblivious_join(elem_t *arr, int length1, int length2, char* output
     elem_t* arr_temp = calloc(1, sizeof(*arr_temp));
     ojoin_int_type* buf_count = calloc(length, sizeof(*buf_count));
     control_bit = calloc(length, sizeof(*control_bit));
-    //int my_count = 0;
+    // int my_count = 0;
     int length_result;
     init_time2();
 
@@ -268,7 +289,7 @@ void scalable_oblivious_join(elem_t *arr, int length1, int length2, char* output
             args_op2_[i].index_thread_start = idx_start_thread[i];
             args_op2_[i].index_thread_end = idx_start_thread[i + 1];
             if (number_threads == 6) {
-                args_op2_[i].thread_order = tree_node_idx_6[i];        
+                args_op2_[i].thread_order = tree_node_idx_6[i];
             } else if (number_threads == 48) {
                 args_op2_[i].thread_order = tree_node_idx_48[i];
             } else {
@@ -286,53 +307,60 @@ void scalable_oblivious_join(elem_t *arr, int length1, int length2, char* output
             thread_wait(&multi_thread_aggregation_tree_1[i]);
         }
     }
-    
+
     length_result = oblivious_compact_elem(arr, control_bit, length, 1, number_threads, buf_count);
     oblivious_compact_elem(arr_, control_bit, length, 1, number_threads, buf_count);
-    
+
     get_time2(true);
-    //printf("1\n");
-    char *char_current = output_path;
-    //printf("1.0\n");
+    // printf("1\n");
+    char* char_current = output_path;
+    // printf("1.0\n");
     for (int i = 0; i < length_result; i++) {
-        if ((i % 5000000 == 0) || (i == length_result - 1)) printf("%d check\n", i);
+        if ((i % 5000000 == 0) || (i == length_result - 1))
+            printf("%d check\n", i);
         int data_len1 = my_len(arr[i].data);
         int data_len2 = my_len(arr_[i].data);
 
         strncpy(char_current, arr_[i].data, data_len2);
-        char_current += data_len2; char_current[0] = 64; char_current[1] = 36; char_current += 2;
+        char_current += data_len2;
+        char_current[0] = 64;
+        char_current[1] = 36;
+        char_current += 2;
 
         strncpy(char_current, arr[i].data, data_len1);
-        char_current += data_len1; char_current[0] = '\n'; char_current += 1;
+        char_current += data_len1;
+        char_current[0] = '\n';
+        char_current += 1;
     }
 
-
-    //printf("-2-\n");
+    // printf("-2-\n");
     char_current[0] = '\0';
-    //printf("-3-\n");
+    // printf("-3-\n");
 
+#ifndef DISTRIBUTED_SGX_SORT_HOSTONLY
     oe_mallinfo_t info;
     oe_result_t rc = oe_allocator_mallinfo(&info);
     printf("\nHeap size current is: %ld\n", info.current_allocated_heap_size);
     printf("\nHeap size peak is: %ld\n", info.peak_allocated_heap_size);
     (void)rc;
+#endif
 
     free(buf_count);
 
-    //printf("-4-\n");
+    // printf("-4-\n");
     free(ag_tree);
-    //printf("-5-\n");
+    // printf("-5-\n");
     free(arr_temp);
-    //printf("-6-\n");
-    // free(arr_);
-    //printf("-7-\n");
-    // free(control_bit);
-    //printf("-8.1-\n");
-    //printf("-8.2-\n");
-    //printf("-8.3-\n");
-    //printf("-8.4-\n");
-    //printf("-8.5-\n");
-    //printf("-8.6-\n");
-    
+    // printf("-6-\n");
+    //  free(arr_);
+    // printf("-7-\n");
+    //  free(control_bit);
+    // printf("-8.1-\n");
+    // printf("-8.2-\n");
+    // printf("-8.3-\n");
+    // printf("-8.4-\n");
+    // printf("-8.5-\n");
+    // printf("-8.6-\n");
+
     return;
 }

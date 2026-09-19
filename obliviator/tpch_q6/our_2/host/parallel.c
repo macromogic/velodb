@@ -1,17 +1,19 @@
 #include <errno.h>
+#include <mpi.h>
 #include <pthread.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <mpi.h>
+
+#include "common/algorithm_type.h"
 #include "common/error.h"
 #include "common/ocalls.h"
-#include "common/algorithm_type.h"
 #include "host/error.h"
 
 #ifndef DISTRIBUTED_SGX_SORT_HOSTONLY
 #include <openenclave/host.h>
+
 #include "host/parallel_u.h"
 #endif /* DISTRUBTED_SGX_SORT_HOSTONLY */
 
@@ -20,10 +22,11 @@
 static int world_rank;
 static int world_size;
 
-FILE *input_file;
-FILE *output_file;
+FILE* input_file;
+FILE* output_file;
 
-static int init_mpi(int *argc, char ***argv) {
+static int init_mpi(int* argc, char*** argv)
+{
     int ret;
 
     /* Initialize MPI. */
@@ -55,9 +58,10 @@ exit:
     return ret;
 }
 
-static void *start_thread_work(void *enclave_) {
+static void* start_thread_work(void* enclave_)
+{
 #ifndef DISTRIBUTED_SGX_SORT_HOSTONLY
-    oe_enclave_t *enclave = enclave_;
+    oe_enclave_t* enclave = enclave_;
     oe_result_t result = ecall_start_work(enclave);
     if (result != OE_OK) {
         handle_oe_error(result, "ecall_start_work");
@@ -70,28 +74,29 @@ static void *start_thread_work(void *enclave_) {
 
 #ifndef DISTRIBUTED_SGX_SORT_HOSTONLY
 
-int time_join(oe_enclave_t *enclave) {
+int time_join(oe_enclave_t* enclave)
+{
     oe_result_t result;
 #else
 
-int time_join(enum algorithm_type algorithm_type) {
+int time_join(enum algorithm_type algorithm_type)
+{
 #endif
     int ret;
 
-char *buf = (char *)malloc(MAX_BUF_SIZE);
-ret = fread(buf, 1, MAX_BUF_SIZE, input_file);
-fclose(input_file);
-
+    char* buf = (char*)malloc(MAX_BUF_SIZE);
+    ret = fread(buf, 1, MAX_BUF_SIZE, input_file);
+    fclose(input_file);
 
 #ifndef DISTRIBUTED_SGX_SORT_HOSTONLY
 
     result = ecall_scalable_oblivious_join(enclave, &ret, buf, MAX_BUF_SIZE);
-   
+
     if (result != OE_OK) {
         goto exit_free_arr;
     }
 #else /* DISTRIBUTED_SGX_SORT_HOSTONLY */
-            ret = ecall_scalable_oblivious_join(buf, MAX_BUF_SIZE);
+    ret = ecall_scalable_oblivious_join(buf, MAX_BUF_SIZE);
 #endif /* DISTRIBUTED_SGX_SORT_HOSTONLY */
     if (ret) {
         handle_error_string("Enclave exited with return code %d", ret);
@@ -116,7 +121,8 @@ exit_free_arr:
     return ret;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv)
+{
     int ret = -1;
 
     /* Read arguments. */
@@ -130,7 +136,6 @@ int main(int argc, char **argv) {
 #endif /* DISTRIBUTED_SGX_SORT_HOSTONLY */
         return 0;
     }
-    
 
     errno = 0;
 #ifndef DISTRIBUTED_SGX_SORT_HOSTONLY
@@ -143,7 +148,7 @@ int main(int argc, char **argv) {
         return ret;
     }
 
-    //size_t num_runs = 1;
+    // size_t num_runs = 1;
 
     /* Init MPI. */
 
@@ -161,16 +166,9 @@ int main(int argc, char **argv) {
     }
 
 #ifndef DISTRIBUTED_SGX_SORT_HOSTONLY
-    oe_enclave_t *enclave;
+    oe_enclave_t* enclave;
     oe_result_t result;
-    result = oe_create_parallel_enclave(
-            argv[1],
-            OE_ENCLAVE_TYPE_AUTO,
-            0
-            ,
-            NULL,
-            0,
-            &enclave);
+    result = oe_create_parallel_enclave(argv[1], OE_ENCLAVE_TYPE_AUTO, 0, NULL, 0, &enclave);
 
     if (result != OE_OK) {
         handle_oe_error(result, "oe_create_parallel_enclave");
@@ -182,8 +180,7 @@ int main(int argc, char **argv) {
     /* Init enclave with threads. */
 
 #ifndef DISTRIBUTED_SGX_SORT_HOSTONLY
-    result =
-            ecall_ojoin_init(enclave, &ret, world_rank, world_size, num_threads);
+    result = ecall_ojoin_init(enclave, &ret, world_rank, world_size, num_threads);
     if (result != OE_OK) {
         handle_oe_error(result, "ecall_ojoin_init");
         goto exit_terminate_enclave;
@@ -210,7 +207,7 @@ int main(int argc, char **argv) {
 
     for (int i = 3; i < argc; i++) {
         input_file = fopen(argv[i], "rb");
-        char *output_file_path = calloc(strlen(argv[i]) + 8, sizeof(*output_file_path));
+        char* output_file_path = calloc(strlen(argv[i]) + 8, sizeof(*output_file_path));
         for (size_t u = 0; u < strlen(argv[i]) - 4; u++) {
             output_file_path[u] = argv[i][u];
         }
@@ -234,9 +231,8 @@ int main(int argc, char **argv) {
 #ifndef DISTRIBUTED_SGX_SORT_HOSTONLY
         ret = time_join(enclave);
 #else
-        ret = time_join(algorithm_type);
+        ret = time_join(SORT_BITONIC);
 #endif
-
     }
 
 #ifndef DISTRIBUTED_SGX_SORT_HOSTONLY
