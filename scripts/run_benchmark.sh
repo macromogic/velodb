@@ -112,13 +112,14 @@ function run_duckdb() {
     local SF=$1
     local QUERIES=$2
     local OUT_CSV=$3
+    local TIMEOUT=$((SF * 60))
     shift 3
     local ADDITIONAL_ARGS="$@"
     DATA_DIR="$BENCHMARK_DIR/data/sf_$SF"
     source "$SCRIPTS_DIR/ensure_conda_env.sh"
     python3 -u "$SCRIPTS_DIR/bench_duckdb.py" \
         -i "$ITERATIONS" \
-        -t 60 \
+        -t "$TIMEOUT" \
         --data-dir "$DATA_DIR" \
         -q "$QUERIES" \
         -o "$OUT_CSV" \
@@ -154,9 +155,10 @@ fi
 
 # Run baselines
 if [ "$SKIP_BASELINE" = false ]; then
-    run_duckdb 1 "$ALL_QUERIES" "$BENCHMARK_DIR/results/duckdb_results.csv" --single-threaded
-    run_duckdb 1 "$ALL_QUERIES" "$BENCHMARK_DIR/results/duckdb16_results.csv"
-    run_gpu_native 1 "$BENCHMARK_DIR/results/gpu_native_results.csv"
+    for SF in "${ALL_SF[@]}"; do
+        run_duckdb "$SF" "$ALL_QUERIES" "$BENCHMARK_DIR/results/duckdb_results_sf${SF}.csv" --single-threaded
+        run_duckdb "$SF" "$ALL_QUERIES" "$BENCHMARK_DIR/results/duckdb16_results_sf${SF}.csv"
+    done
 else
     echo "Skipping baseline benchmarks (--skip-baseline)"
 fi

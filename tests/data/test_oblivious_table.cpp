@@ -141,6 +141,30 @@ TEST_F(ObliviousTableTest, QueryLifecycle)
     EXPECT_GE(stats.total_shuffles, 1);
 }
 
+TEST_F(ObliviousTableTest, ProfilesControlledShuffleForAccessedTables)
+{
+    catalog_.initObliviousManager(task_manager_);
+    catalog_.registerAllTablesAsOblivious();
+
+    auto& mgr = catalog_.getObliviousManager();
+    mgr.beginQuery({ "test_table" });
+    mgr.markAccessed("test_table");
+    mgr.endQuery();
+
+    const auto shuffle_count = mgr.getTable("test_table").getShuffleCount();
+    mgr.profileAccessedTableShuffles();
+
+    EXPECT_EQ(mgr.getTable("test_table").getShuffleCount(), shuffle_count + 1);
+
+#if VELODB_ENABLE_PROFILING
+    const auto hot_spots = Profiler::getInstance().getHotSpots();
+    const auto timing = std::find_if(hot_spots.begin(), hot_spots.end(), [](const auto& entry) {
+        return entry.first == "Controlled shuffle: test_table";
+    });
+    EXPECT_NE(timing, hot_spots.end());
+#endif
+}
+
 // Test multiple shuffles
 TEST_F(ObliviousTableTest, MultipleShuffles)
 {

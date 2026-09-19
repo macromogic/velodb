@@ -5,6 +5,7 @@
 #include "catalog/table_builder.hpp"
 #include "common/exception.hpp"
 #include "data/data_type.hpp"
+#include "planner/filter_compaction_plan_node.hpp"
 #include "planner/limit_plan_node.hpp"
 #include "planner/query_planner.hpp"
 
@@ -122,6 +123,18 @@ TEST_F(PlannerTest, PlanSelectWithProjection)
 
     // Should create a plan with projection
     EXPECT_NE(plan->getPlanType(), PlanType::INVALID);
+
+    const auto& children = plan->getChildren();
+    ASSERT_EQ(children.size(), 1);
+    ASSERT_EQ(children[0]->getPlanType(), PlanType::COMPACTION);
+
+    const auto* compaction = static_cast<const FilterCompactionPlanNode*>(children[0].get());
+    const auto& compact_columns = compaction->getCompactColumns();
+    ASSERT_EQ(compact_columns.size(), compaction->getOutputSchema().getColumnCount());
+    EXPECT_TRUE(compact_columns[compaction->getOutputSchema().getColumnIndex("users.id")]);
+    EXPECT_FALSE(compact_columns[compaction->getOutputSchema().getColumnIndex("users.name")]);
+    EXPECT_FALSE(compact_columns[compaction->getOutputSchema().getColumnIndex("users.$_rowid")]);
+    EXPECT_FALSE(compact_columns[compaction->getOutputSchema().getColumnIndex("users.$_mask")]);
 }
 
 TEST_F(PlannerTest, PlanInvalidTable)

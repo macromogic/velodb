@@ -47,6 +47,9 @@ public:
     bool hasTable(const std::string& table_name) const;
     std::optional<std::reference_wrapper<const Table>> getTable(const std::string& table_name) const;
 
+    // Enable oblivious position-map management for all currently loaded tables.
+    void enableObliviousTables();
+
     // Query execution
     Result<QueryResult> executeQuery(const std::string& sql, QueryStatistics* stats = nullptr);
 

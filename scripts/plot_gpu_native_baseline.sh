@@ -3,7 +3,7 @@
 SCRIPTS_DIR="$(realpath "$(dirname "$0")")"
 BASE_DIR="$(realpath "$(dirname "$0")/..")"
 BENCHMARK_DIR="$BASE_DIR/benchmark_tpch"
-LATEST_VELODB_CSV=$(ls -t "$BENCHMARK_DIR/results/sf_1"/*.csv 2>/dev/null | head -1)
+LATEST_VELODB_CSV=$(ls -t "$BENCHMARK_DIR/results/sf_50"/*.csv 2>/dev/null | head -1)
 
 VELODB_CSV="${VELODB_CSV:-$LATEST_VELODB_CSV}"
 if [ ! -n "$VELODB_CSV" ]; then

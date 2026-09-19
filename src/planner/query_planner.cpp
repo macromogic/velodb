@@ -120,14 +120,27 @@ std::unique_ptr<AbstractPlanNode> QueryPlanner::planSelect(const hsql::SelectSta
     if (select_stmt->whereClause != nullptr) {
         predicate = parseExpression(table_ref, select_stmt->whereClause);
     }
+    auto output_expressions = parseSelectList(table_ref, select_stmt->selectList);
     auto plan = planTables(table_ref, std::move(predicate));
+
+    // Keep the full H2D batch, but avoid compacting columns that the immediate
+    // single-table projection will discard.
+    if (plan->getPlanType() == PlanType::COMPACTION) {
+        std::vector<bool> compact_columns(plan->getOutputSchema().getColumnCount(), false);
+        for (const auto& expr : output_expressions) {
+            if (expr->getExpressionType() == ExpressionType::COLUMN_REF) {
+                const auto* column_ref = static_cast<const ColumnRefExpression*>(expr.get());
+                compact_columns[plan->getOutputSchema().getColumnIndex(column_ref->getColumnName())] = true;
+            }
+        }
+        static_cast<FilterCompactionPlanNode*>(plan.get())->setCompactColumns(std::move(compact_columns));
+    }
 
     // The rest of planSelect (projection, order, limit) remains mostly valid
     // BUT projection expects specific columns.
     // The planTables produces a wide table with all columns from all joined tables (plus RowIds).
     // We need to ensure the columns are named correctly "TableName.ColName".
 
-    auto output_expressions = parseSelectList(table_ref, select_stmt->selectList);
     auto& input_schema = plan->getOutputSchema();
     auto select_schema = inferSelectSchema(output_expressions);
 

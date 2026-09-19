@@ -82,6 +82,14 @@ std::optional<std::reference_wrapper<const Table>> Database::getTable(const std:
     return catalog_.getTable(table_name);
 }
 
+void Database::enableObliviousTables()
+{
+    if (!catalog_.hasObliviousManager()) {
+        catalog_.initObliviousManager(task_manager_);
+        catalog_.registerAllTablesAsOblivious();
+    }
+}
+
 Result<QueryResult> Database::executeQuery(const std::string& sql, QueryStatistics* stats)
 {
     if (!initialized_) {

@@ -15,9 +15,16 @@ namespace velodb {
 
 FilterCompactionOperator::FilterCompactionOperator(ExecutionContext& context,
                                                    Schema output_schema,
-                                                   std::unique_ptr<AbstractOperator> child)
+                                                   std::unique_ptr<AbstractOperator> child,
+                                                   std::vector<bool> compact_columns)
     : UnaryOperator(context, std::move(output_schema), std::move(child))
+    , compact_columns_(std::move(compact_columns))
 {
+    if (compact_columns_.empty()) {
+        compact_columns_.resize(output_schema_.getColumnCount(), true);
+    }
+    VELODB_ASSERT_MSG(compact_columns_.size() == output_schema_.getColumnCount(),
+                      "Compaction mask must match the output schema");
 }
 
 FilterCompactionOperator::~FilterCompactionOperator()
@@ -112,16 +119,17 @@ Result<RowBatch> FilterCompactionOperator::processBatchOnGpu(RowBatch& batch)
     {
         // Phase 1: Submit all gather commands without waiting
         for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
+            const bool compact = compact_columns_[col_idx];
             auto& input_col = batch.getColumn(col_idx);
             auto* data_ptr = input_col.rawData();
             auto* bitmap_ptr = input_col.rawBitmapData();
-            auto* temp_buffer = input_col.getDeviceBuffer();
-            auto* temp_bitmap_buffer = input_col.getDeviceBitmapBuffer();
+            auto* temp_buffer = compact ? input_col.getDeviceBuffer() : nullptr;
+            auto* temp_bitmap_buffer = compact ? input_col.getDeviceBitmapBuffer() : nullptr;
             buffers[col_idx] = temp_buffer;
             bitmap_buffers[col_idx] = temp_bitmap_buffer;
 
             Command gather_cmd = {};
-            gather_cmd.opcode = OpCode::OP_GATHER;
+            gather_cmd.opcode = compact ? OpCode::OP_GATHER : OpCode::OP_NOP;
             gather_cmd.args = {
                 .gather = {
                     .out_data = static_cast<void*>(temp_buffer),
@@ -135,7 +143,7 @@ Result<RowBatch> FilterCompactionOperator::processBatchOnGpu(RowBatch& batch)
             task_manager.submitCommand(gather_cmd);
 
             Command gather_bits_cmd = {};
-            gather_bits_cmd.opcode = OpCode::OP_GATHER;
+            gather_bits_cmd.opcode = compact ? OpCode::OP_GATHER : OpCode::OP_NOP;
             gather_bits_cmd.args = { .gather = {
                                          .out_data = static_cast<void*>(temp_bitmap_buffer),
                                          .in_data = static_cast<void*>(bitmap_ptr),
@@ -154,7 +162,9 @@ Result<RowBatch> FilterCompactionOperator::processBatchOnGpu(RowBatch& batch)
 
         // Phase 3: Swap buffers for all columns
         for (size_t col_idx = 0; col_idx < n_cols; ++col_idx) {
-            batch.getColumn(col_idx).setFromDeviceBuffers(buffers[col_idx], bitmap_buffers[col_idx]);
+            if (compact_columns_[col_idx]) {
+                batch.getColumn(col_idx).setFromDeviceBuffers(buffers[col_idx], bitmap_buffers[col_idx]);
+            }
         }
     }
 

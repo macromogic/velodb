@@ -46,7 +46,7 @@ pip install seaborn pandas==2.3.3 duckdb
 ### 3.1 Clone the Repository
 
 ```bash
-git clone --recursive [this-repo-url]
+git clone --recursive https://github.com/macromogic/velodb.git
 cd velodb
 ```
 
@@ -73,8 +73,7 @@ cmake --build --preset debug
 
 ```bash
 # Run unit tests
-cd build
-ctest --output-on-failure
+ctest --preset release
 ```
 
 ---
@@ -122,3 +121,92 @@ velodb/
 ├── tests/            # Unit tests
 └── thirdparty/       # Third-party dependencies
 ```
+
+---
+
+## 6. Reproducing Figures
+
+Run all commands from the repository root with the `velodb` conda environment active. The shell plotting wrappers require conda, even if Python packages are installed elsewhere.
+
+```bash
+conda activate velodb
+mkdir -p figures
+```
+
+The commands below are reconstructed from shell history and checked against the current scripts. Plotting wrappers select the newest CSV in `benchmark_tpch/results/sf_<SF>/`; use complete, non-profiled benchmark runs for performance comparisons. Figures 5 and 8 also accept `VELODB_CSV=/absolute/path/to/results.csv` to select a specific run. Profiling writes CSVs to the same directory, so generate these plots before running Figure 7, or explicitly select the non-profiled CSV.
+
+For evaluation, retain the raw CSVs, profiling logs, repository revision (`git rev-parse HEAD`), local changes (`git diff`), GPU/driver information (`nvidia-smi`), compiler/toolkit versions, and Python package versions (`python3 -m pip freeze`) alongside the figures.
+
+### Figure 2: The working GPU memory needed for SJ
+
+``` bash
+python3 scripts/memory_savings_analysis.py
+```
+
+Output: `figures/memory_savings_materialized_sf1000.pdf`
+
+### Figure 3: The number of input/output rows for SJ
+
+```bash
+python3 scripts/row_reduction_analysis.py
+```
+
+Output: `figures/row_reduction_sf1000.pdf`
+
+### Figure 5: Performance comparison with Opaque and Obliviator on TPC-H with scale factor 50
+
+
+```bash
+scripts/run_benchmark.sh -s 50 -i 3 --skip-baseline
+SF=50 scripts/plot_obliv_baselines.sh
+```
+
+Output: `figures/benchmark_obliv_sf50.pdf`
+
+This compares Q3, Q5, and Q6 using newly measured VelODB times and the checked-in `scripts/obliviator_sf50.csv`. Refer the scripts under `obliviator/tpch_*` to reproduce the results for Obliviator and Opaque (SGX SDK and Docker required).
+
+### Figure 6: Comparison of the slowdown against non-oblivious variants on TPC-H with scale factor 50
+
+```bash
+python3 scripts/plot_slowdown.py \
+    -i scripts/nobl_comparison.csv \
+    -o figures/bench_obl_slowdown.pdf \
+    --bar-labels --figsize 4,4 --ylim-scale 1.1
+```
+
+Output: `figures/bench_obl_slowdown.pdf`
+
+### Figure 7: Execution time of VelODB compared to a non-oblivious variant on TPC-H with scale factor 50
+
+```bash
+scripts/run_benchmark.sh -s 50 -i 3 --skip-benchmark --skip-baseline -p
+
+python3 scripts/generate_table.py \
+    -i benchmark_tpch/results/profile_breakdown.log > obv_cost.csv
+
+python3 scripts/plot_bars.py \
+    -i obv_cost.csv -o figures/bench_olm_rev.pdf \
+    --ylabel "Time (s)" --bar-labels --rotate-labels \
+    --figsize 6,3.5 --ylim-scale 1.1 \
+    --base-hue 'VelODB (non-oblivious)'
+```
+
+Output: `figures/bench_olm_rev.pdf`
+
+### Figure 8: Execution time of VelODB vs. DuckDB on TPC-H with SF 50
+
+```bash
+scripts/run_benchmark.sh -s 50 -i 3 # add --skip-benchmark to run the baselines only
+SF=50 scripts/plot_duckdb_baseline.sh
+```
+
+Output: `figures/benchmark_duckdb_sf50.pdf`
+
+### Figure 9: Scalability of representative queries with increasing dataset sizes (scale factors 1--10)
+
+```bash
+scripts/run_benchmark.sh -s 1,2,3,5,10 -i 3 --skip-baseline
+scripts/plot_scales.sh
+```
+
+Outputs: `figures/benchmark_scales_binary_join.pdf` (Q4, Q12, Q15) and `figures/benchmark_scales_multi_join.pdf` (Q5, Q10, Q18).

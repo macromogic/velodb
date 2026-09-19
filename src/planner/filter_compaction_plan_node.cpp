@@ -10,11 +10,21 @@ FilterCompactionPlanNode::FilterCompactionPlanNode(Schema output_schema)
 {
 }
 
+void FilterCompactionPlanNode::setCompactColumns(std::vector<bool> compact_columns)
+{
+    VELODB_ASSERT_MSG(compact_columns.size() == output_schema_.getColumnCount(),
+                      "Compaction mask must match the output schema");
+    compact_columns_ = std::move(compact_columns);
+}
+
 std::unique_ptr<AbstractOperator> FilterCompactionPlanNode::createOperator(ExecutionContext& context) const
 {
     VELODB_ASSERT_MSG(children_.size() == 1, "FilterCompactionPlanNode must have exactly one child");
     auto child_operator = children_[0]->createOperator(context);
-    return std::make_unique<FilterCompactionOperator>(context, output_schema_.clone(), std::move(child_operator));
+    return std::make_unique<FilterCompactionOperator>(context,
+                                                      output_schema_.clone(),
+                                                      std::move(child_operator),
+                                                      compact_columns_);
 }
 
 std::string FilterCompactionPlanNode::toString() const
