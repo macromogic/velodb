@@ -14,7 +14,7 @@ set(CMAKE_CUDA_ARCHITECTURES "75;80;86;89;90")
 # Project configuration
 project(
   velodb
-  VERSION 0.0.1
+  VERSION 1.0.0
   DESCRIPTION "GPU-accelerated Oblivious Relational Database"
   LANGUAGES CXX CUDA)
 
